@@ -5,14 +5,13 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
+// OAuth / session storage — required by @shopify/shopify-app-react-router
+// (PrismaSessionStorage). Do not rename or remove; the adapter fixes this shape.
 model Session {
   id            String    @id
   shop          String
@@ -31,4 +30,69 @@ model Session {
   emailVerified Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+}
+
+// App-level record for an installed shop. OAuth data lives in `Session`;
+// this is the home for per-shop app settings and config going forward.
+model Shop {
+  id        String   @id @default(cuid())
+  shop      String   @unique // myshopify.com domain
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum OfferType {
+  cross_sell
+  bundle
+  volume
+  free_gift
+  subscription
+}
+
+enum OfferPlacement {
+  product_page
+  cart_drawer
+  checkout
+  post_purchase
+  order_status
+}
+
+enum OfferEventType {
+  viewed
+  accepted
+  declined
+}
+
+model Offer {
+  id               String         @id @default(cuid())
+  shop             String         // myshopify.com domain — every query is scoped by this
+  name             String
+  type             OfferType
+  placement        OfferPlacement
+  targetProductIds String[]       // Shopify product GIDs, e.g. gid://shopify/Product/123
+  triggerRules     Json? // e.g. { "cartValueMin": 50, "collectionIds": [...], "customerTags": [...] }
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  events OfferEvent[]
+
+  @@index([shop])
+  @@index([shop, placement, isActive])
+}
+
+model OfferEvent {
+  id        String         @id @default(cuid())
+  offerId   String
+  offer     Offer          @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  shop      String         // denormalized for fast shop-scoped analytics
+  eventType OfferEventType
+  orderId   String? // Shopify order GID when the event ties to an order
+  revenue   Decimal?       @db.Decimal(12, 2)
+  createdAt DateTime       @default(now())
+
+  @@index([offerId, eventType])
+  @@index([shop])
+  @@index([offerId, createdAt])
 }
