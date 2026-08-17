@@ -97,6 +97,58 @@ model OfferEvent {
   @@index([offerId, createdAt])
 }
 
+// Synced Shopify catalog — ONE ROW PER VARIANT (the unit we upsell/suggest).
+// Populated by the dashboard "Sync products" action, upserted by [shop, variantId].
+// Parent-product fields are denormalized onto each variant row. Standard core.
+model ProductVariant {
+  id   String @id @default(cuid())
+  shop String // myshopify.com domain — every query is scoped by this
+
+  // Variant — this row's identity
+  variantId         String // gid://shopify/ProductVariant/123
+  variantTitle      String? // e.g. "Small / Blue"
+  sku               String?
+  price             Decimal? @db.Decimal(12, 2)
+  compareAtPrice    Decimal? @db.Decimal(12, 2)
+  inventoryQuantity Int?
+  availableForSale  Boolean  @default(true)
+  selectedOptions   Json? // [{ "name": "Size", "value": "Small" }, ...]
+  imageUrl          String? // variant image, falling back to product image at sync time
+
+  // Parent product — denormalized onto every variant row
+  productId     String // gid://shopify/Product/123
+  productTitle  String
+  productHandle String?
+  productStatus String? // ACTIVE | ARCHIVED | DRAFT
+
+  syncedAt  DateTime @default(now()) // stamp of the run that last touched this row
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([shop, variantId])
+  @@index([shop])
+  @@index([shop, productId])
+}
+
+// One row per product-sync run, shop-scoped. Powers the dashboard progress bar
+// (via `estimated`, the prior successful run's variant count) and the sync-log
+// history table. Written by app/models/syncLog.server.ts. Standard core.
+model SyncLog {
+  id         String    @id @default(cuid())
+  shop       String // myshopify.com domain — every query is scoped by this
+  status     String    @default("running") // running | success | error
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  pages      Int       @default(0)
+  upserted   Int       @default(0) // variant rows created or updated this run
+  removed    Int       @default(0) // stale rows deleted on the final chunk
+  estimated  Int? // progress denominator = prior successful run's upserted
+  error      String?
+  createdAt  DateTime  @default(now())
+
+  @@index([shop, startedAt])
+}
+
 // ===========================================================================
 // Legacy (v1) upsell app — ported from upSell_live.sql (MySQL 8.0 / Laravel).
 //
