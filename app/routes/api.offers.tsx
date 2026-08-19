@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { badRequest, methodNotAllowed, readJsonBody } from "../lib/http.server";
 import {
+  buildOfferPayload,
   createOffer,
   listOffers,
   validateCreateOffer,
@@ -23,7 +24,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const parsed = await readJsonBody(request);
   if (!parsed.ok) return badRequest({ body: "Request body must be valid JSON." });
 
-  const result = validateCreateOffer(parsed.body);
+  const normalized = buildOfferPayload(parsed.body as any);
+  const result = validateCreateOffer(normalized);
   if (!result.ok) return badRequest(result.errors);
 
   const offer = await createOffer(session.shop, result.data);

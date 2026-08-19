@@ -20,6 +20,33 @@ export interface OfferCreateInput {
   isActive: boolean;
 }
 
+export interface OfferFormPayload {
+  title?: string;
+  name?: string;
+  upsellType?: string;
+  showUpsell?: string;
+  conditions?: Array<{ field?: string; operator?: string; value?: string }>;
+  displayOnCheckout?: boolean;
+  upsellProduct?: string;
+  manualSelections?: Array<{
+    productId?: string;
+    productTitle?: string;
+    variantId?: string;
+    variantTitle?: string;
+  }>;
+  offerType?: string;
+  discountValue?: number | null;
+  activeFrom?: string | null;
+  activeTo?: string | null;
+  promotionalTitle?: string;
+  status?: string;
+  type?: OfferType;
+  placement?: OfferPlacement;
+  targetProductIds?: string[];
+  triggerRules?: Prisma.InputJsonValue;
+  isActive?: boolean;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -32,6 +59,112 @@ function asStringArray(value: unknown): string[] | null {
   return value as string[];
 }
 
+function dedupeStrings(value: string[]) {
+  return Array.from(new Set(value.filter(Boolean)));
+}
+
+function offerPlacementFromUpsellType(value?: string): OfferPlacement {
+  if (value === "post-purchase") return OfferPlacement.post_purchase;
+  return OfferPlacement.checkout;
+}
+
+function normalizeTriggerRules(input: OfferFormPayload): Record<string, unknown> {
+  const triggerRules: Record<string, unknown> = isPlainObject(input.triggerRules)
+    ? { ...input.triggerRules }
+    : {};
+
+  if (typeof input.upsellType === "string") {
+    triggerRules.upsellType = input.upsellType;
+  }
+  if (typeof input.showUpsell === "string") {
+    triggerRules.showUpsell = input.showUpsell;
+  }
+  if (Array.isArray(input.conditions) && input.conditions.length > 0) {
+    triggerRules.conditions = input.conditions;
+  }
+  if (typeof input.displayOnCheckout === "boolean") {
+    triggerRules.displayOnCheckout = input.displayOnCheckout;
+  }
+  if (typeof input.upsellProduct === "string") {
+    triggerRules.upsellProduct = input.upsellProduct;
+  }
+  if (Array.isArray(input.manualSelections) && input.manualSelections.length > 0) {
+    const items = input.manualSelections
+      .filter(
+        (item): item is { productId: string; variantId: string } =>
+          typeof item?.productId === "string" &&
+          typeof item?.variantId === "string" &&
+          item.productId.length > 0 &&
+          item.variantId.length > 0,
+      )
+      .map((item) => ({
+        productId: item.productId,
+        variantId: item.variantId,
+      }));
+
+    if (items.length > 0) {
+      triggerRules.manualSelections = items;
+      triggerRules.productSelection = {
+        mode: input.upsellProduct === "manual" ? "manual" : "related",
+        items,
+      };
+    }
+  }
+  if (typeof input.offerType === "string") {
+    triggerRules.offerType = input.offerType;
+  }
+  if (typeof input.discountValue === "number") {
+    triggerRules.discountValue = input.discountValue;
+  } else if (input.discountValue === null || input.discountValue === undefined) {
+    // leave undefined unless explicitly set
+  }
+  if (input.activeFrom || input.activeTo) {
+    triggerRules.activeFrom = input.activeFrom ?? null;
+    triggerRules.activeTo = input.activeTo ?? null;
+  }
+  if (typeof input.promotionalTitle === "string") {
+    triggerRules.promotionalTitle = input.promotionalTitle;
+  }
+  if (typeof input.status === "string") {
+    triggerRules.status = input.status;
+  }
+
+  return triggerRules;
+}
+
+export function buildOfferPayload(input: OfferFormPayload): OfferCreateInput {
+  const name = (input.name ?? input.title ?? "Untitled upsell").trim() || "Untitled upsell";
+  const placement =
+    input.placement ??
+    offerPlacementFromUpsellType(input.upsellType ?? "pre-purchase");
+  const type = input.type ?? OfferType.cross_sell;
+  const normalizedTargetProductIds = dedupeStrings(
+    asStringArray(input.targetProductIds) ??
+      (Array.isArray(input.manualSelections)
+        ? input.manualSelections
+            .map((selection) => selection.productId)
+            .filter((value): value is string => typeof value === "string" && value.length > 0)
+        : []),
+  );
+
+  const triggerRules = normalizeTriggerRules(input);
+  const isActive =
+    input.isActive ??
+    (typeof input.status === "string" ? input.status === "Active" : true);
+
+  return {
+    name,
+    type,
+    placement,
+    targetProductIds: normalizedTargetProductIds,
+    triggerRules:
+      Object.keys(triggerRules).length > 0
+        ? (triggerRules as Prisma.InputJsonValue)
+        : undefined,
+    isActive,
+  };
+}
+
 /** Validate a create payload. `shop` is never taken from the body — only the session. */
 export function validateCreateOffer(
   body: unknown,
@@ -39,19 +172,40 @@ export function validateCreateOffer(
   const errors: Record<string, string> = {};
   const b = (isPlainObject(body) ? body : {}) as Record<string, unknown>;
 
-  const name = typeof b.name === "string" ? b.name.trim() : "";
+  const name = typeof b.name === "string" ? b.name.trim() : typeof b.title === "string" ? b.title.trim() : "";
   if (!name) errors.name = "Name is required.";
 
-  if (!OFFER_TYPES.includes(b.type as OfferType)) {
+  const normalizedType =
+    (b.type as OfferType | undefined) ??
+    (typeof b.offerType === "string" && b.offerType === "discount"
+      ? OfferType.cross_sell
+      : OfferType.cross_sell);
+
+  if (!OFFER_TYPES.includes(normalizedType)) {
     errors.type = `Type must be one of: ${OFFER_TYPES.join(", ")}.`;
   }
 
-  if (!OFFER_PLACEMENTS.includes(b.placement as OfferPlacement)) {
+  const normalizedPlacement =
+    (b.placement as OfferPlacement | undefined) ??
+    (typeof b.upsellType === "string"
+      ? offerPlacementFromUpsellType(b.upsellType)
+      : OfferPlacement.checkout);
+
+  if (!OFFER_PLACEMENTS.includes(normalizedPlacement)) {
     errors.placement = `Placement must be one of: ${OFFER_PLACEMENTS.join(", ")}.`;
   }
 
-  const targetProductIds = asStringArray(b.targetProductIds);
-  if (targetProductIds === null) {
+  const targetProductIds =
+    asStringArray(b.targetProductIds) ??
+    (Array.isArray(b.manualSelections)
+      ? dedupeStrings(
+          (b.manualSelections as Array<Record<string, unknown>>)
+            .map((selection) => (typeof selection.productId === "string" ? selection.productId : ""))
+            .filter((value) => value.length > 0),
+        )
+      : []);
+
+  if (Array.isArray(b.targetProductIds) && b.targetProductIds.some((value) => typeof value !== "string")) {
     errors.targetProductIds = "targetProductIds must be an array of strings.";
   }
 
@@ -65,16 +219,18 @@ export function validateCreateOffer(
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
+  const triggerRules = isPlainObject(b.triggerRules)
+    ? (b.triggerRules as Prisma.InputJsonValue)
+    : undefined;
+
   return {
     ok: true,
     data: {
       name,
-      type: b.type as OfferType,
-      placement: b.placement as OfferPlacement,
-      targetProductIds: targetProductIds ?? [],
-      triggerRules: isPlainObject(b.triggerRules)
-        ? (b.triggerRules as Prisma.InputJsonValue)
-        : undefined,
+      type: normalizedType,
+      placement: normalizedPlacement,
+      targetProductIds,
+      triggerRules,
       isActive: b.isActive === undefined ? true : Boolean(b.isActive),
     },
   };
@@ -88,8 +244,8 @@ export function validateUpdateOffer(
   const b = (isPlainObject(body) ? body : {}) as Record<string, unknown>;
   const data: Prisma.OfferUpdateInput = {};
 
-  if (b.name !== undefined) {
-    const name = typeof b.name === "string" ? b.name.trim() : "";
+  if (b.name !== undefined || b.title !== undefined) {
+    const name = typeof b.name === "string" ? b.name.trim() : typeof b.title === "string" ? b.title.trim() : "";
     if (!name) errors.name = "Name cannot be empty.";
     else data.name = name;
   }
@@ -150,17 +306,21 @@ export function getOffer(shop: string, id: string) {
   return db.offer.findFirst({ where: { id, shop } });
 }
 
-export function createOffer(shop: string, input: OfferCreateInput) {
+export function createOffer(shop: string, input: OfferCreateInput | OfferFormPayload) {
+  const normalized = buildOfferPayload(
+    (input as OfferFormPayload) ?? {},
+  );
+
   return db.offer.create({
     data: {
       shop,
-      name: input.name,
-      type: input.type,
-      placement: input.placement,
-      targetProductIds: input.targetProductIds,
-      isActive: input.isActive,
-      ...(input.triggerRules !== undefined
-        ? { triggerRules: input.triggerRules }
+      name: normalized.name,
+      type: normalized.type,
+      placement: normalized.placement,
+      targetProductIds: normalized.targetProductIds,
+      isActive: normalized.isActive,
+      ...(normalized.triggerRules !== undefined
+        ? { triggerRules: normalized.triggerRules }
         : {}),
     },
   });

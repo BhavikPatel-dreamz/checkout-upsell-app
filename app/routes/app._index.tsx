@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -7,18 +7,9 @@ import type {
 import { useFetcher, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
-import {
-  deleteStaleVariants,
-  getSyncStatus,
-  syncProductsChunk,
-} from "../models/productVariant.server";
-import {
-  failSyncRun,
-  finishSyncRun,
-  listSyncLogs,
-  recordChunk,
-  startSyncRun,
-} from "../models/syncLog.server";
+import { getSyncStatus } from "../models/productVariant.server";
+import { listSyncLogs } from "../models/syncLog.server";
+import { productSyncAction } from "../lib/productSync.server";
 
 // Client-side loop safety: 400 chunks × 250 variants = 100k variants. Shopify's
 // cursor pagination always terminates on its own; this only guards a bug.
@@ -35,87 +26,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // One chunk (one 250-variant page) per POST. The client re-submits with the
 // returned cursor until `done`, so no single request risks the action timeout.
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
-  const shop = session.shop;
-  const form = await request.formData();
-  const intent = String(form.get("intent") ?? "start");
-
-  // Tracked outside the try so a failure mid-chunk can still close the run.
-  let openRunId: string | null =
-    typeof form.get("runId") === "string" ? String(form.get("runId")) : null;
-
-  try {
-    let runId: string;
-    let startedAt: Date;
-    let estimated: number | null;
-    let upsertedSoFar: number;
-    let pagesSoFar: number;
-
-    if (intent === "start") {
-      const run = await startSyncRun(shop);
-      runId = run.runId;
-      startedAt = run.startedAt;
-      estimated = run.estimated;
-      upsertedSoFar = 0;
-      pagesSoFar = 0;
-      openRunId = runId;
-    } else {
-      if (!openRunId) throw new Error("Missing runId for chunk request.");
-      runId = openRunId;
-      // startedAt is round-tripped as ISO so every upsert in the run shares one
-      // timestamp — the basis for correct stale-variant deletion.
-      startedAt = new Date(String(form.get("startedAt")));
-      estimated = form.get("estimated") ? Number(form.get("estimated")) : null;
-      upsertedSoFar = Number(form.get("upserted") ?? 0);
-      pagesSoFar = Number(form.get("pages") ?? 0);
-    }
-
-    const cursor = form.get("cursor") ? String(form.get("cursor")) : null;
-
-    const chunk = await syncProductsChunk(admin, shop, { cursor, syncedAt: startedAt });
-    await recordChunk(runId, { upserted: chunk.upserted, pages: 1 });
-
-    const upserted = upsertedSoFar + chunk.upserted;
-    const pages = pagesSoFar + 1;
-    const startedAtISO = startedAt.toISOString();
-
-    if (chunk.done) {
-      const removed = await deleteStaleVariants(shop, startedAt);
-      await finishSyncRun(runId, { removed });
-      return {
-        ok: true as const,
-        done: true as const,
-        runId,
-        startedAt: startedAtISO,
-        estimated,
-        cursor: null,
-        upserted,
-        removed,
-        pages,
-      };
-    }
-
-    return {
-      ok: true as const,
-      done: false as const,
-      runId,
-      startedAt: startedAtISO,
-      estimated,
-      cursor: chunk.nextCursor,
-      upserted,
-      removed: 0,
-      pages,
-    };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Product sync failed.";
-    if (openRunId) {
-      await failSyncRun(openRunId, message).catch(() => {});
-    }
-    return { ok: false as const, error: message };
-  }
-};
+export const action = async (args: ActionFunctionArgs) => productSyncAction(args);
 
 function badgeTone(status: string) {
   if (status === "success") return "success" as const;
@@ -148,6 +59,63 @@ export default function DashboardPage() {
     estimate && estimate > 0
       ? Math.min(99, Math.round((liveCount / estimate) * 100))
       : null;
+  const fallbackPct = pageNo > 0 ? Math.min(95, pageNo * 18) : 8;
+  const [displayPct, setDisplayPct] = useState<number>(fallbackPct);
+
+  useEffect(() => {
+    const target = pct ?? fallbackPct;
+    let frameId: number;
+    let cancelled = false;
+
+    const tick = () => {
+      if (cancelled) return;
+      let reached = false;
+
+      setDisplayPct((prev) => {
+        const diff = target - prev;
+        if (Math.abs(diff) < 0.15) {
+          reached = true;
+          return target;
+        }
+        return prev + diff * 0.12;
+      });
+
+      if (!reached) {
+        frameId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [pct, fallbackPct]);
+
+  const [simCount, setSimCount] = useState(0);
+
+  useEffect(() => {
+    if (!running) {
+      setSimCount(0);
+      return;
+    }
+
+    const target = Math.max(variantCount, 1);
+    const start = Date.now();
+    const ratePerSecond = Math.max(target / 6, 15);
+
+    const id = window.setInterval(() => {
+      const elapsedSeconds = (Date.now() - start) / 1000;
+      setSimCount((prev) => {
+        const next = Math.min(target * 0.95, elapsedSeconds * ratePerSecond);
+        return next > prev ? next : prev;
+      });
+    }, 100);
+
+    return () => window.clearInterval(id);
+  }, [running, variantCount]);
+
+  const effectiveLiveCount = liveCount > 0 ? liveCount : Math.round(simCount);
 
   // Auto-advance: when a non-final chunk returns and the fetcher is idle,
   // submit the next chunk with the threaded cursor + running totals.
@@ -197,7 +165,7 @@ export default function DashboardPage() {
               {pct != null ? (
                 <div
                   role="progressbar"
-                  aria-valuenow={pct}
+                  aria-valuenow={Math.round(displayPct)}
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-label="Product sync progress"
@@ -211,20 +179,43 @@ export default function DashboardPage() {
                 >
                   <div
                     style={{
-                      width: `${pct}%`,
+                      width: `${displayPct}%`,
                       height: "100%",
                       background: "#008060",
                       borderRadius: "4px",
-                      transition: "width 200ms ease",
+                      transition: "width 220ms ease-out",
                     }}
                   />
                 </div>
               ) : (
-                <s-spinner size="base" accessibilityLabel="Syncing products"></s-spinner>
+                <div
+                  role="progressbar"
+                  aria-valuenow={Math.round(displayPct)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Product sync progress"
+                  style={{
+                    width: "100%",
+                    height: "8px",
+                    background: "rgba(0, 0, 0, 0.08)",
+                    borderRadius: "4px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${displayPct}%`,
+                      height: "100%",
+                      background: "#008060",
+                      borderRadius: "4px",
+                      transition: "width 220ms ease-out",
+                    }}
+                  />
+                </div>
               )}
               <s-paragraph tone="neutral" color="subdued">
                 {pct != null ? `Syncing… ${pct}% · ` : "Syncing… "}
-                {`${liveCount} variant${liveCount === 1 ? "" : "s"}`}
+                {`${effectiveLiveCount} variant${effectiveLiveCount === 1 ? "" : "s"}`}
                 {pageNo > 0 ? ` · page ${pageNo}` : ""}
               </s-paragraph>
             </s-stack>

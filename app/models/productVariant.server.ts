@@ -14,7 +14,7 @@ type AdminGraphqlClient = {
   ) => Promise<Response>;
 };
 
-const PAGE_SIZE = 250; // Shopify connection maximum — one chunk per client request
+const PAGE_SIZE = 25; 
 
 // Validated against Admin API 2026-07 (shopify-admin toolkit).
 const SYNC_VARIANTS_QUERY = `#graphql
@@ -37,6 +37,74 @@ const SYNC_VARIANTS_QUERY = `#graphql
           handle
           status
           featuredMedia { preview { image { url } } }
+        }
+      }
+    }
+  }
+`;
+
+const SHOPIFY_PRODUCTS_QUERY = `#graphql
+  query ProductCatalog($first: Int!, $after: String) {
+    products(first: $first, after: $after) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        id
+        title
+        handle
+        status
+        description
+        updatedAt
+        featuredMedia { preview { image { url } } }
+        variants(first: 250) {
+          nodes {
+            id
+            title
+            sku
+            price
+            compareAtPrice
+            inventoryQuantity
+            availableForSale
+            selectedOptions { name value }
+            media(first: 1) { nodes { preview { image { url } } } }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const SHOPIFY_PRODUCT_BY_ID_QUERY = `#graphql
+  query ProductById($id: ID!) {
+    product(id: $id) {
+      id
+      title
+      handle
+      status
+      description
+      updatedAt
+      vendor
+      productType
+      publishedAt
+      tags
+      collections(first: 5) {
+        nodes { title }
+      }
+      onlineStoreUrl
+      metafields(first: 20) {
+        nodes { namespace key value }
+      }
+      featuredMedia { preview { image { url } } }
+      variants(first: 250) {
+        nodes {
+          id
+          title
+          sku
+          price
+          compareAtPrice
+          inventoryQuantity
+          availableForSale
+          selectedOptions { name value }
+          media(first: 1) { nodes { preview { image { url } } } }
         }
       }
     }
@@ -120,6 +188,8 @@ export async function syncProductsChunk(
   shop: string,
   { cursor, syncedAt }: { cursor: string | null; syncedAt: Date },
 ): Promise<SyncChunkResult> {
+  console.info("[ProductSync] Started shop sync", { shop, cursor, pageSize: PAGE_SIZE });
+
   const response = await admin.graphql(SYNC_VARIANTS_QUERY, {
     variables: { first: PAGE_SIZE, after: cursor },
   });
@@ -130,6 +200,7 @@ export async function syncProductsChunk(
   };
 
   if (body.errors || !body.data) {
+    console.error("[ProductSync] Failed", { shop, errors: body.errors ?? "no data returned" });
     throw new Error(
       `Shopify productVariants query failed: ${JSON.stringify(
         body.errors ?? "no data returned",
@@ -138,6 +209,12 @@ export async function syncProductsChunk(
   }
 
   const { nodes, pageInfo } = body.data.productVariants;
+  console.info("[ProductSync] Fetched variants", {
+    shop,
+    fetched: nodes.length,
+    hasNextPage: pageInfo.hasNextPage,
+    nextCursor: pageInfo.endCursor,
+  });
 
   // One transaction per page keeps the page atomic without holding a huge
   // transaction open across the whole (possibly large) catalog.
@@ -153,6 +230,12 @@ export async function syncProductsChunk(
   );
 
   const nextCursor = pageInfo.hasNextPage ? pageInfo.endCursor : null;
+  console.info("[ProductSync] Variants saved", {
+    shop,
+    saved: nodes.length,
+    done: nextCursor === null,
+    nextCursor,
+  });
 
   return {
     upserted: nodes.length,
@@ -174,7 +257,116 @@ export async function deleteStaleVariants(
   const deleted = await db.productVariant.deleteMany({
     where: { shop, syncedAt: { lt: before } },
   });
+  console.info("[ProductSync] Removed stale variants", { shop, removed: deleted.count, before });
   return deleted.count;
+}
+
+export async function getShopifyProductCatalog(admin: AdminGraphqlClient, shop: string) {
+  const products: any[] = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const response = await admin.graphql(SHOPIFY_PRODUCTS_QUERY, {
+      variables: { first: PAGE_SIZE, after },
+    });
+
+    const body = (await response.json()) as {
+      data?: { products?: { pageInfo?: { hasNextPage?: boolean; endCursor?: string | null }; nodes?: any[] } };
+      errors?: unknown;
+    };
+
+    if (body.errors || !body.data?.products) {
+      const message = JSON.stringify(body.errors ?? "no Shopify product catalog returned");
+      console.error("[ProductSync] Failed to load product catalog", { shop, message });
+      throw new Error(`Shopify product catalog query failed: ${message}`);
+    }
+
+    const nodes = body.data.products.nodes ?? [];
+    products.push(...nodes);
+    hasNextPage = Boolean(body.data.products.pageInfo?.hasNextPage);
+    after = body.data.products.pageInfo?.endCursor ?? null;
+  }
+
+  return products;
+}
+
+export async function getShopifyProductById(admin: AdminGraphqlClient, productId: string) {
+  const response = await admin.graphql(SHOPIFY_PRODUCT_BY_ID_QUERY, {
+    variables: { id: productId },
+  });
+
+  const body = (await response.json()) as {
+    data?: { product?: any };
+    errors?: unknown;
+  };
+
+  if (body.errors || !body.data) {
+    const message = JSON.stringify(body.errors ?? "Product not found");
+    console.error("[ProductSync] Failed to load product detail", { productId, message });
+    return null;
+  }
+
+  return body.data.product ?? null;
+}
+
+export async function syncProductById(
+  admin: AdminGraphqlClient,
+  shop: string,
+  productId: string,
+  syncedAt = new Date(),
+): Promise<{ upserted: number; removed: number }> {
+  const product = await getShopifyProductById(admin, productId);
+  if (!product) {
+    throw new Error("Product not found in the connected Shopify store.");
+  }
+
+  const variantNodes = product.variants?.nodes ?? [];
+  const observedIds = new Set<string>();
+
+  await db.$transaction(
+    variantNodes.map((node: any) => {
+      const row = toRow(
+        shop,
+        {
+          id: node.id,
+          title: node.title,
+          sku: node.sku,
+          price: node.price,
+          compareAtPrice: node.compareAtPrice,
+          inventoryQuantity: node.inventoryQuantity,
+          availableForSale: Boolean(node.availableForSale),
+          selectedOptions: node.selectedOptions ?? [],
+          media: node.media ?? { nodes: [] },
+          product: {
+            id: product.id,
+            title: product.title,
+            handle: product.handle,
+            status: product.status,
+            featuredMedia: product.featuredMedia ?? null,
+          },
+        },
+        syncedAt,
+      );
+      observedIds.add(node.id);
+      return db.productVariant.upsert({
+        where: { shop_variantId: { shop, variantId: node.id } },
+        create: row,
+        update: row,
+      });
+    }),
+  );
+
+  let removed = 0;
+  if (variantNodes.length === 0) {
+    removed = (await db.productVariant.deleteMany({ where: { shop, productId } })).count;
+  } else {
+    removed = (await db.productVariant.deleteMany({
+      where: { shop, productId, variantId: { notIn: Array.from(observedIds) } },
+    })).count;
+  }
+
+  return { upserted: variantNodes.length, removed };
 }
 
 /** Current sync state for a shop — used by the dashboard status line. */
@@ -197,5 +389,14 @@ export function listProductVariants(shop: string, take = 50) {
     where: { shop },
     orderBy: [{ productTitle: "asc" }, { variantTitle: "asc" }],
     take,
+  });
+}
+
+/** Find variants for the given product IDs (shop-scoped). Returns minimal fields used by the UI. */
+export function findVariantsByProductIds(shop: string, productIds: string[]) {
+  if (!Array.isArray(productIds) || productIds.length === 0) return Promise.resolve([] as any[]);
+  return db.productVariant.findMany({
+    where: { shop, productId: { in: productIds } },
+    select: { productId: true, productTitle: true, variantId: true, variantTitle: true },
   });
 }

@@ -143,6 +143,7 @@ model SyncLog {
   upserted   Int       @default(0) // variant rows created or updated this run
   removed    Int       @default(0) // stale rows deleted on the final chunk
   estimated  Int? // progress denominator = prior successful run's upserted
+  cursor     String? // resume from the last processed Shopify page after refresh/close
   error      String?
   createdAt  DateTime  @default(now())
 
