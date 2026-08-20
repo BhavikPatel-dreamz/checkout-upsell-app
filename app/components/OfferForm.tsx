@@ -2,18 +2,31 @@
 /**
  * Unified offer create / edit form.
  *
- * Renders the correct fields and labels for every offer placement
- * (Pre-Purchase, Post-Purchase, etc.) through a single component.
- * Route files pass in the placement + optional initial data; the
- * component owns all local UI state and serialises the form payload.
+ * Renders the correct fields for every offer type (and placement) through a
+ * single component. The route passes in the canonical `offerType` (drives
+ * which type-specific fields render), the `placement`, and optional initial
+ * data when editing. The component owns all local UI state and serialises the
+ * form payload.
+ *
+ * Layout:
+ *   OfferForm
+ *   ├── CommonOfferFields   (shared by every offer type)
+ *   ├── TypeSpecificFields  (driven by OFFER_TYPE_CONFIG[offerType].fields)
+ *   └── (OfferActions — rendered by the owning route's form)
  */
 
 import { useState, useEffect } from "react";
-import type { OfferPlacement } from "@prisma/client";
+import type { OfferPlacement, OfferType } from "@prisma/client";
 import {
   placementHeaderLabel,
   displayLocationOptions,
 } from "../types/offer";
+import {
+  DEAL_TYPE_OPTIONS,
+  OFFER_TYPE_CONFIG,
+  getOfferTypeConfig,
+  COMMON_OFFER_FIELDS,
+} from "../config/offerTypes";
 
 // ── Public types ──────────────────────────────────────────────────────
 
@@ -55,7 +68,11 @@ export interface OfferInitialData {
   isActive: boolean;
 }
 
-interface OfferFormProps {
+export interface OfferFormProps {
+  /** create or edit — drives the header copy and submit button label. */
+  mode: "create" | "edit";
+  /** The canonical offer type. Controls which type-specific fields render. */
+  offerType: OfferType;
   /** The canonical placement for this offer. Controls labels + hidden field value. */
   placement: OfferPlacement;
   /** Pre-existing offer data when editing. */
@@ -80,9 +97,46 @@ function nextRowId() {
   return `row-${rowIdCounter++}`;
 }
 
+// ── Shared form state ─────────────────────────────────────────────────
+
+interface OfferFormState {
+  title: string;
+  setTitle: (value: string) => void;
+  showUpsell: "always" | "condition" | "";
+  setShowUpsell: (value: "always" | "condition") => void;
+  conditions: ConditionRow[];
+  addConditionRow: () => void;
+  removeConditionRow: (id: string) => void;
+  updateConditionRow: (id: string, patch: Partial<ConditionRow>) => void;
+  displayLocation: string;
+  setDisplayLocation: (value: string) => void;
+  upsellProduct: "manual" | "related" | "";
+  setUpsellProduct: (value: "manual" | "related") => void;
+  pickerProductId: string;
+  setPickerProductId: (value: string) => void;
+  pickerVariantId: string;
+  setPickerVariantId: (value: string) => void;
+  manualSelections: ManualSelection[];
+  handleAddProduct: () => void;
+  removeManualSelection: (id: string) => void;
+  dealType: "free" | "discount" | "as-is" | "";
+  setDealType: (value: "free" | "discount" | "as-is") => void;
+  discountValue: string;
+  setDiscountValue: (value: string) => void;
+  activeFrom: string;
+  activeTo: string;
+  showDateRange: boolean;
+  setShowDateRange: (value: boolean) => void;
+  setActiveFrom: (value: string) => void;
+  setActiveTo: (value: string) => void;
+  promotionalTitle: string;
+  setPromotionalTitle: (value: string) => void;
+}
+
 // ── Component ─────────────────────────────────────────────────────────
 
 export default function OfferForm({
+  offerType,
   placement,
   initialData,
   products,
@@ -92,6 +146,10 @@ export default function OfferForm({
   const upsellTypeValue =
     placement === "post_purchase" ? "post-purchase" : "pre-purchase";
   const locationOptions = displayLocationOptions(placement);
+  const typeConfig = getOfferTypeConfig(offerType);
+  const typeSpecificFieldIds = typeConfig.fields.filter(
+    (fieldId) => !COMMON_OFFER_FIELDS.includes(fieldId),
+  );
 
   // ── Local state ─────────────────────────────────────────────────────
   const [title, setTitle] = useState(initialData?.title ?? "");
@@ -166,7 +224,7 @@ export default function OfferForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manualSelections]);
 
-  const [offerType, setOfferType] = useState<"free" | "discount" | "as-is" | "">(
+  const [dealType, setDealType] = useState<"free" | "discount" | "as-is" | "">(
     (initialData?.offerType as any) ?? ""
   );
   const [discountValue, setDiscountValue] = useState(
@@ -205,8 +263,8 @@ export default function OfferForm({
   function selectUpsellProduct(value: "manual" | "related") {
     setUpsellProduct(value);
   }
-  function selectOfferType(value: "free" | "discount" | "as-is") {
-    setOfferType(value);
+  function selectDealType(value: "free" | "discount" | "as-is") {
+    setDealType(value);
   }
 
   function handleAddProduct() {
@@ -230,6 +288,40 @@ export default function OfferForm({
     setManualSelections((prev) => prev.filter((r) => r.id !== id));
   }
 
+  const state: OfferFormState = {
+    title,
+    setTitle,
+    showUpsell,
+    setShowUpsell: selectShowUpsell,
+    conditions,
+    addConditionRow,
+    removeConditionRow,
+    updateConditionRow,
+    displayLocation,
+    setDisplayLocation,
+    upsellProduct,
+    setUpsellProduct: selectUpsellProduct,
+    pickerProductId,
+    setPickerProductId,
+    pickerVariantId,
+    setPickerVariantId,
+    manualSelections,
+    handleAddProduct,
+    removeManualSelection,
+    dealType,
+    setDealType: selectDealType,
+    discountValue,
+    setDiscountValue,
+    activeFrom,
+    activeTo,
+    showDateRange,
+    setShowDateRange,
+    setActiveFrom,
+    setActiveTo,
+    promotionalTitle,
+    setPromotionalTitle,
+  };
+
   // ── Render ──────────────────────────────────────────────────────────
 
   return (
@@ -237,8 +329,69 @@ export default function OfferForm({
       {/* Hidden fields carried by the parent <fetcher.Form> */}
       <input type="hidden" name="upsellType" value={upsellTypeValue} />
       <input type="hidden" name="placement" value={placement} />
+      <input type="hidden" name="type" value={offerType} />
       <input type="hidden" name="conditions" value={JSON.stringify(conditions)} />
       <input type="hidden" name="manualSelections" value={JSON.stringify(manualSelections)} />
+
+      <Field label="Offer Type">
+        <div style={styles.typeBadge}>
+          {OFFER_TYPE_CONFIG[offerType].label}
+          <span style={styles.typeBadgeSeparator}>·</span>
+          {placementHeaderLabel(placement)}
+        </div>
+      </Field>
+
+      <CommonOfferFields state={state} errors={errors} locationOptions={locationOptions} />
+
+      {typeSpecificFieldIds.length > 0 && (
+        <div style={styles.section}>
+          <div style={styles.sectionHeading}>Offer Configuration</div>
+          <TypeSpecificFields
+            state={state}
+            errors={errors}
+            products={products}
+            hasSyncedProducts={hasSyncedProducts}
+            fieldIds={typeSpecificFieldIds}
+          />
+        </div>
+      )}
+
+      {/* Schedule */}
+      <div style={styles.section}>
+        <div style={styles.sectionHeading}>Schedule</div>
+        <DateRangePicker
+          activeFrom={state.activeFrom}
+          activeTo={state.activeTo}
+          open={state.showDateRange}
+          onOpen={() => state.setShowDateRange(true)}
+          onClose={() => state.setShowDateRange(false)}
+          onApply={(from, to) => {
+            state.setActiveFrom(from);
+            state.setActiveTo(to);
+            state.setShowDateRange(false);
+          }}
+        />
+        <input type="hidden" name="activeFrom" value={state.activeFrom} />
+        <input type="hidden" name="activeTo" value={state.activeTo} />
+      </div>
+    </>
+  );
+}
+
+// ── Common offer fields (shared by every offer type) ─────────────────
+
+function CommonOfferFields({
+  state,
+  errors,
+  locationOptions,
+}: {
+  state: OfferFormState;
+  errors: ErrorMap;
+  locationOptions: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <div style={styles.section}>
+      <div style={styles.sectionHeading}>Basic Information</div>
 
       {/* Title */}
       <Field label="Title" required error={errors.title}>
@@ -246,8 +399,8 @@ export default function OfferForm({
           name="title"
           style={styles.input}
           placeholder="Enter title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          value={state.title}
+          onChange={(e) => state.setTitle(e.target.value)}
         />
       </Field>
 
@@ -256,26 +409,26 @@ export default function OfferForm({
         <div style={styles.checkRow}>
           <Checkbox
             label="Always"
-            checked={showUpsell === "always"}
-            onClick={() => selectShowUpsell("always")}
+            checked={state.showUpsell === "always"}
+            onClick={() => state.setShowUpsell("always")}
           />
           <Checkbox
             label="Based on Condition"
-            checked={showUpsell === "condition"}
-            onClick={() => selectShowUpsell("condition")}
+            checked={state.showUpsell === "condition"}
+            onClick={() => state.setShowUpsell("condition")}
           />
         </div>
-        <input type="hidden" name="showUpsell" value={showUpsell} />
+        <input type="hidden" name="showUpsell" value={state.showUpsell} />
 
-        {showUpsell === "condition" && (
+        {state.showUpsell === "condition" && (
           <div style={styles.conditionBox}>
-            {conditions.map((row, idx) => (
+            {state.conditions.map((row, idx) => (
               <div key={row.id} style={styles.conditionRow}>
                 <span style={styles.rowBadge}>{idx + 1}</span>
                 <select
                   style={styles.select}
                   value={row.field}
-                  onChange={(e) => updateConditionRow(row.id, { field: e.target.value })}
+                  onChange={(e) => state.updateConditionRow(row.id, { field: e.target.value })}
                 >
                   <option value="">Field</option>
                   {FIELD_OPTIONS.map((f) => (
@@ -285,7 +438,7 @@ export default function OfferForm({
                 <select
                   style={styles.select}
                   value={row.operator}
-                  onChange={(e) => updateConditionRow(row.id, { operator: e.target.value })}
+                  onChange={(e) => state.updateConditionRow(row.id, { operator: e.target.value })}
                 >
                   <option value="">Operator</option>
                   {OPERATOR_OPTIONS.map((o) => (
@@ -296,21 +449,21 @@ export default function OfferForm({
                   style={styles.conditionValueInput}
                   placeholder="Value"
                   value={row.value}
-                  onChange={(e) => updateConditionRow(row.id, { value: e.target.value })}
+                  onChange={(e) => state.updateConditionRow(row.id, { value: e.target.value })}
                 />
                 <button
                   type="button"
                   style={styles.roundButtonRemove}
-                  onClick={() => removeConditionRow(row.id)}
+                  onClick={() => state.removeConditionRow(row.id)}
                   aria-label="Remove condition"
                 >
                   −
                 </button>
-                {idx === conditions.length - 1 && (
+                {idx === state.conditions.length - 1 && (
                   <button
                     type="button"
                     style={styles.roundButtonAdd}
-                    onClick={addConditionRow}
+                    onClick={state.addConditionRow}
                     aria-label="Add condition"
                   >
                     +
@@ -331,8 +484,8 @@ export default function OfferForm({
                 type="radio"
                 name="displayLocation"
                 value={opt.value}
-                checked={displayLocation === opt.value}
-                onChange={() => setDisplayLocation(opt.value)}
+                checked={state.displayLocation === opt.value}
+                onChange={() => state.setDisplayLocation(opt.value)}
                 style={styles.nativeRadio}
               />
               <span style={styles.checkboxLabel}>{opt.label}</span>
@@ -340,178 +493,221 @@ export default function OfferForm({
           ))}
         </div>
       </Field>
+    </div>
+  );
+}
 
-      {/* Upsell Product */}
-      <Field label="Upsell Product" required error={errors.upsellProduct}>
-        <div style={styles.checkCol}>
-          <Checkbox
-            label="Manual selection"
-            checked={upsellProduct === "manual"}
-            onClick={() => selectUpsellProduct("manual")}
-          />
+// ── Type-specific fields (driven by the offer type's config) ─────────
 
-          {upsellProduct === "manual" && (
-            <div>
-              {!hasSyncedProducts ? (
-                <div style={{ marginTop: 8, color: "#5C5F62" }}>
-                  No synced products found. Please sync products first.
-                </div>
-              ) : (
-                <div style={styles.pickerRow}>
-                  <select
-                    style={styles.select}
-                    value={pickerProductId}
-                    disabled={!hasSyncedProducts}
-                    onChange={(e) => {
-                      setPickerProductId(e.target.value);
-                      setPickerVariantId("");
-                    }}
-                  >
-                    <option value="">Select Product</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.title}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    style={styles.select}
-                    value={pickerVariantId}
-                    disabled={!pickerProduct || !hasSyncedProducts}
-                    onChange={(e) => setPickerVariantId(e.target.value)}
-                  >
-                    <option value="">
-                      {pickerProduct ? "Select Variant" : "First Select Product"}
-                    </option>
-                    {pickerProduct?.variants.map((v) => (
-                      <option key={v.id} value={v.id}>{v.title}</option>
-                    ))}
-                  </select>
-
-                  <button
-                    type="button"
-                    style={styles.addButton}
-                    disabled={!pickerProduct || !hasSyncedProducts}
-                    onClick={handleAddProduct}
-                  >
-                    Add
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {upsellProduct === "manual" && manualSelections.length > 0 && (
-            <div style={styles.selectionList}>
-              {manualSelections.map((sel) => (
-                <div key={sel.id} style={styles.selectionItem}>
-                  <span>
-                    {sel.productTitle}
-                    {sel.variantTitle && sel.variantTitle !== "Default Title"
-                      ? ` — ${sel.variantTitle}`
-                      : ""}
-                  </span>
-                  <button
-                    type="button"
-                    style={styles.roundButtonRemove}
-                    onClick={() => removeManualSelection(sel.id)}
-                    aria-label="Remove product"
-                  >
-                    −
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <Checkbox
-            label="Related Item form shopify based on items in order"
-            checked={upsellProduct === "related"}
-            onClick={() => selectUpsellProduct("related")}
-          />
-        </div>
-        <input type="hidden" name="upsellProduct" value={upsellProduct} />
-      </Field>
-
-      {/* Offer on Upsell */}
-      <Field label="Offer on Upsell" required error={errors.offerType}>
-        <div style={styles.checkCol}>
-          <Checkbox
-            label="Free"
-            checked={offerType === "free"}
-            onClick={() => selectOfferType("free")}
-          />
-          <Checkbox
-            label="Discount (% value)"
-            checked={offerType === "discount"}
-            onClick={() => selectOfferType("discount")}
-          />
-          {offerType === "discount" && (
-            <input
-              name="discountValue"
-              type="number"
-              min={0}
-              max={100}
-              placeholder="e.g. 15"
-              style={{ ...styles.input, width: 140, marginLeft: 26 }}
-              value={discountValue}
-              onChange={(e) => setDiscountValue(e.target.value)}
-            />
-          )}
-          <Checkbox
-            label="As it is"
-            checked={offerType === "as-is"}
-            onClick={() => selectOfferType("as-is")}
-          />
-        </div>
-        <input type="hidden" name="offerType" value={offerType} />
-      </Field>
-
-      {/* Upsell active range */}
-      <Field label="Upsell active range">
-        <DateRangePicker
-          activeFrom={activeFrom}
-          activeTo={activeTo}
-          open={showDateRange}
-          onOpen={() => setShowDateRange(true)}
-          onClose={() => setShowDateRange(false)}
-          onApply={(from, to) => {
-            setActiveFrom(from);
-            setActiveTo(to);
-            setShowDateRange(false);
-          }}
+function TypeSpecificFields({
+  state,
+  errors,
+  products,
+  hasSyncedProducts,
+  fieldIds,
+}: {
+  state: OfferFormState;
+  errors: ErrorMap;
+  products: Product[];
+  hasSyncedProducts: boolean;
+  fieldIds: string[];
+}) {
+  return (
+    <>
+      {fieldIds.includes("upsellProduct") && (
+        <UpsellProductField
+          state={state}
+          errors={errors}
+          products={products}
+          hasSyncedProducts={hasSyncedProducts}
         />
-        <input type="hidden" name="activeFrom" value={activeFrom} />
-        <input type="hidden" name="activeTo" value={activeTo} />
-      </Field>
-
-      {/* Promotional Title */}
-      <Field label="Promotional Title for upsell" required error={errors.promotionalTitle}>
-        <input
-          name="promotionalTitle"
-          style={styles.input}
-          placeholder="Enter promotional title"
-          value={promotionalTitle}
-          onChange={(e) => setPromotionalTitle(e.target.value)}
-        />
-      </Field>
+      )}
+      {fieldIds.includes("dealType") && <DealTypeField state={state} errors={errors} />}
     </>
+  );
+}
+
+function UpsellProductField({
+  state,
+  errors,
+  products,
+  hasSyncedProducts,
+}: {
+  state: OfferFormState;
+  errors: ErrorMap;
+  products: Product[];
+  hasSyncedProducts: boolean;
+}) {
+  const pickerProduct = products.find((p) => p.id === state.pickerProductId);
+
+  return (
+    <Field label="Upsell Product" required error={errors.upsellProduct}>
+      <div style={styles.checkCol}>
+        <Checkbox
+          label="Manual selection"
+          checked={state.upsellProduct === "manual"}
+          onClick={() => state.setUpsellProduct("manual")}
+        />
+
+        {state.upsellProduct === "manual" && (
+          <div>
+            {!hasSyncedProducts ? (
+              <div style={{ marginTop: 8, color: "#5C5F62" }}>
+                No synced products found. Please sync products first.
+              </div>
+            ) : (
+              <div style={styles.pickerRow}>
+                <select
+                  style={styles.select}
+                  value={state.pickerProductId}
+                  disabled={!hasSyncedProducts}
+                  onChange={(e) => {
+                    state.setPickerProductId(e.target.value);
+                    state.setPickerVariantId("");
+                  }}
+                >
+                  <option value="">Select Product</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>{p.title}</option>
+                  ))}
+                </select>
+
+                <select
+                  style={styles.select}
+                  value={state.pickerVariantId}
+                  disabled={!pickerProduct || !hasSyncedProducts}
+                  onChange={(e) => state.setPickerVariantId(e.target.value)}
+                >
+                  <option value="">
+                    {pickerProduct ? "Select Variant" : "First Select Product"}
+                  </option>
+                  {pickerProduct?.variants.map((v) => (
+                    <option key={v.id} value={v.id}>{v.title}</option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  style={styles.addButton}
+                  disabled={!pickerProduct || !hasSyncedProducts}
+                  onClick={state.handleAddProduct}
+                >
+                  Add
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {state.upsellProduct === "manual" && state.manualSelections.length > 0 && (
+          <div style={styles.selectionList}>
+            {state.manualSelections.map((sel) => (
+              <div key={sel.id} style={styles.selectionItem}>
+                <span>
+                  {sel.productTitle}
+                  {sel.variantTitle && sel.variantTitle !== "Default Title"
+                    ? ` — ${sel.variantTitle}`
+                    : ""}
+                </span>
+                <button
+                  type="button"
+                  style={styles.roundButtonRemove}
+                  onClick={() => state.removeManualSelection(sel.id)}
+                  aria-label="Remove product"
+                >
+                  −
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Checkbox
+          label="Related Item form shopify based on items in order"
+          checked={state.upsellProduct === "related"}
+          onClick={() => state.setUpsellProduct("related")}
+        />
+      </div>
+      <input type="hidden" name="upsellProduct" value={state.upsellProduct} />
+    </Field>
+  );
+}
+
+function DealTypeField({ state, errors }: { state: OfferFormState; errors: ErrorMap }) {
+  return (
+    <Field label="Offer on Upsell" required error={errors.offerType}>
+      <div style={styles.checkCol}>
+        {DEAL_TYPE_OPTIONS.map((option) => (
+          <div key={option.value}>
+            <Checkbox
+              label={option.label}
+              checked={state.dealType === option.value}
+              onClick={() => state.setDealType(option.value)}
+            />
+            {option.value === "discount" && state.dealType === "discount" && (
+              <input
+                name="discountValue"
+                type="number"
+                min={0}
+                max={100}
+                placeholder="e.g. 15"
+                style={{ ...styles.input, width: 140, marginLeft: 26 }}
+                value={state.discountValue}
+                onChange={(e) => state.setDiscountValue(e.target.value)}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      <input type="hidden" name="offerType" value={state.dealType} />
+    </Field>
+  );
+}
+
+// ── Offer actions (submit / cancel) ──────────────────────────────────
+
+export function OfferActions({
+  mode,
+  submitting,
+  onCancel,
+}: {
+  mode: "create" | "edit";
+  submitting: boolean;
+  onCancel: () => void;
+}) {
+  return (
+    <div style={styles.actionsRow}>
+      <button type="submit" style={styles.submitButton} disabled={submitting}>
+        {submitting ? "Saving\u2026" : mode === "edit" ? "Save Changes" : "Save Offer"}
+      </button>
+      <button type="button" style={styles.cancelButton} onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
   );
 }
 
 // ── Page wrapper (header bar + form chrome) ──────────────────────────
 
 export function OfferFormPage({
+  mode,
+  offerType,
   placement,
   children,
 }: {
+  mode: "create" | "edit";
+  offerType: OfferType;
   placement: OfferPlacement;
   children: React.ReactNode;
 }) {
-  const typeLabel = placementHeaderLabel(placement);
+  const heading =
+    mode === "edit" ? "Edit Offer" : "Create New Offer";
+  const subtitle = `${OFFER_TYPE_CONFIG[offerType].label} · ${placementHeaderLabel(placement)}`;
   return (
     <div style={styles.page}>
       <div style={styles.headerBar}>
-        <h2 style={styles.headerText}>Create New {typeLabel} Upsell</h2>
+        <h2 style={styles.headerText}>{heading}</h2>
+        <div style={styles.headerSubtitle}>{subtitle}</div>
       </div>
       {children}
     </div>
@@ -832,7 +1028,16 @@ export const styles: Record<string, React.CSSProperties> = {
     padding: "14px 24px",
   },
   headerText: { margin: 0, fontSize: 15, fontWeight: 700 },
+  headerSubtitle: { marginTop: 2, fontSize: 12, color: "#616161" },
   form: { padding: "24px 24px 40px", maxWidth: 900 },
+  section: { marginBottom: 8 },
+  sectionHeading: {
+    fontWeight: 700,
+    fontSize: 15,
+    color: "#202223",
+    padding: "14px 0 4px",
+    marginBottom: 10,
+  },
   field: { marginBottom: 26 },
   fieldLabel: { fontWeight: 700, fontSize: 14, marginBottom: 10 },
   asterisk: { color: "#d72c0d" },
@@ -855,6 +1060,19 @@ export const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     minWidth: 180,
   },
+  typeBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    background: "#f6f6f7",
+    border: "1px solid #e1e3e5",
+    borderRadius: 6,
+    padding: "8px 14px",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#202223",
+  },
+  typeBadgeSeparator: { color: "#8c9196" },
   checkRow: { display: "flex", gap: 32 },
   checkCol: { display: "flex", flexDirection: "column", gap: 12 },
   checkboxRow: {

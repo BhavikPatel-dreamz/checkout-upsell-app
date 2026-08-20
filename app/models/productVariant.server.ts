@@ -16,6 +16,11 @@ type AdminGraphqlClient = {
 
 const PAGE_SIZE = 25; 
 
+// Catalog reads don't chunk for timeout safety like sync does, so fetch as
+// many products per round-trip as Shopify allows (250) to cut page-load
+// latency down to a handful of API calls.
+const CATALOG_PAGE_SIZE = 250; 
+
 // Validated against Admin API 2026-07 (shopify-admin toolkit).
 const SYNC_VARIANTS_QUERY = `#graphql
   query SyncProductVariants($first: Int!, $after: String) {
@@ -111,7 +116,20 @@ const SHOPIFY_PRODUCT_BY_ID_QUERY = `#graphql
   }
 `;
 
-type ImagePreview = { preview: { image: { url: string | null } | null } | null };
+interface ImagePreview { preview: { image: { url: string | null } | null } | null }
+
+/** Shape of a variant node inside a product query (no nested product). */
+interface CatalogVariantNode {
+  id: string;
+  title: string | null;
+  sku: string | null;
+  price: string | null;
+  compareAtPrice: string | null;
+  inventoryQuantity: number | null;
+  availableForSale: boolean | null;
+  selectedOptions: { name: string; value: string }[] | null;
+  media: { nodes: ImagePreview[] } | null;
+}
 
 interface VariantNode {
   id: string;
@@ -130,6 +148,25 @@ interface VariantNode {
     status: string | null;
     featuredMedia: ImagePreview | null;
   };
+}
+
+/** Shape of a product node as returned by the Shopify product catalog query. */
+export interface CatalogProductNode {
+  id: string;
+  title: string;
+  handle: string | null;
+  status: string | null;
+  description: string | null;
+  updatedAt: string | null;
+  vendor: string | null;
+  productType: string | null;
+  publishedAt: string | null;
+  tags: string[];
+  collections: { nodes: { title: string }[] };
+  onlineStoreUrl: string | null;
+  metafields: { nodes: { namespace: string; key: string; value: string }[] };
+  featuredMedia: ImagePreview | null;
+  variants: { nodes: CatalogVariantNode[] };
 }
 
 interface ProductVariantsPage {
@@ -262,17 +299,22 @@ export async function deleteStaleVariants(
 }
 
 export async function getShopifyProductCatalog(admin: AdminGraphqlClient, shop: string) {
-  const products: any[] = [];
+  const products: CatalogProductNode[] = [];
   let after: string | null = null;
   let hasNextPage = true;
 
   while (hasNextPage) {
     const response = await admin.graphql(SHOPIFY_PRODUCTS_QUERY, {
-      variables: { first: PAGE_SIZE, after },
+      variables: { first: CATALOG_PAGE_SIZE, after },
     });
 
     const body = (await response.json()) as {
-      data?: { products?: { pageInfo?: { hasNextPage?: boolean; endCursor?: string | null }; nodes?: any[] } };
+      data?: {
+        products?: {
+          pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+          nodes?: CatalogProductNode[];
+        };
+      };
       errors?: unknown;
     };
 
@@ -297,7 +339,7 @@ export async function getShopifyProductById(admin: AdminGraphqlClient, productId
   });
 
   const body = (await response.json()) as {
-    data?: { product?: any };
+    data?: { product?: CatalogProductNode };
     errors?: unknown;
   };
 
@@ -325,7 +367,7 @@ export async function syncProductById(
   const observedIds = new Set<string>();
 
   await db.$transaction(
-    variantNodes.map((node: any) => {
+    variantNodes.map((node: CatalogVariantNode) => {
       const row = toRow(
         shop,
         {
@@ -394,7 +436,7 @@ export function listProductVariants(shop: string, take = 50) {
 
 /** Find variants for the given product IDs (shop-scoped). Returns minimal fields used by the UI. */
 export function findVariantsByProductIds(shop: string, productIds: string[]) {
-  if (!Array.isArray(productIds) || productIds.length === 0) return Promise.resolve([] as any[]);
+  if (!Array.isArray(productIds) || productIds.length === 0) return Promise.resolve([]);
   return db.productVariant.findMany({
     where: { shop, productId: { in: productIds } },
     select: { productId: true, productTitle: true, variantId: true, variantTitle: true },

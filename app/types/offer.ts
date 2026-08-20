@@ -1,15 +1,26 @@
 /**
- * Centralized offer type definitions.
+ * Centralized offer definitions.
  *
  * The canonical offer types and placements live in the Prisma schema
- * (OfferType / OfferPlacement enums). This module re-exports them and
- * adds application-level helpers so every route shares a single source
- * of truth for offer semantics, labels, and display logic.
+ * (OfferType / OfferPlacement enums). Offer-type configuration and helpers
+ * live in `../config/offerTypes` — re-exported here so every route shares a
+ * single source of truth for offer semantics, labels, and display logic.
  */
 
 import { OfferPlacement } from "@prisma/client";
 
 export { OfferPlacement };
+export {
+  OfferType,
+  OFFER_TYPE_CONFIG,
+  COMMON_OFFER_FIELDS,
+  DEAL_TYPE_OPTIONS,
+  getOfferTypeConfig,
+  isOfferType,
+  isOfferPlacement,
+  normalizeOfferType,
+  offerTypeOptions,
+} from "../config/offerTypes";
 
 /** Human-readable labels for each offer placement. */
 export const PLACEMENT_LABELS: Record<OfferPlacement, string> = {

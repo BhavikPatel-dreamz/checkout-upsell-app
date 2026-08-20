@@ -2,16 +2,19 @@
 /**
  * Unified offer create / edit route.
  *
- * GET  /app/offers/new?type=pre-purchase        → pre-purchase form
- * GET  /app/offers/new?type=post-purchase        → post-purchase form
- * GET  /app/offers/new?id=<offerId>              → edit (placement from DB)
+ * GET /app/offers/new                      → offer type + placement selection
+ * GET /app/offers/new?offerType=<type>&placement=<placement>
+ *                                          → unified create form
+ * GET /app/offers/new?type=post-purchase   → legacy alias → create form
+ * GET /app/offers/new?id=<offerId>         → edit (type + placement from DB)
  *
- * Both create and edit go through the same OfferForm component.
+ * Create and edit share the same OfferForm component, the same type-aware
+ * validation, and the same create/update action — no per-type routes.
  */
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useFetcher, useLoaderData, useNavigate, redirect } from "react-router";
-import { OfferPlacement } from "@prisma/client";
+import type { OfferPlacement, OfferType } from "@prisma/client";
 
 import { authenticate } from "../shopify.server";
 import {
@@ -19,11 +22,22 @@ import {
   createOffer,
   getOffer,
   updateOffer,
+  type OfferFormPayload,
 } from "../models/offer.server";
 import { listProductVariants } from "../models/productVariant.server";
-import OfferForm, { OfferFormPage } from "../components/OfferForm";
-
-import type { Product, ErrorMap } from "../components/OfferForm";
+import OfferForm, {
+  OfferFormPage,
+  OfferActions,
+  type Product,
+  type ErrorMap,
+} from "../components/OfferForm";
+import OfferTypeSelector from "../components/OfferTypeSelector";
+import {
+  getOfferTypeConfig,
+  isOfferPlacement,
+  normalizeOfferType,
+} from "../config/offerTypes";
+import { validateOfferFields } from "../validation/offerSchemas";
 
 // ── Loader ─────────────────────────────────────────────────────────────
 
@@ -32,6 +46,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const offerId = url.searchParams.get("id");
   const typeParam = url.searchParams.get("type");
+  const offerTypeParam = url.searchParams.get("offerType");
+  const placementParam = url.searchParams.get("placement");
 
   const [variantRows, offer] = await Promise.all([
     listProductVariants(session.shop, 200),
@@ -62,6 +78,27 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }, {}),
   );
 
+  // Canonical offer type: DB record wins, then the ?offerType= param, then the
+  // default (cross-sell). Only used to render the correct fields.
+  const offerType: OfferType = offer
+    ? offer.type
+    : normalizeOfferType(offerTypeParam);
+
+  // Placement priority: (1) existing offer's DB placement, (2) ?placement=,
+  // (3) legacy ?type= alias, (4) the offer type's default placement.
+  let placement: OfferPlacement;
+  if (offer) {
+    placement = offer.placement as OfferPlacement;
+  } else if (isOfferPlacement(placementParam) && placementParam) {
+    placement = placementParam;
+  } else if (typeParam === "post-purchase") {
+    placement = "post_purchase";
+  } else if (typeParam === "pre-purchase") {
+    placement = "checkout";
+  } else {
+    placement = getOfferTypeConfig(offerType).defaultPlacement;
+  }
+
   const rawRules = (offer?.triggerRules as Record<string, any>) ?? {};
   const savedProductSelection = Array.isArray(rawRules.productSelection?.items)
     ? rawRules.productSelection.items
@@ -69,20 +106,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
       ? rawRules.manualSelections
       : [];
 
-  // Determine the placement for this request.
-  // Priority: (1) existing offer's DB placement, (2) ?type= query param, (3) default checkout.
-  let placement: OfferPlacement;
-  if (offer) {
-    placement = offer.placement as OfferPlacement;
-  } else if (typeParam === "post-purchase") {
-    placement = OfferPlacement.post_purchase;
-  } else {
-    placement = OfferPlacement.checkout;
-  }
-
   return {
     products,
     placement,
+    offerType,
+    mode: offer ? ("edit" as const) : ("create" as const),
+    // Bare /app/offers/new shows the type+placement selection step first.
+    isSelecting: !offer && !typeParam && !offerTypeParam && !placementParam,
     offer: offer
       ? {
           id: offer.id,
@@ -112,17 +142,31 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const offerId = String(formData.get("offerId") || "");
 
-  const title = String(formData.get("title") || "").trim();
-  const upsellType = String(formData.get("upsellType") || "pre-purchase");
-  const placementRaw = String(formData.get("placement") || "");
-  const showUpsell = String(formData.get("showUpsell") || "");
-  const conditions = JSON.parse(String(formData.get("conditions") || "[]"));
   const displayLocation = String(formData.get("displayLocation") || "checkout_page");
-  const upsellProduct = String(formData.get("upsellProduct") || "");
-  const manualSelections = JSON.parse(
-    String(formData.get("manualSelections") || "[]")
-  );
-  const offerType = String(formData.get("offerType") || "");
+
+  const payload: OfferFormPayload = {
+    title: String(formData.get("title") || "").trim(),
+    upsellType: String(formData.get("upsellType") || "pre-purchase"),
+    type: normalizeOfferType(formData.get("type")),
+    showUpsell: String(formData.get("showUpsell") || ""),
+    conditions: JSON.parse(String(formData.get("conditions") || "[]")),
+    displayOnCheckout: displayLocation !== "",
+    displayLocation,
+    upsellProduct: String(formData.get("upsellProduct") || ""),
+    manualSelections: JSON.parse(
+      String(formData.get("manualSelections") || "[]")
+    ),
+    offerType: String(formData.get("offerType") || ""),
+    discountValue: formData.get("discountValue")
+      ? Number(formData.get("discountValue"))
+      : null,
+    activeFrom: String(formData.get("activeFrom") || "") || null,
+    activeTo: String(formData.get("activeTo") || "") || null,
+    promotionalTitle: String(formData.get("promotionalTitle") || "").trim(),
+  };
+
+  // Verify manual selections reference products/variants that actually exist
+  // in this shop's synced catalog and are paired correctly.
   const variantRows = await listProductVariants(session.shop, 500);
   const variantToProductId = new Map(
     variantRows.map((row) => [row.variantId, row.productId] as const)
@@ -131,9 +175,9 @@ export async function action({ request }: ActionFunctionArgs) {
   const validVariantIds = new Set(variantRows.map((row) => row.variantId));
 
   if (
-    upsellProduct === "manual" &&
-    Array.isArray(manualSelections) &&
-    manualSelections.some((item: any) => {
+    payload.upsellProduct === "manual" &&
+    Array.isArray(payload.manualSelections) &&
+    payload.manualSelections.some((item: any) => {
       const productId =
         typeof item?.productId === "string" ? item.productId : "";
       const variantId =
@@ -154,89 +198,49 @@ export async function action({ request }: ActionFunctionArgs) {
     };
   }
 
-  const discountValue = formData.get("discountValue")
-    ? Number(formData.get("discountValue"))
-    : null;
-  const activeFrom = String(formData.get("activeFrom") || "") || null;
-  const activeTo = String(formData.get("activeTo") || "") || null;
-  const promotionalTitle = String(formData.get("promotionalTitle") || "").trim();
-
-  // ── Validation ────────────────────────────────────────────────────
-  const errors: Record<string, string> = {};
-  if (!title) errors.title = "Title is required";
-  if (!showUpsell) errors.showUpsell = "Select when to show the upsell";
-  if (showUpsell === "condition" && conditions.length === 0)
-    errors.showUpsell = "Add at least one condition";
-  if (!displayLocation)
-    errors.displayLocation = "Select where to display the upsell";
-  if (!upsellProduct)
-    errors.upsellProduct = "Select how the upsell product is chosen";
-  if (upsellProduct === "manual" && manualSelections.length === 0)
-    errors.upsellProduct = "Add at least one product";
-  if (!offerType) errors.offerType = "Select an offer type";
-  if (offerType === "discount" && !discountValue)
-    errors.offerType = "Enter a discount percentage";
-  if (!promotionalTitle)
-    errors.promotionalTitle = "Promotional title is required";
-
+  // ── Validation (type-aware, shared with the JSON API) ──────────────
+  const errors = validateOfferFields(payload as Record<string, unknown>, payload.type ?? "cross_sell");
   if (Object.keys(errors).length > 0) {
     return { errors };
   }
 
   // ── Build payload ────────────────────────────────────────────────
-  const payload = buildOfferPayload({
-    title,
-    upsellType,
-    showUpsell,
-    conditions,
-    displayOnCheckout: displayLocation !== "",
-    upsellProduct,
-    manualSelections,
-    offerType,
-    discountValue,
-    activeFrom,
-    activeTo,
-    promotionalTitle,
-  });
-
-  // Store displayLocation in triggerRules for the form to read back on edit.
-  if (payload.triggerRules && typeof payload.triggerRules === "object") {
-    (payload.triggerRules as Record<string, unknown>).displayLocation =
-      displayLocation;
-  }
+  const built = buildOfferPayload(payload);
 
   // Respect the placement sent from the form (pre-purchase vs post-purchase).
-  if (
-    placementRaw === "post_purchase" ||
-    placementRaw === "checkout"
-  ) {
-    payload.placement = placementRaw as OfferPlacement;
+  const placementRaw = String(formData.get("placement") || "");
+  if (placementRaw === "post_purchase" || placementRaw === "checkout") {
+    built.placement = placementRaw as OfferPlacement;
   }
 
   if (offerId) {
     await updateOffer(session.shop, offerId, {
-      name: payload.name,
-      type: payload.type,
-      placement: payload.placement,
-      targetProductIds: payload.targetProductIds,
-      triggerRules: payload.triggerRules,
-      isActive: payload.isActive,
+      name: built.name,
+      type: built.type,
+      placement: built.placement,
+      targetProductIds: built.targetProductIds,
+      triggerRules: built.triggerRules,
+      isActive: built.isActive,
     });
-    return redirect("/app/offers");
+    return redirect("/app");
   }
 
-  await createOffer(session.shop, payload);
-  return redirect("/app/offers?created=1");
+  await createOffer(session.shop, built);
+  return redirect("/app?created=1");
 }
 
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function CreateOfferPage() {
-  const { products, offer, placement } = useLoaderData<{
-    products: Product[];
-    offer: any;
-    placement: OfferPlacement;
-  }>();
+  const { products, offer, placement, offerType, mode, isSelecting } =
+    useLoaderData<{
+      products: Product[];
+      offer: any;
+      placement: OfferPlacement;
+      offerType: OfferType;
+      mode: "create" | "edit";
+      isSelecting: boolean;
+    }>();
   const navigate = useNavigate();
   const fetcher = useFetcher<{ errors?: ErrorMap }>();
 
@@ -249,11 +253,19 @@ export default function CreateOfferPage() {
   }
 
   function handleCancel() {
-    navigate("/app/offers");
+    navigate("/app");
+  }
+
+  if (isSelecting) {
+    return (
+      <OfferFormPage mode="create" offerType={offerType} placement={placement}>
+        <OfferTypeSelector />
+      </OfferFormPage>
+    );
   }
 
   return (
-    <OfferFormPage placement={placement}>
+    <OfferFormPage mode={mode} offerType={offerType} placement={placement}>
       <fetcher.Form
         method="post"
         onSubmit={handleSubmit}
@@ -264,43 +276,16 @@ export default function CreateOfferPage() {
         ) : null}
 
         <OfferForm
+          mode={mode}
+          offerType={offerType}
           placement={placement}
           initialData={offer}
           products={products}
           fetcherErrors={errors}
         />
 
-        <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-          <button type="submit" style={submitBtnStyle} disabled={submitting}>
-            {submitting ? "Saving\u2026" : "Submit"}
-          </button>
-          <button type="button" style={cancelBtnStyle} onClick={handleCancel}>
-            Cancel
-          </button>
-        </div>
+        <OfferActions mode={mode} submitting={submitting} onCancel={handleCancel} />
       </fetcher.Form>
     </OfferFormPage>
   );
 }
-
-// Inline button styles (kept here to avoid importing the full styles map)
-const submitBtnStyle: React.CSSProperties = {
-  background: "#1a1a1a",
-  color: "#fff",
-  border: "none",
-  borderRadius: 6,
-  padding: "10px 22px",
-  fontSize: 14,
-  fontWeight: 500,
-  cursor: "pointer",
-};
-const cancelBtnStyle: React.CSSProperties = {
-  background: "#fff",
-  color: "#202223",
-  border: "1px solid #c9cccf",
-  borderRadius: 6,
-  padding: "10px 22px",
-  fontSize: 14,
-  fontWeight: 500,
-  cursor: "pointer",
-};

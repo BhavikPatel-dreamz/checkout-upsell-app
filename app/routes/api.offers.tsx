@@ -6,6 +6,7 @@ import {
   createOffer,
   listOffers,
   validateCreateOffer,
+  type OfferFormPayload,
 } from "../models/offer.server";
 
 // GET /api/offers — list this shop's offers
@@ -24,7 +25,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const parsed = await readJsonBody(request);
   if (!parsed.ok) return badRequest({ body: "Request body must be valid JSON." });
 
-  const normalized = buildOfferPayload(parsed.body as any);
+  const normalized = buildOfferPayload(parsed.body as OfferFormPayload);
   const result = validateCreateOffer(normalized);
   if (!result.ok) return badRequest(result.errors);
 

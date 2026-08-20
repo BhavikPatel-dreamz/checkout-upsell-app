@@ -184,7 +184,6 @@ type RunStatus = "running" | "paused" | "success" | "error";
 // =======================================================================
 export default function ProductSyncPage() {
   const {
-    shop,
     lastSyncedAt,
     totalProducts,
     syncedProducts,
@@ -367,11 +366,11 @@ export default function ProductSyncPage() {
           <span style={styles.logoText}>Dynamic Dreamz</span>
         </div>
         <div style={styles.navTabs}>
-          <button style={styles.navTab} onClick={() => navigate("/app/offers")}>
+          <button style={styles.navTab} onClick={() => navigate("/app")}>
             Dashboard
           </button>
           <button style={{ ...styles.navTab, ...styles.navTabActive }}>Product Sync</button>
-          <button style={styles.navTab} onClick={() => navigate("/app/offers")}>
+          <button style={styles.navTab} onClick={() => navigate("/app")}>
             Help
           </button>
         </div>
@@ -463,7 +462,7 @@ export default function ProductSyncPage() {
             <div
               style={styles.progressTrack}
               role="progressbar"
-              aria-valuenow={displayPct}
+              aria-valuenow={displayPct ?? undefined}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label="Product sync progress"
@@ -783,11 +782,6 @@ function Spinner({ color = "#fff" }: { color?: string }) {
 // ---------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------
-function shortId(gid: string) {
-  const parts = gid.split("/");
-  return parts[parts.length - 1] ?? gid;
-}
-
 function formatStableDate(date: Date) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",

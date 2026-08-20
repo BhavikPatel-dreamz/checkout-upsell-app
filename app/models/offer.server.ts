@@ -3,6 +3,7 @@
 
 import { Prisma, OfferType, OfferPlacement } from "@prisma/client";
 import db from "../db.server";
+import { validateOfferFields } from "../validation/offerSchemas";
 
 const OFFER_TYPES = Object.values(OfferType);
 const OFFER_PLACEMENTS = Object.values(OfferPlacement);
@@ -27,6 +28,7 @@ export interface OfferFormPayload {
   showUpsell?: string;
   conditions?: Array<{ field?: string; operator?: string; value?: string }>;
   displayOnCheckout?: boolean;
+  displayLocation?: string;
   upsellProduct?: string;
   manualSelections?: Array<{
     productId?: string;
@@ -84,6 +86,9 @@ function normalizeTriggerRules(input: OfferFormPayload): Record<string, unknown>
   }
   if (typeof input.displayOnCheckout === "boolean") {
     triggerRules.displayOnCheckout = input.displayOnCheckout;
+  }
+  if (typeof input.displayLocation === "string" && input.displayLocation.length > 0) {
+    triggerRules.displayLocation = input.displayLocation;
   }
   if (typeof input.upsellProduct === "string") {
     triggerRules.upsellProduct = input.upsellProduct;
@@ -217,6 +222,13 @@ export function validateCreateOffer(
     errors.triggerRules = "triggerRules must be an object.";
   }
 
+  // Type-aware field validation — the same core the unified form uses.
+  // Fields may be nested in triggerRules (the shape buildOfferPayload emits).
+  const fieldErrors = validateOfferFields(b, normalizedType, "name");
+  for (const [key, message] of Object.entries(fieldErrors)) {
+    if (!(key in errors)) errors[key] = message;
+  }
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   const triggerRules = isPlainObject(b.triggerRules)
@@ -282,6 +294,17 @@ export function validateUpdateOffer(
       errors.triggerRules = "triggerRules must be an object.";
     } else {
       data.triggerRules = b.triggerRules as Prisma.InputJsonValue;
+
+      // A full form update includes triggerRules — validate its fields against
+      // the offer's type so partial API updates can't persist malformed type-
+      // specific data either.
+      const updateType = b.type as OfferType | undefined;
+      if (updateType && OFFER_TYPES.includes(updateType)) {
+        const fieldErrors = validateOfferFields(b, updateType, "name");
+        for (const [key, message] of Object.entries(fieldErrors)) {
+          if (!(key in errors)) errors[key] = message;
+        }
+      }
     }
   }
 
