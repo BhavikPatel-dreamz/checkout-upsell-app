@@ -13,8 +13,6 @@ import { authenticate } from "../shopify.server";
 import { listOffers } from "../models/offer.server";
 import { findVariantsByProductIds } from "../models/productVariant.server";
 
-type UpsellType = "Pre-Purchase" | "Post-Purchase";
-
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   const offers = await listOffers(session.shop);
@@ -103,30 +101,16 @@ export default function OffersPage() {
   const totalAdded = 0;
   const activeCount = visibleOffers.filter((o) => Boolean(o.isActive)).length;
 
-  function goToCreate(type: UpsellType) {
-    const params = new URLSearchParams(location.search);
-    if (type === "Pre-Purchase") {
-      // preserve shop/host/embedded query params and set type
-      params.set("type", "pre-purchase");
-      params.delete("id");
-      navigate(`/app/offers/new?${params.toString()}`);
-    } else {
-      // preserve shop/host/embedded query params for post-purchase route
-      // remove any type/id params that don't apply
-      params.delete("type");
-      params.delete("id");
-      const suffix = params.toString();
-      navigate(`/app/offers/new-post${suffix ? `?${suffix}` : ""}`);
-    }
+  function goToCreate() {
+    navigate("/app/offers/new");
   }
 
   function editUpsell(id: string) {
     const params = new URLSearchParams(location.search);
-    // ensure edit opens within the same shop/host context
     params.set("id", id);
     params.delete("type");
     const suffix = params.toString();
-    navigate(`/app/offers/new-post${suffix ? `?${suffix}` : ""}`);
+    navigate(`/app/offers/new${suffix ? `?${suffix}` : ""}`);
   }
 
   async function toggleStatus(id: string) {
@@ -280,15 +264,9 @@ export default function OffersPage() {
               <div style={styles.headerButtons}>
                 <button
                   style={styles.darkButton}
-                  onClick={() => goToCreate("Pre-Purchase")}
+                  onClick={goToCreate}
                 >
-                  Create New Pre-Purchase Upsell
-                </button>
-                <button
-                  style={styles.darkButton}
-                  onClick={() => goToCreate("Post-Purchase")}
-                >
-                  Create New Post-Purchase Upsell
+                  Create New Upsell Offer
                 </button>
               </div>
             </div>
