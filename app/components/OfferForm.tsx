@@ -47,6 +47,12 @@ export type ManualSelection = {
   variantTitle: string;
 };
 
+export type TriggerSelection = {
+  id: string;
+  productId: string;
+  productTitle: string;
+};
+
 export interface OfferInitialData {
   id: string;
   title: string;
@@ -54,6 +60,7 @@ export interface OfferInitialData {
   conditions: Array<{ field: string; operator: string; value: string }>;
   displayLocation: string;
   upsellProduct: string;
+  triggerProductIds?: string[];
   manualSelections: Array<{
     productId: string;
     productTitle?: string;
@@ -174,9 +181,27 @@ export default function OfferForm({
   const [upsellProduct, setUpsellProduct] = useState<"manual" | "related" | "">(
     (initialData?.upsellProduct as any) ?? ""
   );
+  const [triggerPickerProductId, setTriggerPickerProductId] = useState("");
   const [pickerProductId, setPickerProductId] = useState("");
   const [pickerVariantId, setPickerVariantId] = useState("");
   const [manualSelections, setManualSelections] = useState<ManualSelection[]>([]);
+  const [triggerSelections, setTriggerSelections] = useState<TriggerSelection[]>([]);
+
+  useEffect(() => {
+    if (!initialData || !Array.isArray(initialData.triggerProductIds)) return;
+    if (triggerSelections.length > 0) return;
+
+    const productMap = new Map(products.map((p) => [p.id, p] as const));
+    const populated = initialData.triggerProductIds
+      .filter((id): id is string => typeof id === "string" && !!id)
+      .map((productId, index) => ({
+        id: `trigger-${index + 1}`,
+        productId,
+        productTitle: productMap.get(productId)?.title ?? productId,
+      }));
+
+    setTriggerSelections(populated);
+  }, [initialData, products, triggerSelections.length]);
 
   // Populate manualSelections with titles derived from `products` for each saved row.
   useEffect(() => {
@@ -267,20 +292,44 @@ export default function OfferForm({
     setDealType(value);
   }
 
+  function handleAddTriggerProduct() {
+    if (!triggerPickerProductId) return;
+    setTriggerSelections((prev) => {
+      if (prev.some((item) => item.productId === triggerPickerProductId)) return prev;
+      const product = products.find((p) => p.id === triggerPickerProductId);
+      return [
+        ...prev,
+        {
+          id: nextRowId(),
+          productId: triggerPickerProductId,
+          productTitle: product?.title ?? triggerPickerProductId,
+        },
+      ];
+    });
+    setTriggerPickerProductId("");
+  }
+
+  function removeTriggerSelection(id: string) {
+    setTriggerSelections((prev) => prev.filter((item) => item.id !== id));
+  }
+
   function handleAddProduct() {
     if (!pickerProduct) return;
     const variant = pickerProduct.variants.find((v) => v.id === pickerVariantId);
     if (!variant || !variant.id) return;
-    setManualSelections((prev) => [
-      ...prev,
-      {
-        id: nextRowId(),
-        productId: pickerProduct.id,
-        productTitle: pickerProduct.title,
-        variantId: variant.id,
-        variantTitle: variant.title,
-      },
-    ]);
+    setManualSelections((prev) => {
+      if (prev.some((item) => item.variantId === variant.id)) return prev;
+      return [
+        ...prev,
+        {
+          id: nextRowId(),
+          productId: pickerProduct.id,
+          productTitle: pickerProduct.title,
+          variantId: variant.id,
+          variantTitle: variant.title,
+        },
+      ];
+    });
     setPickerProductId("");
     setPickerVariantId("");
   }
@@ -331,6 +380,7 @@ export default function OfferForm({
       <input type="hidden" name="placement" value={placement} />
       <input type="hidden" name="type" value={offerType} />
       <input type="hidden" name="conditions" value={JSON.stringify(conditions)} />
+      <input type="hidden" name="targetProductIds" value={JSON.stringify(triggerSelections.map((item) => item.productId))} />
       <input type="hidden" name="manualSelections" value={JSON.stringify(manualSelections)} />
 
       <Field label="Offer Type">
@@ -342,6 +392,20 @@ export default function OfferForm({
       </Field>
 
       <CommonOfferFields state={state} errors={errors} locationOptions={locationOptions} />
+
+      {offerType === "cross_sell" && (
+        <div style={styles.section}>
+          <TriggerProductField
+            products={products}
+            selected={triggerSelections}
+            value={triggerPickerProductId}
+            onValueChange={setTriggerPickerProductId}
+            onAdd={handleAddTriggerProduct}
+            onRemove={removeTriggerSelection}
+            error={errors.targetProductIds}
+          />
+        </div>
+      )}
 
       {typeSpecificFieldIds.length > 0 && (
         <div style={styles.section}>
@@ -401,6 +465,17 @@ function CommonOfferFields({
           placeholder="Enter title"
           value={state.title}
           onChange={(e) => state.setTitle(e.target.value)}
+        />
+      </Field>
+
+      {/* Promotional Title */}
+      <Field label="Promotional Title" required error={errors.promotionalTitle}>
+        <input
+          name="promotionalTitle"
+          style={styles.input}
+          placeholder="Enter promotional title"
+          value={state.promotionalTitle}
+          onChange={(e) => state.setPromotionalTitle(e.target.value)}
         />
       </Field>
 
@@ -629,6 +704,63 @@ function UpsellProductField({
         />
       </div>
       <input type="hidden" name="upsellProduct" value={state.upsellProduct} />
+    </Field>
+  );
+}
+
+function TriggerProductField({
+  products,
+  selected,
+  value,
+  onValueChange,
+  onAdd,
+  onRemove,
+  error,
+}: {
+  products: Product[];
+  selected: TriggerSelection[];
+  value: string;
+  onValueChange: (v: string) => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+  error?: string;
+}) {
+  return (
+    <Field label="Main Products" required error={error}>
+      <div style={styles.pickerRow}>
+        <select
+          style={styles.select}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+        >
+          <option value="">Select trigger product</option>
+          {products.map((product) => (
+            <option key={product.id} value={product.id}>{product.title}</option>
+          ))}
+        </select>
+
+        <button type="button" style={styles.addButton} disabled={!value} onClick={onAdd}>
+          Add
+        </button>
+      </div>
+
+      {selected.length > 0 && (
+        <div style={styles.selectionList}>
+          {selected.map((item) => (
+            <div key={item.id} style={styles.selectionItem}>
+              <span>{item.productTitle}</span>
+              <button
+                type="button"
+                style={styles.roundButtonRemove}
+                onClick={() => onRemove(item.id)}
+                aria-label="Remove trigger product"
+              >
+                −
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </Field>
   );
 }

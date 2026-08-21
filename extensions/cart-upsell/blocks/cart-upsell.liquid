@@ -1,0 +1,24 @@
+<div id="cart-upsell-root" class="cart-upsell-block" style="display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin: 16px 0;">
+  <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">{{ "cart_upsell.title" | t }}</h3>
+
+  <div id="cart-upsell-items" style="display: flex; flex-direction: row; gap: 12px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity;"></div>
+
+  <div id="cart-upsell-error" class="cart-upsell-error" style="display: none; color: #d32f2f; font-size: 12px; margin-top: 8px;"></div>
+</div>
+
+<script>
+  window.CART_UPSELL_CONFIG = {
+    eligibilityUrl: "/apps/checkout-upsell/api/offers/eligible"
+  };
+</script>
+
+{% schema %}
+{
+  "name": "Cart Upsell",
+  "target": "section",
+  "enabled_on": {
+    "templates": ["cart"]
+  },
+  "javascript": "cart-upsell.js"
+}
+{% endschema %}

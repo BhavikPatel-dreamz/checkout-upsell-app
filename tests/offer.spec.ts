@@ -81,6 +81,42 @@ describe("type-aware build + validation", () => {
     }
   });
 
+  it("requires at least one trigger product for cross-sell offers", () => {
+    const result = validateCreateOffer({
+      name: "No Trigger Offer",
+      type: OfferType.cross_sell,
+      placement: "checkout" as any,
+      targetProductIds: [],
+      triggerRules: {
+        upsellProduct: "manual",
+        manualSelections: [{ productId: "gid://shopify/Product/1", variantId: "gid://shopify/ProductVariant/1" }],
+      },
+      isActive: true,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.targetProductIds).toBe("Select at least one trigger product.");
+    }
+  });
+
+  it("limits manual upsell selections to five products", () => {
+    const items = Array.from({ length: 6 }, (_, index) => ({
+      productId: `gid://shopify/Product/${index + 1}`,
+      variantId: `gid://shopify/ProductVariant/${index + 1}`,
+    }));
+
+    const result = validateOfferFields({
+      ...sample,
+      type: OfferType.cross_sell,
+      targetProductIds: ["gid://shopify/Product/99"],
+      upsellProduct: "manual",
+      manualSelections: items,
+    }, OfferType.cross_sell);
+
+    expect(result.upsellProduct).toBe("Select up to 5 products.");
+  });
+
   it("returns a working per-type schema via getOfferValidationSchema", () => {
     const schema = getOfferValidationSchema(OfferType.cross_sell);
     expect(Object.keys(schema({ ...sample, title: "" }, "title")).length).toBeGreaterThan(0);

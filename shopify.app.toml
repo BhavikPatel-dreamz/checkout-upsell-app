@@ -2,12 +2,16 @@
 
 client_id = "af17d3edcb1fe476de8388c085611521"
 name = "Checkout Upsell App"
-application_url = "https://example.com"
+application_url = "https://dd-75.dynamicdreamz.net"
 embedded = true
+
+[app_proxy]
+url = "https://dd-75.dynamicdreamz.net"
+subpath = "checkout-upsell"
+prefix = "apps"
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
 [webhooks]
 api_version = "2026-10"

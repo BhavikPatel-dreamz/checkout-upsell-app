@@ -123,6 +123,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
             : [{ field: "", operator: "", value: "" }],
           displayLocation: rawRules.displayLocation ?? "checkout_page",
           upsellProduct: rawRules.upsellProduct ?? "manual",
+          triggerProductIds: Array.isArray(offer.targetProductIds)
+            ? offer.targetProductIds
+            : [],
           manualSelections: savedProductSelection,
           offerType: rawRules.offerType ?? "free",
           discountValue: rawRules.discountValue ?? "",
@@ -153,6 +156,7 @@ export async function action({ request }: ActionFunctionArgs) {
     displayOnCheckout: displayLocation !== "",
     displayLocation,
     upsellProduct: String(formData.get("upsellProduct") || ""),
+    targetProductIds: JSON.parse(String(formData.get("targetProductIds") || "[]")),
     manualSelections: JSON.parse(
       String(formData.get("manualSelections") || "[]")
     ),

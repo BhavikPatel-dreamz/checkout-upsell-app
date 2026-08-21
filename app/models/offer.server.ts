@@ -44,6 +44,12 @@ export interface OfferFormPayload {
   status?: string;
   type?: OfferType;
   placement?: OfferPlacement;
+  /**
+   * Trigger product GIDs — the cart products that make the offer eligible.
+   * Stored as `Offer.targetProductIds`. Distinct from `manualSelections`,
+   * which are the upsell products shown when the offer fires.
+   */
+  triggerProductIds?: string[];
   targetProductIds?: string[];
   triggerRules?: Prisma.InputJsonValue;
   isActive?: boolean;
@@ -54,7 +60,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function asStringArray(value: unknown): string[] | null {
-  if (value === undefined || value === null) return [];
+  // undefined/null → null so callers can fall through to their next source.
+  if (value === undefined || value === null) return null;
   if (!Array.isArray(value) || !value.every((v) => typeof v === "string")) {
     return null;
   }
@@ -105,7 +112,8 @@ function normalizeTriggerRules(input: OfferFormPayload): Record<string, unknown>
       .map((item) => ({
         productId: item.productId,
         variantId: item.variantId,
-      }));
+      }))
+      .slice(0, 5);
 
     if (items.length > 0) {
       triggerRules.manualSelections = items;
@@ -143,13 +151,14 @@ export function buildOfferPayload(input: OfferFormPayload): OfferCreateInput {
     input.placement ??
     offerPlacementFromUpsellType(input.upsellType ?? "pre-purchase");
   const type = input.type ?? OfferType.cross_sell;
+  // `targetProductIds` holds the TRIGGER products (cart contents that make the
+  // offer eligible). They come from the form's explicit trigger-product picker
+  // (`triggerProductIds`) or an explicit `targetProductIds` (JSON API) — never
+  // from `manualSelections`, which are the upsell products shown by the offer.
   const normalizedTargetProductIds = dedupeStrings(
     asStringArray(input.targetProductIds) ??
-      (Array.isArray(input.manualSelections)
-        ? input.manualSelections
-            .map((selection) => selection.productId)
-            .filter((value): value is string => typeof value === "string" && value.length > 0)
-        : []),
+      asStringArray(input.triggerProductIds) ??
+      [],
   );
 
   const triggerRules = normalizeTriggerRules(input);
@@ -200,17 +209,23 @@ export function validateCreateOffer(
     errors.placement = `Placement must be one of: ${OFFER_PLACEMENTS.join(", ")}.`;
   }
 
+  // Trigger products: explicit `targetProductIds` or the `triggerProductIds`
+  // alias. Upsell selections (`manualSelections`) are NOT triggers.
   const targetProductIds =
     asStringArray(b.targetProductIds) ??
-    (Array.isArray(b.manualSelections)
-      ? dedupeStrings(
-          (b.manualSelections as Array<Record<string, unknown>>)
-            .map((selection) => (typeof selection.productId === "string" ? selection.productId : ""))
-            .filter((value) => value.length > 0),
-        )
-      : []);
+    asStringArray(b.triggerProductIds) ??
+    [];
 
-  if (Array.isArray(b.targetProductIds) && b.targetProductIds.some((value) => typeof value !== "string")) {
+  if (normalizedType === OfferType.cross_sell && targetProductIds.length === 0) {
+    errors.targetProductIds = "Select at least one trigger product.";
+  }
+
+  if (
+    (Array.isArray(b.targetProductIds) &&
+      b.targetProductIds.some((value) => typeof value !== "string")) ||
+    (Array.isArray(b.triggerProductIds) &&
+      b.triggerProductIds.some((value) => typeof value !== "string"))
+  ) {
     errors.targetProductIds = "targetProductIds must be an array of strings.";
   }
 
@@ -283,7 +298,11 @@ export function validateUpdateOffer(
     if (arr === null) {
       errors.targetProductIds = "targetProductIds must be an array of strings.";
     } else {
-      data.targetProductIds = arr;
+      if ((b.type === OfferType.cross_sell || b.type === undefined) && arr.length === 0) {
+        errors.targetProductIds = "Select at least one trigger product.";
+      } else {
+        data.targetProductIds = arr;
+      }
     }
   }
 

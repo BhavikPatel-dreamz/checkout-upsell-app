@@ -95,8 +95,23 @@ export function validateOfferFields(
     if (!upsellProduct) {
       errors.upsellProduct = "Select how the upsell product is chosen";
     }
-    if (upsellProduct === "manual" && !hasNonEmptyArray(body, "manualSelections")) {
-      errors.upsellProduct = "Add at least one product";
+    if (upsellProduct === "manual") {
+      const manual = Array.isArray(fieldValue(body, "manualSelections")) ? fieldValue(body, "manualSelections") as unknown[] : [];
+      if (manual.length === 0) {
+        errors.upsellProduct = "Add at least one product";
+      } else if (manual.length > 5) {
+        errors.upsellProduct = "Select up to 5 products.";
+      }
+    }
+  }
+
+  if (offerType === "cross_sell") {
+    const targetIds = Array.isArray(fieldValue(body, "targetProductIds"))
+      ? (fieldValue(body, "targetProductIds") as unknown[])
+      : [];
+    const normalizedTargetIds = targetIds.filter((value) => typeof value === "string" && value.trim().length > 0);
+    if (normalizedTargetIds.length === 0) {
+      errors.targetProductIds = "Select at least one trigger product.";
     }
   }
 
