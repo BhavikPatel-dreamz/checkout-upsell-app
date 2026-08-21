@@ -10,6 +10,7 @@ import type { Offer as OfferRecord } from "@prisma/client";
 
 import { authenticate } from "../shopify.server";
 import { listOffers } from "../models/offer.server";
+import { getOfferViewMetrics } from "../models/offerAnalytics.server";
 import { findVariantsByProductIds } from "../models/productVariant.server";
 import {
   PLACEMENT_LABELS,
@@ -50,13 +51,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (r.productId && r.productTitle) productTitleByProductId[r.productId] = r.productTitle;
   }
 
-  return { offers, productTitleByProductId };
+  const metrics = await getOfferViewMetrics(session.shop);
+
+  return { offers, productTitleByProductId, metrics };
 }
 
 export default function OffersPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { offers, productTitleByProductId } = useLoaderData<typeof loader>();
+  const { offers, productTitleByProductId, metrics } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const [visibleOffers, setVisibleOffers] = useState(offers);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -99,7 +102,7 @@ export default function OffersPage() {
     return titles;
   }
 
-  const totalViews = 0;
+  const totalViews = metrics.totalViews;
   const totalAdded = 0;
   const activeCount = visibleOffers.filter((o) => Boolean(o.isActive)).length;
 

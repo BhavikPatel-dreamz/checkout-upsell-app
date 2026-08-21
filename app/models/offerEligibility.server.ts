@@ -6,6 +6,7 @@ export interface EligibleOfferPayload {
   offerName: string;
   productId: string;
   variantId: string;
+  productHandle: string | null;
   productTitle: string;
   variantTitle: string | null;
   imageUrl: string | null;
@@ -111,6 +112,7 @@ export async function findEligibleCrossSellOffers(options: {
         offerName: offer.name,
         productId: pv.productId,
         variantId: pv.variantId,
+        productHandle: pv.productHandle ?? null,
         productTitle: pv.productTitle,
         variantTitle: pv.variantTitle ?? null,
         imageUrl: pv.imageUrl ?? null,

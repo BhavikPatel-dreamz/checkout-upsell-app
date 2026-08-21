@@ -34,15 +34,53 @@ function ThankYouUpsellBlock() {
 
   useEffect(() => {
     let cancelled = false;
+    const apiRecord = api as unknown as Record<string, unknown>;
+
+    async function trackViewed(shopDomain: string, visibleOffer: EligibleOffer) {
+      try {
+        const customer = apiRecord.customer as Record<string, unknown> | undefined;
+        const customerId =
+          customer && (typeof customer.id === "string" || typeof customer.id === "number")
+            ? String(customer.id)
+            : null;
+        const guestKey = customerId ? null : (() => {
+          try {
+            const stored = window.sessionStorage.getItem("checkout-upsell-guest-key");
+            if (stored) return stored;
+            const next = `guest-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
+            window.sessionStorage.setItem("checkout-upsell-guest-key", next);
+            return next;
+          } catch {
+            return `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          }
+        })();
+
+        await fetch(`https://${shopDomain}/apps/checkout-upsell/api/offers/viewed`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            shop: shopDomain,
+            offerId: visibleOffer.offerId,
+            offerName: visibleOffer.offerName,
+            productId: visibleOffer.productId,
+            variantId: visibleOffer.variantId,
+            placement: "post_purchase",
+            customerId,
+            guestKey,
+            isGuest: !customerId,
+          }),
+        });
+      } catch (err) {
+        console.error("ThankYou upsell impression tracking error:", err);
+      }
+    }
 
     async function fetchOffer() {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const shop = (api as Record<string, unknown>).shop as string | undefined;
+        const shop = apiRecord.shop as string | undefined;
         if (!shop) { setLoading(false); return; }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lines = ((api as Record<string, unknown>).lines ?? []) as Array<Record<string, unknown>>;
+        const lines = ((apiRecord.lines ?? []) as Array<Record<string, unknown>>);
         const productIds = lines
           .map((l) => {
             const merchandise = l.merchandise as Record<string, unknown> | undefined;
@@ -75,7 +113,9 @@ function ThankYouUpsellBlock() {
 
         const data = await res.json() as { offers?: EligibleOffer[] };
         if (!cancelled && data?.offers && data.offers.length > 0) {
-          setOffer(data.offers[0]);
+          const visibleOffer = data.offers[0];
+          setOffer(visibleOffer);
+          void trackViewed(shop, visibleOffer);
         }
       } catch (err) {
         console.error("ThankYou upsell fetch error:", err);
