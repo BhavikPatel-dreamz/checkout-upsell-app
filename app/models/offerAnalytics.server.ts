@@ -78,6 +78,193 @@ export interface OfferPurchaseMetrics {
   productBreakdown: Array<{ productId: string; purchases: number }>;
 }
 
+export interface OfferAnalyticsDetailProduct {
+  offerId: string;
+  productId: string;
+  productName: string;
+  imageUrl: string | null;
+  views: number;
+  clicks: number;
+  addedToCart: number;
+  purchases: number;
+}
+
+export interface OfferAnalyticsDetail {
+  offer: {
+    id: string;
+    name: string;
+    configuredProductCount: number;
+  };
+  summary: {
+    totalViews: number;
+    totalClicks: number;
+    totalAddedToCart: number;
+    totalPurchases: number;
+    uniqueLoggedInUsers: number;
+    uniqueGuestUsers: number;
+  };
+  funnel: {
+    views: number;
+    clicks: number;
+    addedToCart: number;
+    purchases: number;
+    clickThroughRate: number | null;
+    addToCartRate: number | null;
+    purchaseRate: number | null;
+  };
+  products: OfferAnalyticsDetailProduct[];
+}
+
+export async function getOfferAnalyticsForOffer(shop: string, offerId: string): Promise<OfferAnalyticsDetail | null> {
+  const offer = await db.offer.findUnique({
+    where: { shop, id: offerId },
+    select: {
+      id: true,
+      name: true,
+      targetProductIds: true,
+      triggerRules: true,
+    },
+  });
+
+  if (!offer) return null;
+
+  const rows = await db.offerEvent.findMany({
+    where: { shop, offerId },
+    select: {
+      eventType: true,
+      customerId: true,
+      guestKey: true,
+      productId: true,
+    },
+  });
+
+  const uniqueLoggedInUsers = new Set<string>();
+  const uniqueGuestUsers = new Set<string>();
+
+  const totals = {
+    totalViews: 0,
+    totalClicks: 0,
+    totalAddedToCart: 0,
+    totalPurchases: 0,
+  };
+
+  const productMap = new Map<
+    string,
+    {
+      offerId: string;
+      productId: string;
+      productName: string;
+      imageUrl: string | null;
+      views: number;
+      clicks: number;
+      addedToCart: number;
+      purchases: number;
+    }
+  >();
+
+  for (const row of rows) {
+    if (row.eventType === OfferEventType.viewed) {
+      totals.totalViews += 1;
+      if (row.customerId) uniqueLoggedInUsers.add(row.customerId);
+      if (row.guestKey) uniqueGuestUsers.add(row.guestKey);
+    }
+    if (row.eventType === OfferEventType.clicked) totals.totalClicks += 1;
+    if (row.eventType === OfferEventType.added_to_cart) totals.totalAddedToCart += 1;
+    if (row.eventType === OfferEventType.purchased) totals.totalPurchases += 1;
+
+    if (!row.productId) continue;
+
+    const productEntry =
+      productMap.get(row.productId) ?? {
+        offerId,
+        productId: row.productId,
+        productName: row.productId,
+        imageUrl: null,
+        views: 0,
+        clicks: 0,
+        addedToCart: 0,
+        purchases: 0,
+      };
+
+    if (row.eventType === OfferEventType.viewed) productEntry.views += 1;
+    if (row.eventType === OfferEventType.clicked) productEntry.clicks += 1;
+    if (row.eventType === OfferEventType.added_to_cart) productEntry.addedToCart += 1;
+    if (row.eventType === OfferEventType.purchased) productEntry.purchases += 1;
+
+    productMap.set(row.productId, productEntry);
+  }
+
+  const productIds = Array.from(productMap.keys());
+  const productMetaRows = productIds.length
+    ? await db.productVariant.findMany({
+        where: { shop, productId: { in: productIds } },
+        select: { productId: true, productTitle: true, imageUrl: true },
+      })
+    : [];
+
+  const productMetaMap = new Map(
+    productMetaRows.map((row) => [row.productId, { productName: row.productTitle || row.productId, imageUrl: row.imageUrl ?? null }]),
+  );
+
+  const products = Array.from(productMap.values())
+    .map((product) => {
+      const meta = productMetaMap.get(product.productId);
+      return {
+        ...product,
+        productName: meta?.productName ?? product.productId,
+        imageUrl: meta?.imageUrl ?? null,
+      };
+    })
+    .sort((a, b) => {
+      const scoreA = a.views + a.clicks + a.addedToCart + a.purchases;
+      const scoreB = b.views + b.clicks + b.addedToCart + b.purchases;
+      return scoreB - scoreA || b.views - a.views || a.productId.localeCompare(b.productId);
+    });
+
+  const triggerRules = (offer.triggerRules ?? {}) as Record<string, unknown>;
+  const manualSelections = Array.isArray(triggerRules.manualSelections)
+    ? triggerRules.manualSelections
+    : Array.isArray((triggerRules.productSelection as { items?: unknown[] } | undefined)?.items)
+      ? ((triggerRules.productSelection as { items?: unknown[] }).items as unknown[])
+      : [];
+  const configuredProductCount =
+    manualSelections.length > 0
+      ? manualSelections.filter((item) => item && typeof (item as { productId?: unknown }).productId === "string").length
+      : Array.isArray(offer.targetProductIds)
+        ? offer.targetProductIds.filter(Boolean).length
+        : 0;
+
+  const clickThroughRate = totals.totalViews > 0 ? totals.totalClicks / totals.totalViews : null;
+  const addToCartRate = totals.totalClicks > 0 ? totals.totalAddedToCart / totals.totalClicks : null;
+  const purchaseRate = totals.totalAddedToCart > 0 ? totals.totalPurchases / totals.totalAddedToCart : null;
+
+  return {
+    offer: {
+      id: offer.id,
+      name: offer.name,
+      configuredProductCount,
+    },
+    summary: {
+      totalViews: totals.totalViews,
+      totalClicks: totals.totalClicks,
+      totalAddedToCart: totals.totalAddedToCart,
+      totalPurchases: totals.totalPurchases,
+      uniqueLoggedInUsers: uniqueLoggedInUsers.size,
+      uniqueGuestUsers: uniqueGuestUsers.size,
+    },
+    funnel: {
+      views: totals.totalViews,
+      clicks: totals.totalClicks,
+      addedToCart: totals.totalAddedToCart,
+      purchases: totals.totalPurchases,
+      clickThroughRate,
+      addToCartRate,
+      purchaseRate,
+    },
+    products,
+  };
+}
+
 export async function trackOfferImpression(
   input: OfferViewTrackingInput,
 ): Promise<{ counted: boolean; duplicate: boolean; eventId?: string | null }> {

@@ -1,4 +1,4 @@
-import { useLoaderData, type LoaderFunctionArgs } from "react-router";
+import { useLoaderData, useNavigate, type LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
 import {
@@ -307,7 +307,15 @@ function StatCard({
   );
 }
 
-type Row = { key: string; label: string; subtitle?: string; imageSrc?: string; value: number; image?: boolean };
+type Row = {
+  key: string;
+  label: string;
+  subtitle?: string;
+  imageSrc?: string;
+  value: number;
+  image?: boolean;
+  action?: React.ReactNode;
+};
 
 function BreakdownTable({
   title,
@@ -435,42 +443,46 @@ function BreakdownTable({
                       transition: "background 0.1s ease",
                     }}
                   >
-                    {row.image ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-                        {row.imageSrc ? (
-                          <img
-                            src={row.imageSrc}
-                            alt="Product"
-                            style={{
-                              width: "26px",
-                              height: "26px",
-                              borderRadius: "6px",
-                              objectFit: "cover",
-                              border: `1px solid ${colors.border}`,
-                              display: "block",
-                              flexShrink: 0,
-                              background: colors.headBg,
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: "26px",
-                              height: "26px",
-                              borderRadius: "6px",
-                              background: colors.headBg,
-                              border: `1px solid ${colors.border}`,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <ImagePlaceholderIcon />
-                          </div>
-                        )}
-                        <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                          <span style={{ wordBreak: "break-word", fontWeight: 600 }}>{row.label}</span>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", minWidth: 0, flex: 1 }}>
+                        {row.image ? (
+                          <>
+                            {row.imageSrc ? (
+                              <img
+                                src={row.imageSrc}
+                                alt="Product"
+                                style={{
+                                  width: "26px",
+                                  height: "26px",
+                                  borderRadius: "6px",
+                                  objectFit: "cover",
+                                  border: `1px solid ${colors.border}`,
+                                  display: "block",
+                                  flexShrink: 0,
+                                  background: colors.headBg,
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: "26px",
+                                  height: "26px",
+                                  borderRadius: "6px",
+                                  background: colors.headBg,
+                                  border: `1px solid ${colors.border}`,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <ImagePlaceholderIcon />
+                              </div>
+                            )}
+                          </>
+                        ) : null}
+                        <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                          <span style={{ wordBreak: "break-word", fontWeight: row.action ? 600 : 500 }}>{row.label}</span>
                           {row.subtitle ? (
                             <span style={{ wordBreak: "break-all", fontSize: "0.72rem", color: colors.subdued }}>
                               {row.subtitle}
@@ -478,16 +490,8 @@ function BreakdownTable({
                           ) : null}
                         </div>
                       </div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column" }}>
-                        <span>{row.label}</span>
-                        {row.subtitle ? (
-                          <span style={{ fontSize: "0.72rem", color: colors.subdued, wordBreak: "break-all" }}>
-                            {row.subtitle}
-                          </span>
-                        ) : null}
-                      </div>
-                    )}
+                      {row.action ? <div style={{ flexShrink: 0 }}>{row.action}</div> : null}
+                    </div>
                   </td>
                   <td
                     style={{
@@ -537,7 +541,12 @@ function Row({
 /* Page                                */
 /* ---------------------------------- */
 export default function AnalyticsPage() {
+  const navigate = useNavigate();
   const { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, productMetaMap } = useLoaderData<typeof loader>();
+
+  const openOfferDetails = (offerId: string) => {
+    navigate(`/app/analytics/${encodeURIComponent(offerId)}`);
+  };
 
   return (
     <div
@@ -605,6 +614,24 @@ export default function AnalyticsPage() {
                   key: r.offerId,
                   label: r.offerName,
                   value: r.views,
+                  action: (
+                    <button
+                      type="button"
+                      onClick={() => openOfferDetails(r.offerId)}
+                      style={{
+                        border: `1px solid ${colors.border}`,
+                        background: "#F8FAFC",
+                        color: colors.text,
+                        borderRadius: "6px",
+                        padding: "0.35rem 0.65rem",
+                        fontSize: "0.74rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      View
+                    </button>
+                  ),
                 }))}
               />
               <BreakdownTable
