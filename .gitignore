@@ -32,3 +32,6 @@ database.sqlite
 
 # Local history files
 .history/
+*.woff2
+.vscode/
+temp_auto_push.bat
