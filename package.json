@@ -1,6 +1,7 @@
 {
   "name": "checkout-upsell-app",
   "private": true,
+  "version":"1.0.0",
   "scripts": {
     "build": "react-router build",
     "dev": "shopify app dev --tunnel-url=https://upsale.dynamicdreamz.net:3001",
