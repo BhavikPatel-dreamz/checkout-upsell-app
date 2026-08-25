@@ -836,12 +836,14 @@ export function OfferFormPage({
     mode === "edit" ? "Edit Offer" : "Create New Offer";
   const subtitle = `${OFFER_TYPE_CONFIG[offerType].label} · ${placementHeaderLabel(placement)}`;
   return (
-    <div style={styles.page}>
-      <div style={styles.headerBar}>
-        <h2 style={styles.headerText}>{heading}</h2>
-        <div style={styles.headerSubtitle}>{subtitle}</div>
+    <div className="appPageShell" style={styles.page}>
+      <div className="appPageContent">
+        <div style={styles.headerBar}>
+          <h2 style={styles.headerText}>{heading}</h2>
+          <div style={styles.headerSubtitle}>{subtitle}</div>
+        </div>
+        {children}
       </div>
-      {children}
     </div>
   );
 }
@@ -1149,15 +1151,12 @@ function CalendarMonth({
 
 export const styles: Record<string, React.CSSProperties> = {
   page: {
-    background: "#ffffff",
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     color: "#202223",
   },
   headerBar: {
-    background: "#f1f2f3",
-    borderBottom: "1px solid #e1e3e5",
-    padding: "14px 24px",
+    padding: "0 0 20px",
   },
   headerText: { margin: 0, fontSize: 15, fontWeight: 700 },
   headerSubtitle: { marginTop: 2, fontSize: 12, color: "#616161" },

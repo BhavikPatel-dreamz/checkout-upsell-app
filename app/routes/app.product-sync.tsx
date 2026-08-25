@@ -23,7 +23,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   useFetcher,
   useLoaderData,
-  useNavigate,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from "react-router";
@@ -34,6 +33,7 @@ import {
   getSyncStatus,
 } from "../models/productVariant.server";
 import db from "../db.server";
+import "../styles/app._index.css";
 
 const MAX_CHUNKS = 400;
 
@@ -197,7 +197,6 @@ export default function ProductSyncPage() {
     activeRun,
   } = useLoaderData<typeof loader>();
 
-  const navigate = useNavigate();
   const syncFetcher = useFetcher<{
     ok?: boolean;
     done?: boolean;
@@ -358,25 +357,8 @@ export default function ProductSyncPage() {
   }
 
   return (
-    <div style={styles.page}>
-      {/* ---- Top bar (matches other pages in this app) ---- */}
-      <div style={styles.navBar}>
-        <div style={styles.navLeft}>
-          <span style={styles.logoMark}>D</span>
-          <span style={styles.logoText}>Dynamic Dreamz</span>
-        </div>
-        <div style={styles.navTabs}>
-          <button style={styles.navTab} onClick={() => navigate("/app")}>
-            Dashboard
-          </button>
-          <button style={{ ...styles.navTab, ...styles.navTabActive }}>Product Sync</button>
-          <button style={styles.navTab} onClick={() => navigate("/app")}>
-            Help
-          </button>
-        </div>
-      </div>
-
-      <div style={styles.content}>
+    <div className="appPageShell" style={styles.page}>
+      <div className="appPageContent productSyncContent">
         {/* ---- Header ---- */}
         <div style={styles.headerRow}>
           <div>
@@ -814,8 +796,6 @@ function formatDuration(startedAt: Date | string, finishedAt: Date | string | nu
 // ---------------------------------------------------------------------
 const styles: Record<string, React.CSSProperties> = {
   page: {
-    background: "#f6f6f7",
-    minHeight: "100vh",
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     color: "#202223",

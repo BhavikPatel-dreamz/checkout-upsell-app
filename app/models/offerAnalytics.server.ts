@@ -1,7 +1,13 @@
-import { OfferEventType, OfferPlacement } from "@prisma/client";
+import { OfferEventType, OfferPlacement, Prisma } from "@prisma/client";
 import db from "../db.server";
 
 const VIEW_DEDUPE_WINDOW_MS = 1000 * 60 * 60 * 24;
+
+export interface AnalyticsDashboardFilters {
+  dateFrom?: Date | null;
+  dateTo?: Date | null;
+  offerIds?: string[] | null;
+}
 
 export interface OfferViewTrackingInput {
   shop: string;
@@ -70,10 +76,12 @@ export interface OfferPurchaseTrackingInput {
   customerId?: string | null;
   guestKey?: string | null;
   isGuest?: boolean;
+  revenue?: number | string | Prisma.Decimal | null;
 }
 
 export interface OfferPurchaseMetrics {
   totalPurchases: number;
+  totalRevenue: number;
   offerBreakdown: Array<{ offerId: string; offerName: string; purchases: number }>;
   productBreakdown: Array<{ productId: string; purchases: number }>;
 }
@@ -93,6 +101,7 @@ export interface OfferAnalyticsDetail {
   offer: {
     id: string;
     name: string;
+    isActive: boolean;
     configuredProductCount: number;
   };
   summary: {
@@ -112,6 +121,7 @@ export interface OfferAnalyticsDetail {
     addToCartRate: number | null;
     purchaseRate: number | null;
   };
+  totalRevenue: number;
   products: OfferAnalyticsDetailProduct[];
 }
 
@@ -121,6 +131,7 @@ export async function getOfferAnalyticsForOffer(shop: string, offerId: string): 
     select: {
       id: true,
       name: true,
+      isActive: true,
       targetProductIds: true,
       triggerRules: true,
     },
@@ -194,6 +205,12 @@ export async function getOfferAnalyticsForOffer(shop: string, offerId: string): 
     productMap.set(row.productId, productEntry);
   }
 
+  const revenueResult = await db.offerEvent.aggregate({
+    where: { shop, offerId, eventType: OfferEventType.purchased },
+    _sum: { revenue: true },
+  });
+  const totalRevenue = revenueResult._sum.revenue == null ? 0 : Number(revenueResult._sum.revenue.toString());
+
   const productIds = Array.from(productMap.keys());
   const productMetaRows = productIds.length
     ? await db.productVariant.findMany({
@@ -242,6 +259,7 @@ export async function getOfferAnalyticsForOffer(shop: string, offerId: string): 
     offer: {
       id: offer.id,
       name: offer.name,
+      isActive: offer.isActive,
       configuredProductCount,
     },
     summary: {
@@ -261,6 +279,7 @@ export async function getOfferAnalyticsForOffer(shop: string, offerId: string): 
       addToCartRate,
       purchaseRate,
     },
+    totalRevenue,
     products,
   };
 }
@@ -324,37 +343,38 @@ export async function trackOfferImpression(
   return { counted: true, duplicate: false, eventId: created.id };
 }
 
-export async function getOfferViewMetrics(shop: string): Promise<OfferViewMetrics> {
+export async function getOfferViewMetrics(shop: string, filters?: AnalyticsDashboardFilters): Promise<OfferViewMetrics> {
+  const eventWhere: Prisma.OfferEventWhereInput = { shop, eventType: OfferEventType.viewed };
+  if (filters?.dateFrom || filters?.dateTo) {
+    eventWhere.createdAt = {
+      ...(filters.dateFrom ? { gte: filters.dateFrom } : {}),
+      ...(filters.dateTo ? { lte: filters.dateTo } : {}),
+    };
+  }
+  if (filters?.offerIds && filters.offerIds.length > 0) {
+    eventWhere.offerId = { in: filters.offerIds };
+  }
+
   const [totalViews, uniqueLoggedInUsers, uniqueGuestUsers, offerSummary, productSummary] = await Promise.all([
-    db.offerEvent.count({
-      where: { shop, eventType: OfferEventType.viewed },
-    }),
+    db.offerEvent.count({ where: eventWhere }),
     db.offerEvent.groupBy({
       by: ["customerId"],
-      where: {
-        shop,
-        eventType: OfferEventType.viewed,
-        customerId: { not: null },
-      },
+      where: { ...eventWhere, customerId: { not: null } },
       _count: { customerId: true },
     }),
     db.offerEvent.groupBy({
       by: ["guestKey"],
-      where: {
-        shop,
-        eventType: OfferEventType.viewed,
-        guestKey: { not: null },
-      },
+      where: { ...eventWhere, guestKey: { not: null } },
       _count: { guestKey: true },
     }),
     db.offerEvent.groupBy({
       by: ["offerId"],
-      where: { shop, eventType: OfferEventType.viewed },
+      where: eventWhere,
       _count: { _all: true },
     }),
     db.offerEvent.groupBy({
       by: ["productId"],
-      where: { shop, eventType: OfferEventType.viewed },
+      where: eventWhere,
       _count: { _all: true },
     }),
   ]);
@@ -451,19 +471,28 @@ export async function trackOfferClick(
   return { counted: true, duplicate: false, eventId: created.id };
 }
 
-export async function getOfferClickMetrics(shop: string): Promise<OfferClickMetrics> {
+export async function getOfferClickMetrics(shop: string, filters?: AnalyticsDashboardFilters): Promise<OfferClickMetrics> {
+  const eventWhere: Prisma.OfferEventWhereInput = { shop, eventType: OfferEventType.clicked };
+  if (filters?.dateFrom || filters?.dateTo) {
+    eventWhere.createdAt = {
+      ...(filters.dateFrom ? { gte: filters.dateFrom } : {}),
+      ...(filters.dateTo ? { lte: filters.dateTo } : {}),
+    };
+  }
+  if (filters?.offerIds && filters.offerIds.length > 0) {
+    eventWhere.offerId = { in: filters.offerIds };
+  }
+
   const [totalClicks, offerSummary, productSummary] = await Promise.all([
-    db.offerEvent.count({
-      where: { shop, eventType: OfferEventType.clicked },
-    }),
+    db.offerEvent.count({ where: eventWhere }),
     db.offerEvent.groupBy({
       by: ["offerId"],
-      where: { shop, eventType: OfferEventType.clicked },
+      where: eventWhere,
       _count: { _all: true },
     }),
     db.offerEvent.groupBy({
       by: ["productId"],
-      where: { shop, eventType: OfferEventType.clicked },
+      where: eventWhere,
       _count: { _all: true },
     }),
   ]);
@@ -558,19 +587,28 @@ export async function trackOfferAddedToCart(
   return { counted: true, duplicate: false, eventId: created.id };
 }
 
-export async function getOfferAddedToCartMetrics(shop: string): Promise<OfferAddedToCartMetrics> {
+export async function getOfferAddedToCartMetrics(shop: string, filters?: AnalyticsDashboardFilters): Promise<OfferAddedToCartMetrics> {
+  const eventWhere: Prisma.OfferEventWhereInput = { shop, eventType: OfferEventType.added_to_cart };
+  if (filters?.dateFrom || filters?.dateTo) {
+    eventWhere.createdAt = {
+      ...(filters.dateFrom ? { gte: filters.dateFrom } : {}),
+      ...(filters.dateTo ? { lte: filters.dateTo } : {}),
+    };
+  }
+  if (filters?.offerIds && filters.offerIds.length > 0) {
+    eventWhere.offerId = { in: filters.offerIds };
+  }
+
   const [totalAddedToCart, offerSummary, productSummary] = await Promise.all([
-    db.offerEvent.count({
-      where: { shop, eventType: OfferEventType.added_to_cart },
-    }),
+    db.offerEvent.count({ where: eventWhere }),
     db.offerEvent.groupBy({
       by: ["offerId"],
-      where: { shop, eventType: OfferEventType.added_to_cart },
+      where: eventWhere,
       _count: { _all: true },
     }),
     db.offerEvent.groupBy({
       by: ["productId"],
-      where: { shop, eventType: OfferEventType.added_to_cart },
+      where: eventWhere,
       _count: { _all: true },
     }),
   ]);
@@ -629,6 +667,9 @@ export async function trackOfferPurchase(
     return { counted: false, duplicate: false, eventId: null };
   }
 
+  const rawRevenue = input.revenue == null ? null : Number(input.revenue);
+  const normalizedRevenue = Number.isFinite(rawRevenue) ? Math.max(0, rawRevenue as number) : null;
+
   const duplicate = await db.offerEvent.findFirst({
     where: {
       shop,
@@ -657,15 +698,14 @@ export async function trackOfferPurchase(
       productId,
       variantId,
       placement: input.placement,
+      ...(normalizedRevenue != null ? { revenue: normalizedRevenue } : {}),
     },
   });
 
   return { counted: true, duplicate: false, eventId: created.id };
 }
 
-export async function getOfferPurchaseMetrics(shop: string): Promise<OfferPurchaseMetrics> {
-  // Guard against a stale Prisma client: if OfferEventType.purchased is
-  // missing, the filter would silently drop and count ALL events as purchases.
+export async function getOfferPurchaseMetrics(shop: string, filters?: AnalyticsDashboardFilters): Promise<OfferPurchaseMetrics> {
   const purchasedType = OfferEventType.purchased;
   if (purchasedType !== "purchased") {
     throw new Error(
@@ -673,21 +713,33 @@ export async function getOfferPurchaseMetrics(shop: string): Promise<OfferPurcha
     );
   }
 
-  const [totalPurchases, offerSummary, productSummary] = await Promise.all([
-    db.offerEvent.count({
-      where: { shop, eventType: purchasedType },
-    }),
+  const eventWhere: Prisma.OfferEventWhereInput = { shop, eventType: purchasedType };
+  if (filters?.dateFrom || filters?.dateTo) {
+    eventWhere.createdAt = {
+      ...(filters.dateFrom ? { gte: filters.dateFrom } : {}),
+      ...(filters.dateTo ? { lte: filters.dateTo } : {}),
+    };
+  }
+  if (filters?.offerIds && filters.offerIds.length > 0) {
+    eventWhere.offerId = { in: filters.offerIds };
+  }
+
+  const [totalPurchases, revenueTotals, offerSummary, productSummary] = await Promise.all([
+    db.offerEvent.count({ where: eventWhere }),
+    db.offerEvent.aggregate({ where: eventWhere, _sum: { revenue: true } }),
     db.offerEvent.groupBy({
       by: ["offerId"],
-      where: { shop, eventType: purchasedType },
+      where: eventWhere,
       _count: { _all: true },
     }),
     db.offerEvent.groupBy({
       by: ["productId"],
-      where: { shop, eventType: purchasedType },
+      where: eventWhere,
       _count: { _all: true },
     }),
   ]);
+
+  const totalRevenue = revenueTotals._sum.revenue == null ? 0 : Number(revenueTotals._sum.revenue.toString());
 
   const offerIds = offerSummary.map((row) => row.offerId).filter(Boolean);
   const offerMap = new Map(
@@ -715,7 +767,147 @@ export async function getOfferPurchaseMetrics(shop: string): Promise<OfferPurcha
 
   return {
     totalPurchases,
+    totalRevenue,
     offerBreakdown,
     productBreakdown,
   };
+}
+
+/** Purchase revenue grouped by offer for list views. Values are persisted event revenue, not estimates. */
+export async function getOfferRevenueByOffer(shop: string): Promise<Array<{ offerId: string; revenue: number }>> {
+  const rows = await db.offerEvent.groupBy({
+    by: ["offerId"],
+    where: { shop, eventType: OfferEventType.purchased },
+    _sum: { revenue: true },
+  });
+
+  return rows.map((row) => ({
+    offerId: row.offerId,
+    revenue: row._sum.revenue == null ? 0 : Number(row._sum.revenue.toString()),
+  }));
+}
+
+export async function getOfferTrendMetrics(shop: string, days = 12, filters?: AnalyticsDashboardFilters): Promise<{
+  labels: string[];
+  views: number[];
+  clicks: number[];
+  addedToCart: number[];
+  purchases: number[];
+}> {
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  since.setDate(since.getDate() - (days - 1));
+
+  const eventWhere: Prisma.OfferEventWhereInput = { shop, createdAt: { gte: since } };
+  if (filters?.dateFrom || filters?.dateTo) {
+    eventWhere.createdAt = {
+      gte: filters.dateFrom && filters.dateFrom > since ? filters.dateFrom : since,
+      ...(filters.dateTo ? { lte: filters.dateTo } : {}),
+    };
+  }
+  if (filters?.offerIds && filters.offerIds.length > 0) {
+    eventWhere.offerId = { in: filters.offerIds };
+  }
+
+  const rows = await db.offerEvent.findMany({
+    where: eventWhere,
+    select: {
+      createdAt: true,
+      eventType: true,
+    },
+  });
+
+  const bucketMap = new Map<string, { views: number; clicks: number; addedToCart: number; purchases: number }>();
+
+  for (let i = 0; i < days; i += 1) {
+    const date = new Date(since);
+    date.setDate(since.getDate() + i);
+    const key = date.toISOString().slice(0, 10);
+    bucketMap.set(key, { views: 0, clicks: 0, addedToCart: 0, purchases: 0 });
+  }
+
+  for (const row of rows) {
+    const key = row.createdAt.toISOString().slice(0, 10);
+    if (!bucketMap.has(key)) continue;
+    const bucket = bucketMap.get(key)!;
+
+    if (row.eventType === OfferEventType.viewed) bucket.views += 1;
+    if (row.eventType === OfferEventType.clicked) bucket.clicks += 1;
+    if (row.eventType === OfferEventType.added_to_cart) bucket.addedToCart += 1;
+    if (row.eventType === OfferEventType.purchased) bucket.purchases += 1;
+  }
+
+  const labels: string[] = [];
+  const views: number[] = [];
+  const clicks: number[] = [];
+  const addedToCart: number[] = [];
+  const purchases: number[] = [];
+
+  for (let i = 0; i < days; i += 1) {
+    const date = new Date(since);
+    date.setDate(since.getDate() + i);
+    const key = date.toISOString().slice(0, 10);
+    const bucket = bucketMap.get(key) ?? { views: 0, clicks: 0, addedToCart: 0, purchases: 0 };
+    labels.push(date.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+    views.push(bucket.views);
+    clicks.push(bucket.clicks);
+    addedToCart.push(bucket.addedToCart);
+    purchases.push(bucket.purchases);
+  }
+
+  return { labels, views, clicks, addedToCart, purchases };
+}
+
+export interface DashboardFilterParams {
+  days?: number;
+  status?: string;
+}
+
+export interface DashboardMetricsResult {
+  viewMetrics: OfferViewMetrics;
+  clickMetrics: OfferClickMetrics;
+  addedToCartMetrics: OfferAddedToCartMetrics;
+  purchaseMetrics: OfferPurchaseMetrics;
+  trendMetrics: {
+    labels: string[];
+    views: number[];
+    clicks: number[];
+    addedToCart: number[];
+    purchases: number[];
+  };
+}
+
+export async function getFilteredDashboardMetrics(
+  shop: string,
+  params: DashboardFilterParams,
+): Promise<DashboardMetricsResult> {
+  const days = Math.max(1, Math.min(365, params.days ?? 30));
+
+  const dateFrom = new Date();
+  dateFrom.setHours(0, 0, 0, 0);
+  dateFrom.setDate(dateFrom.getDate() - (days - 1));
+
+  let offerIds: string[] | null = null;
+  if (params.status && params.status !== "all") {
+    const offerWhere: Prisma.OfferWhereInput = { shop };
+    if (params.status === "live") offerWhere.isActive = true;
+    else if (params.status === "draft") offerWhere.isActive = false;
+    const matchingOffers = await db.offer.findMany({ where: offerWhere, select: { id: true } });
+    offerIds = matchingOffers.map((o) => o.id);
+  }
+
+  const filters: AnalyticsDashboardFilters = {
+    dateFrom,
+    offerIds,
+  };
+
+  const [viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics] = await Promise.all([
+    getOfferViewMetrics(shop, filters),
+    getOfferClickMetrics(shop, filters),
+    getOfferAddedToCartMetrics(shop, filters),
+    getOfferPurchaseMetrics(shop, filters),
+    getOfferTrendMetrics(shop, days, filters),
+  ]);
+
+  return { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics };
 }

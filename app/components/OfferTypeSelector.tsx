@@ -43,16 +43,20 @@ export default function OfferTypeSelector() {
       <div style={styles.cardGrid}>
         {offerTypeOptions().map((option) => {
           const active = option.value === selectedType;
+          const disabled = option.value !== "cross_sell";
           return (
             <button
               key={option.value}
               type="button"
-              onClick={() => setSelectedType(option.value)}
+              disabled={disabled}
+              onClick={() => !disabled && setSelectedType(option.value)}
               style={{
                 ...styles.card,
                 ...(active ? styles.cardActive : {}),
+                ...(disabled ? styles.cardDisabled : {}),
               }}
               aria-pressed={active}
+              aria-disabled={disabled}
             >
               <span style={styles.cardTitle}>{option.label}</span>
               <span style={styles.cardDescription}>{option.description}</span>
@@ -97,7 +101,7 @@ export default function OfferTypeSelector() {
 
 const styles: Record<string, React.CSSProperties> = {
   wrapper: {
-    padding: "24px 24px 40px",
+    padding: "24px 0 40px",
     maxWidth: 900,
   },
   helpText: { fontSize: 14, color: "#4a4a4a", margin: "0 0 20px" },
@@ -129,6 +133,10 @@ const styles: Record<string, React.CSSProperties> = {
     border: "2px solid #2c6ecb",
     background: "#f0f6ff",
     padding: "15px 17px",
+  },
+  cardDisabled: {
+    cursor: "not-allowed",
+    opacity: 0.5,
   },
   cardTitle: { fontSize: 15, fontWeight: 700, color: "#202223" },
   cardDescription: { fontSize: 13, color: "#5C5F62", lineHeight: 1.4 },

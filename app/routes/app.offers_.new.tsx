@@ -38,6 +38,7 @@ import {
   normalizeOfferType,
 } from "../config/offerTypes";
 import { validateOfferFields } from "../validation/offerSchemas";
+import "../styles/app._index.css";
 
 // ── Loader ─────────────────────────────────────────────────────────────
 
@@ -273,7 +274,7 @@ export default function CreateOfferPage() {
       <fetcher.Form
         method="post"
         onSubmit={handleSubmit}
-        style={{ padding: "24px 24px 40px", maxWidth: 900 }}
+        style={{ padding: "24px 0 40px", maxWidth: 900 }}
       >
         {offer?.id ? (
           <input type="hidden" name="offerId" value={offer.id} />

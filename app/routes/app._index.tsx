@@ -10,12 +10,15 @@ import type { Offer as OfferRecord } from "@prisma/client";
 
 import { authenticate } from "../shopify.server";
 import { listOffers } from "../models/offer.server";
-import { getOfferViewMetrics } from "../models/offerAnalytics.server";
-import { findVariantsByProductIds } from "../models/productVariant.server";
 import {
-  PLACEMENT_LABELS,
-  getOfferTypeConfig,
-} from "../types/offer";
+  getOfferViewMetrics,
+  getOfferClickMetrics,
+  getOfferAddedToCartMetrics,
+  getOfferPurchaseMetrics,
+} from "../models/offerAnalytics.server";
+import { findVariantsByProductIds } from "../models/productVariant.server";
+import Dashboard from "../components/Dashboard";
+import "../styles/app._index.css";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -51,15 +54,35 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (r.productId && r.productTitle) productTitleByProductId[r.productId] = r.productTitle;
   }
 
-  const metrics = await getOfferViewMetrics(session.shop);
+  const [viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics] =
+    await Promise.all([
+      getOfferViewMetrics(session.shop),
+      getOfferClickMetrics(session.shop),
+      getOfferAddedToCartMetrics(session.shop),
+      getOfferPurchaseMetrics(session.shop),
+    ]);
 
-  return { offers, productTitleByProductId, metrics };
+  return {
+    offers,
+    productTitleByProductId,
+    metrics: viewMetrics,
+    clickMetrics,
+    addedToCartMetrics,
+    purchaseMetrics,
+  };
 }
 
 export default function OffersPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { offers, productTitleByProductId, metrics } = useLoaderData<typeof loader>();
+  const {
+    offers,
+    productTitleByProductId,
+    metrics,
+    clickMetrics,
+    addedToCartMetrics,
+    purchaseMetrics,
+  } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const [visibleOffers, setVisibleOffers] = useState(offers);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -210,413 +233,30 @@ export default function OffersPage() {
   }
 
   return (
-    <div style={styles.page}>
-      {/* ---- Top nav ---- */}
-      <div style={styles.navBar}>
-        <div style={styles.navLeft}>
-          <span style={styles.logoMark}>D</span>
-          <span style={styles.logoText}>Dynamic Dreamz</span>
-        </div>
-        <div style={styles.navTabs}>
-          <button
-            onClick={() => setActiveTab("Dashboard")}
-            style={{
-              ...styles.navTab,
-              ...(activeTab === "Dashboard" ? styles.navTabActive : {}),
-            }}
-          >
-            Dashboard
-          </button>
-          {/* Product Sync has its own full dashboard route — navigate there
-              directly instead of rendering a local placeholder, so there's
-              no flash of a bare "Sync Products" button before the real
-              stat cards / charts / table page loads. */}
-          <button style={styles.navTab} onClick={() => navigate("/app/product-sync")}>
-            Product Sync
-          </button>
-          <button
-            onClick={() => setActiveTab("Help")}
-            style={{
-              ...styles.navTab,
-              ...(activeTab === "Help" ? styles.navTabActive : {}),
-            }}
-          >
-            Help
-          </button>
-        </div>
-      </div>
-
-      {activeTab === "Help" ? (
-        <div style={styles.placeholderSection}>
-          <h2 style={styles.placeholderHeading}>Help</h2>
-          <p style={styles.placeholderText}>Help &amp; documentation will appear here.</p>
-        </div>
-      ) : (
-        <>
-          {/* ---- Stat cards ---- */}
-          <div style={styles.statGrid}>
-            <StatCard
-              label="Total Upsell Views"
-              value={totalViews}
-              onViewDetails={() => viewDetails("Total Upsell Views")}
-            />
-            <StatCard
-              label="Upsell Product Added to Checkout"
-              value={totalAdded}
-              onViewDetails={() => viewDetails("Upsell Product Added to Checkout")}
-            />
-            <StatCard
-              label="Active Upsells"
-              value={activeCount}
-              onViewDetails={() => viewDetails("Active Upsells")}
-            />
-          </div>
-
-          {/* ---- Active Upsells section ---- */}
-          <div id="active-upsells-section" style={styles.tableSection}>
-            <div style={styles.tableSectionHeader}>
-              <h2 style={styles.sectionHeading}>Active Upsells</h2>
-              <div style={styles.headerButtons}>
-                <button
-                  style={styles.darkButton}
-                  onClick={goToCreate}
-                >
-                  Create New Upsell Offer
-                </button>
-              </div>
-            </div>
-
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Title</th>
-                  <th style={styles.th}>Product</th>
-                  <th style={styles.th}>Type</th>
-                  <th style={styles.th}>Placement</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleOffers.length === 0 ? (
-                  <tr>
-                    <td style={styles.emptyCell} colSpan={6}>
-                      There are no data
-                    </td>
-                  </tr>
-                ) : (
-                  visibleOffers.map((offer: OfferRecord) => {
-                    const titles = productTitlesForOffer(offer);
-                    const productDisplay =
-                      titles.length === 0
-                        ? "Product unavailable"
-                        : titles.length <= 2
-                        ? titles.join(", ")
-                        : `${titles[0]} + ${titles.length - 1}`;
-
-                    return (
-                      <tr key={offer.id} style={styles.tr}>
-                        <td style={styles.td}>{offer.name}</td>
-                        <td style={styles.td}>{productDisplay}</td>
-                        <td style={styles.td}>
-                          {getOfferTypeConfig(offer.type).label}
-                        </td>
-                        <td style={styles.td}>
-                          {PLACEMENT_LABELS[offer.placement]}
-                        </td>
-                        <td style={styles.td}>
-                          <span
-                            style={{
-                              ...styles.badge,
-                              ...(offer.isActive ? styles.badgeActive : styles.badgeDraft),
-                            }}
-                          >
-                            {offer.isActive ? "Active" : "Draft"}
-                          </span>
-                        </td>
-                        <td style={styles.td}>
-                          <button
-                            style={styles.linkButton}
-                            onClick={() => editUpsell(offer.id)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            style={styles.linkButton}
-                            onClick={() => toggleStatus(offer.id)}
-                          >
-                            {offer.isActive ? "Deactivate" : "Activate"}
-                          </button>
-                          <button
-                            style={{
-                              ...styles.linkButton,
-                              color: deletingId === offer.id ? "#6b7280" : "#d72c0d",
-                              opacity: deletingId === offer.id ? 0.7 : 1,
-                              cursor: deletingId === offer.id ? "not-allowed" : "pointer",
-                            }}
-                            onClick={() => deleteUpsell(offer.id)}
-                            disabled={deletingId === offer.id}
-                          >
-                            {deletingId === offer.id ? "Deleting..." : "Delete"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {deleteTarget && (
-        <div style={styles.modalBackdrop}>
-          <div
-            style={styles.modalCard}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Confirm delete upsell"
-          >
-            <div style={styles.modalHeader}>Delete upsell?</div>
-            <div style={styles.modalBody}>
-              <div style={styles.modalTitle}>Delete this upsell?</div>
-              <div style={styles.modalText}>
-                {deleteTarget.title ? `"${deleteTarget.title}" will be permanently removed.` : "This upsell will be permanently removed."}
-              </div>
-            </div>
-            <div style={styles.modalActions}>
-              <button style={styles.cancelButton} onClick={() => setDeleteTarget(null)}>
-                Cancel
-              </button>
-              <button style={styles.confirmButton} onClick={confirmDelete}>
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toast && <div style={styles.toast}>{toast}</div>}
-    </div>
+    <Dashboard
+      productTitleByProductId={productTitleByProductId}
+      metrics={metrics}
+      clickMetrics={clickMetrics}
+      addedToCartMetrics={addedToCartMetrics}
+      purchaseMetrics={purchaseMetrics}
+      visibleOffers={visibleOffers}
+      deletingId={deletingId}
+      deleteTarget={deleteTarget}
+      activeTab={activeTab}
+      toast={toast}
+      onActiveTabChange={setActiveTab}
+      onCreate={goToCreate}
+      onEdit={editUpsell}
+      onToggleStatus={toggleStatus}
+      onDelete={deleteUpsell}
+      onConfirmDelete={confirmDelete}
+      onCancelDelete={() => setDeleteTarget(null)}
+      onViewDetails={viewDetails}
+      onViewAnalytics={() => navigate("/app/analytics")}
+      onViewAllUpsells={() => navigate("/app/upsells")}
+      onViewOfferAnalytics={(offerId) =>
+        navigate(`/app/analytics/${encodeURIComponent(offerId)}`)
+      }
+    />
   );
 }
-
-function StatCard({
-  label,
-  value,
-  onViewDetails,
-}: {
-  label: string;
-  value: number;
-  onViewDetails: () => void;
-}) {
-  return (
-    <div style={styles.statCard}>
-      <div style={styles.statCardBody}>
-        <div style={styles.statLabel}>{label}</div>
-        <div style={styles.statValue}>{value}</div>
-      </div>
-      <div style={styles.statCardFooter}>
-        <button style={styles.linkButton} onClick={onViewDetails}>
-          View Details
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    background: "#f6f6f7",
-    minHeight: "100vh",
-    fontFamily:
-      "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    color: "#202223",
-  },
-  navBar: {
-    background: "#ffffff",
-    borderBottom: "1px solid #e1e3e5",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "0 24px",
-    height: 56,
-  },
-  navLeft: { display: "flex", alignItems: "center", gap: 8 },
-  logoMark: { color: "#d72c0d", fontWeight: 800, fontSize: 22 },
-  logoText: { fontWeight: 600, fontSize: 15 },
-  navTabs: { display: "flex", gap: 28, height: "100%" },
-  navTab: {
-    background: "none",
-    border: "none",
-    borderBottom: "2px solid transparent",
-    padding: "0 4px",
-    height: "100%",
-    fontSize: 14,
-    color: "#616161",
-    cursor: "pointer",
-  },
-  navTabActive: {
-    color: "#202223",
-    fontWeight: 600,
-    borderBottom: "2px solid #d72c0d",
-  },
-  statGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: 16,
-    padding: 24,
-  },
-  statCard: {
-    background: "#ffffff",
-    borderRadius: 8,
-    border: "1px solid #e1e3e5",
-    overflow: "hidden",
-  },
-  statCardBody: { padding: "20px 20px 24px" },
-  statLabel: { fontSize: 13, color: "#616161", marginBottom: 12 },
-  statValue: { fontSize: 28, fontWeight: 700 },
-  statCardFooter: { background: "#f1f2f3", padding: "10px 20px" },
-  tableSection: {
-    background: "#ffffff",
-    margin: "0 24px 24px",
-    borderRadius: 8,
-    border: "1px solid #e1e3e5",
-    overflow: "hidden",
-  },
-  tableSectionHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "18px 20px",
-  },
-  sectionHeading: { fontSize: 20, fontWeight: 600, margin: 0 },
-  headerButtons: { display: "flex", gap: 12 },
-  darkButton: {
-    background: "#1a1a1a",
-    color: "#fff",
-    border: "none",
-    borderRadius: 6,
-    padding: "9px 16px",
-    fontSize: 13,
-    fontWeight: 500,
-    cursor: "pointer",
-  },
-  table: { width: "100%", borderCollapse: "collapse" },
-  th: {
-    textAlign: "left",
-    background: "#f1f2f3",
-    padding: "12px 20px",
-    fontSize: 13,
-    fontWeight: 600,
-    borderTop: "1px solid #e1e3e5",
-    borderBottom: "1px solid #e1e3e5",
-  },
-  tr: { borderBottom: "1px solid #f1f2f3" },
-  td: { padding: "14px 20px", fontSize: 14 },
-  emptyCell: {
-    padding: "40px 20px",
-    textAlign: "center",
-    fontSize: 15,
-    color: "#4a4a4a",
-  },
-  badge: {
-    display: "inline-block",
-    padding: "3px 10px",
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: 600,
-  },
-  badgeActive: { background: "#d3f9d8", color: "#1a7f37" },
-  badgeDraft: { background: "#f1f2f3", color: "#616161" },
-  linkButton: {
-    background: "none",
-    border: "none",
-    color: "#2c6ecb",
-    fontSize: 13,
-    cursor: "pointer",
-    marginRight: 14,
-    padding: 0,
-  },
-  placeholderSection: { padding: 40 },
-  placeholderHeading: { margin: "0 0 8px" },
-  placeholderText: { color: "#616161" },
-  modalBackdrop: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(16, 24, 40, 0.28)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1200,
-  },
-  modalCard: {
-    width: "min(420px, calc(100vw - 32px))",
-    background: "#ffffff",
-    border: "1px solid #dfe3e8",
-    borderRadius: 12,
-    boxShadow: "0 18px 40px rgba(0, 0, 0, 0.16)",
-    overflow: "hidden",
-  },
-  modalHeader: {
-    padding: "16px 20px",
-    background: "#f6f6f7",
-    borderBottom: "1px solid #e1e3e5",
-    fontSize: 15,
-    fontWeight: 700,
-    color: "#202223",
-  },
-  modalBody: {
-    padding: "20px",
-  },
-  modalTitle: {
-    fontSize: 15,
-    fontWeight: 700,
-    color: "#202223",
-    marginBottom: 8,
-  },
-  modalText: {
-    fontSize: 14,
-    lineHeight: 1.5,
-    color: "#4a4a4a",
-  },
-  modalActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: 12,
-    padding: "0 20px 20px",
-  },
-  cancelButton: {
-    background: "#ffffff",
-    border: "1px solid #c4cdd5",
-    color: "#202223",
-    borderRadius: 999,
-    padding: "10px 18px",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  confirmButton: {
-    background: "#d72c0d",
-    border: "none",
-    color: "#ffffff",
-    borderRadius: 999,
-    padding: "10px 18px",
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  toast: {
-    position: "fixed",
-    bottom: 24,
-    left: "50%",
-    transform: "translateX(-50%)",
-    background: "#1a1a1a",
-    color: "#fff",
-    padding: "10px 18px",
-    borderRadius: 6,
-    fontSize: 13,
-    zIndex: 1100,
-  },
-};

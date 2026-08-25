@@ -4,8 +4,10 @@ import { OfferPlacement, OfferType, PrismaClient } from "@prisma/client";
 import { createOffer } from "../app/models/offer.server";
 import {
   getOfferAnalyticsForOffer,
+  getOfferPurchaseMetrics,
   getOfferViewMetrics,
   trackOfferImpression,
+  trackOfferPurchase,
 } from "../app/models/offerAnalytics.server";
 
 const db = new PrismaClient();
@@ -165,5 +167,47 @@ describe("upsell viewed tracking", () => {
     expect(metrics.uniqueLoggedInUsers).toBe(0);
     expect(metrics.uniqueGuestUsers).toBe(1);
     expect(metrics.productBreakdown[0]?.views).toBe(1);
+  });
+
+  it("returns real revenue totals from purchase events", async () => {
+    const offer = await createOffer(SHOP, {
+      name: "Revenue Test",
+      type: OfferType.cross_sell,
+      placement: OfferPlacement.checkout,
+      targetProductIds: ["gid://shopify/Product/3003"],
+      isActive: true,
+    });
+
+    await trackOfferPurchase({
+      shop: SHOP,
+      offerId: offer.id,
+      offerName: offer.name,
+      productId: "gid://shopify/Product/3003",
+      variantId: "gid://shopify/ProductVariant/4003",
+      placement: OfferPlacement.checkout,
+      orderId: "order-1",
+      customerId: "customer-1",
+      guestKey: null,
+      isGuest: false,
+      revenue: 19.99,
+    });
+
+    await trackOfferPurchase({
+      shop: SHOP,
+      offerId: offer.id,
+      offerName: offer.name,
+      productId: "gid://shopify/Product/3003",
+      variantId: "gid://shopify/ProductVariant/4003",
+      placement: OfferPlacement.checkout,
+      orderId: "order-2",
+      customerId: "customer-2",
+      guestKey: null,
+      isGuest: false,
+      revenue: 42.5,
+    });
+
+    const metrics = await getOfferPurchaseMetrics(SHOP);
+    expect(metrics.totalPurchases).toBe(2);
+    expect(metrics.totalRevenue).toBe(62.49);
   });
 });
