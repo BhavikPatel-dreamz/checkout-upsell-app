@@ -8,7 +8,8 @@
 
 <script>
   window.CART_UPSELL_CONFIG = {
-    eligibilityUrl: "/apps/checkout-upsell/api/offers/eligible"
+    eligibilityUrl: "/apps/checkout-upsell/api/offers/eligible",
+    customerId: {% if customer %}{{ customer.id }}{% else %}null{% endif %}
   };
 </script>
 
