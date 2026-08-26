@@ -524,19 +524,7 @@ export default function AnalyticsDashboard({
                 <option value="90d">Last 90 days</option>
               </select>
             </label>
-            <button type="button" className="analytics-icon-button" aria-label="Download report">
-              <span aria-hidden="true">⬇</span>
-            </button>
-            <button
-              type="button"
-              className="analytics-icon-button"
-              aria-label="Refresh analytics"
-              onClick={() => onRefresh?.()}
-              disabled={isRefreshing}
-              title={isRefreshing ? "Refreshing data..." : "Refresh analytics"}
-            >
-              <span aria-hidden="true">↻</span>
-            </button>
+
           </div>
         </header>
 

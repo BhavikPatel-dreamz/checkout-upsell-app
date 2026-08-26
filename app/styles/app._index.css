@@ -578,3 +578,39 @@
     padding: 16px;
   }
 }
+
+/* Onboarding page responsive */
+@media (max-width: 900px) {
+  .onboardingStepsGrid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .onboardingOfferTypeGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .onboardingMetricsGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .onboardingCtaButtons {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .onboardingStepsGrid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .onboardingWelcomeContent {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .onboardingGuideHeader {
+    flex-direction: column;
+    text-align: center;
+  }
+}
