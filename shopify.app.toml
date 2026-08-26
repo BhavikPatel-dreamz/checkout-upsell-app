@@ -2,8 +2,9 @@
 
 client_id = "af17d3edcb1fe476de8388c085611521"
 name = "Checkout Upsell App"
-application_url = "https://dd-75.dynamicdreamz.net"
+application_url = "https://upsell.dreamzapps.com"
 embedded = true
+
 
 [build]
 automatically_update_urls_on_dev = true
@@ -28,7 +29,7 @@ api_version = "2026-10"
 scopes = "read_orders,write_metaobject_definitions,write_metaobjects,write_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://upsell.dreamzapps.com/api/auth" ]
 
 [app_proxy]
 url = "https://dd-75.dynamicdreamz.net"
