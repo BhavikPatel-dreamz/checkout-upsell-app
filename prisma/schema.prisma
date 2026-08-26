@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,8 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// OAuth / session storage — required by @shopify/shopify-app-react-router
-// (PrismaSessionStorage). Do not rename or remove; the adapter fixes this shape.
 model Session {
   id                  String    @id
   shop                String
@@ -32,156 +27,113 @@ model Session {
   refreshTokenExpires DateTime?
 }
 
-// App-level record for an installed shop. OAuth data lives in `Session`;
-// this is the home for per-shop app settings and config going forward.
 model Shop {
   id        String   @id @default(cuid())
-  shop      String   @unique // myshopify.com domain
+  shop      String   @unique
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-enum OfferType {
-  cross_sell
-  bundle
-  volume
-  free_gift
-  subscription
-}
-
-enum OfferPlacement {
-  product_page
-  cart_drawer
-  checkout
-  post_purchase
-  order_status
-}
-
-enum OfferEventType {
-  viewed
-  accepted
-  declined
-}
-
 model Offer {
   id               String         @id @default(cuid())
-  shop             String // myshopify.com domain — every query is scoped by this
+  shop             String
   name             String
   type             OfferType
   placement        OfferPlacement
-  targetProductIds String[] // Shopify product GIDs, e.g. gid://shopify/Product/123
-  triggerRules     Json? // e.g. { "cartValueMin": 50, "collectionIds": [...], "customerTags": [...] }
+  targetProductIds String[]
+  triggerRules     Json?
   isActive         Boolean        @default(true)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
-
-  events OfferEvent[]
+  events           OfferEvent[]
 
   @@index([shop])
   @@index([shop, placement, isActive])
 }
 
 model OfferEvent {
-  id        String         @id @default(cuid())
-  offerId   String
-  offer     Offer          @relation(fields: [offerId], references: [id], onDelete: Cascade)
-  shop      String // denormalized for fast shop-scoped analytics
-  eventType OfferEventType
-  orderId   String? // Shopify order GID when the event ties to an order
-  revenue   Decimal?       @db.Decimal(12, 2)
-  createdAt DateTime       @default(now())
+  id         String          @id @default(cuid())
+  offerId    String
+  shop       String
+  eventType  OfferEventType
+  orderId    String?
+  revenue    Decimal?        @db.Decimal(12, 2)
+  createdAt  DateTime        @default(now())
+  customerId String?
+  guestKey   String?
+  placement  OfferPlacement?
+  productId  String?
+  variantId  String?
+  lineItemId String?
+  offer      Offer           @relation(fields: [offerId], references: [id], onDelete: Cascade)
 
   @@index([offerId, eventType])
   @@index([shop])
   @@index([offerId, createdAt])
+  @@index([shop, eventType, customerId])
+  @@index([shop, eventType, guestKey])
+  @@index([shop, eventType, offerId, productId, variantId, customerId])
+  @@index([shop, eventType, offerId, productId, variantId, guestKey])
 }
 
-// Synced Shopify catalog — ONE ROW PER VARIANT (the unit we upsell/suggest).
-// Populated by the dashboard "Sync products" action, upserted by [shop, variantId].
-// Parent-product fields are denormalized onto each variant row. Standard core.
 model ProductVariant {
-  id   String @id @default(cuid())
-  shop String // myshopify.com domain — every query is scoped by this
-
-  // Variant — this row's identity
-  variantId         String // gid://shopify/ProductVariant/123
-  variantTitle      String? // e.g. "Small / Blue"
+  id                String   @id @default(cuid())
+  shop              String
+  variantId         String
+  variantTitle      String?
   sku               String?
   price             Decimal? @db.Decimal(12, 2)
   compareAtPrice    Decimal? @db.Decimal(12, 2)
   inventoryQuantity Int?
   availableForSale  Boolean  @default(true)
-  selectedOptions   Json? // [{ "name": "Size", "value": "Small" }, ...]
-  imageUrl          String? // variant image, falling back to product image at sync time
-
-  // Parent product — denormalized onto every variant row
-  productId     String // gid://shopify/Product/123
-  productTitle  String
-  productHandle String?
-  productStatus String? // ACTIVE | ARCHIVED | DRAFT
-
-  syncedAt  DateTime @default(now()) // stamp of the run that last touched this row
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  selectedOptions   Json?
+  imageUrl          String?
+  productId         String
+  productTitle      String
+  productHandle     String?
+  productStatus     String?
+  syncedAt          DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@unique([shop, variantId])
   @@index([shop])
   @@index([shop, productId])
 }
 
-// One row per product-sync run, shop-scoped. Powers the dashboard progress bar
-// (via `estimated`, the prior successful run's variant count) and the sync-log
-// history table. Written by app/models/syncLog.server.ts. Standard core.
 model SyncLog {
   id         String    @id @default(cuid())
-  shop       String // myshopify.com domain — every query is scoped by this
-  status     String    @default("running") // running | success | error
+  shop       String
+  status     String    @default("running")
   startedAt  DateTime  @default(now())
   finishedAt DateTime?
   pages      Int       @default(0)
-  upserted   Int       @default(0) // variant rows created or updated this run
-  removed    Int       @default(0) // stale rows deleted on the final chunk
-  estimated  Int? // progress denominator = prior successful run's upserted
+  upserted   Int       @default(0)
+  removed    Int       @default(0)
+  estimated  Int?
   error      String?
   createdAt  DateTime  @default(now())
+  cursor     String?
 
   @@index([shop, startedAt])
 }
 
-// ===========================================================================
-// Legacy (v1) upsell app — ported from upSell_live.sql (MySQL 8.0 / Laravel).
-//
-// Faithful structural port of the previous production schema so its data can
-// be migrated into / read from this app. Original table + column names are
-// preserved via @@map / @map, integer auto-increment PKs are kept, and MySQL
-// types are translated to Postgres/Prisma equivalents:
-//   tinyint(1) -> Boolean · text/longtext -> String @db.Text
-//   enum('0','1') -> String (codes documented inline) · bigint unsigned -> BigInt
-//
-// These models are intentionally kept SEPARATE from the new Offer/OfferEvent
-// core (the Standard product) and carry no relations to it — the legacy DB had
-// no FK constraints, and upsell_id/client_id links mix int/bigint types.
-// Excluded from the dump: Laravel framework tables (migrations, jobs,
-// failed_jobs) and admin-auth tables (admins, upsell_admin).
-// ===========================================================================
-
-// Per-product upsell configuration (NOT the Shopify product catalog).
 model Product {
   id              BigInt    @id @default(autoincrement())
-  title           String?   @db.Text
-  showUpsell      Boolean   @default(true) @map("show_upsell") // 1=Always, 0=Based on Condition
-  isCondition     Boolean?  @map("is_condition") // 1=is_order, 0=is_customer_tag
+  title           String?
+  showUpsell      Boolean   @default(true) @map("show_upsell")
+  isCondition     Boolean?  @map("is_condition")
   upsellOn        String?   @map("upsell_on") @db.VarChar(255)
   upsellDaterange String?   @map("upsell_daterange") @db.VarChar(100)
-  product         String?   @db.VarChar(255) // 0=manual, 1=related, 2=random
+  product         String?   @db.VarChar(255)
   shopDomain      String?   @map("shop_domain") @db.VarChar(255)
-  productId       String?   @map("product_id") @db.Text
-  variantId       String?   @map("variant_id") @db.Text
-  offer           Int? // 1=Free, 2=Discount, 0=As it is
+  productId       String?   @map("product_id")
+  variantId       String?   @map("variant_id")
+  offer           Int?
   isDiscount      Int?      @map("is_discount")
   promotionTitle  String?   @map("promotion_title") @db.VarChar(255)
-  action          Boolean   @default(true) // 0=off, 1=on
+  action          Boolean   @default(true)
   attribute       String?   @db.VarChar(100)
   createdAt       DateTime? @default(now()) @map("created_at")
   updatedAt       DateTime? @updatedAt @map("updated_at")
@@ -210,7 +162,7 @@ model UpsellHistory {
   productId  String?  @map("product_id") @db.VarChar(255)
   variantId  String?  @map("variant_id") @db.VarChar(255)
   shopdomain String?  @db.VarChar(255)
-  action     String   @default("1") // 1=display, 2=Added
+  action     String   @default("1")
   attribute  String?  @db.VarChar(255)
   type       String?  @db.VarChar(20)
   dateTime   DateTime @default(now()) @map("date_time")
@@ -222,7 +174,7 @@ model Condition {
   id              Int      @id @default(autoincrement())
   conditionTypeId Int      @map("condition_type_id")
   conditionName   String   @map("condition_name") @db.VarChar(255)
-  isActive        Boolean  @default(true) @map("is_active") // 1=Active, 0=Inactive
+  isActive        Boolean  @default(true) @map("is_active")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -257,7 +209,7 @@ model Setting {
   borderColor     String?   @map("border_color") @db.VarChar(20)
   titleSize       String?   @map("title_size") @db.VarChar(20)
   buttonBorder    String?   @map("button_border") @db.VarChar(20)
-  buttonRadious   String?   @map("button_radious") @db.VarChar(20) // legacy spelling preserved
+  buttonRadious   String?   @map("button_radious") @db.VarChar(20)
   createdAt       DateTime? @map("created_at")
   updatedAt       DateTime? @default(now()) @map("updated_at")
 
@@ -278,7 +230,7 @@ model StoreDetail {
   planName        String?   @map("plan_name") @db.VarChar(50)
   createdAt       DateTime? @default(now()) @map("created_at")
   updatedAt       DateTime? @default(now()) @map("updated_at")
-  isActive        Boolean   @default(true) @map("is_active") // 0=inactive, 1=active
+  isActive        Boolean   @default(true) @map("is_active")
 
   @@map("storedetails")
 }
@@ -299,9 +251,9 @@ model RecurringApplicationCharge {
   chargeId  String?  @map("charge_id") @db.VarChar(255)
   name      String?  @db.VarChar(255)
   price     String?  @db.VarChar(10)
-  response  String?  @db.Text
-  isApprove Boolean  @default(false) @map("is_approve") // 0=unapproved, 1=approved
-  isActive  Boolean  @default(true) @map("is_active") // 0=inactive, 1=active
+  response  String?
+  isApprove Boolean  @default(false) @map("is_approve")
+  isActive  Boolean  @default(true) @map("is_active")
   created   DateTime @default(now())
   modified  DateTime @default(now())
 
@@ -314,7 +266,7 @@ model Webhook {
   webhookId String?   @map("webhook_id") @db.VarChar(255)
   topic     String?   @db.VarChar(255)
   address   String?   @db.VarChar(255)
-  response  String?   @db.Text
+  response  String?
   created   DateTime? @default(now())
   modified  DateTime? @default(now())
 
@@ -324,7 +276,7 @@ model Webhook {
 model Gdpr {
   id        Int      @id @default(autoincrement())
   topic     String   @db.VarChar(25)
-  response  String   @db.Text
+  response  String
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @map("updated_at")
 
@@ -335,7 +287,7 @@ model JobsHistory {
   id        BigInt   @id @default(autoincrement())
   store     String?  @db.VarChar(200)
   job       String?  @db.VarChar(100)
-  status    String   @default("0") // enum('0','1')
+  status    String   @default("0")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("jobs_history")
@@ -348,4 +300,29 @@ model Currency {
   currencySymbol String @map("currency_symbol") @db.VarChar(50)
 
   @@map("currency")
+}
+
+enum OfferType {
+  cross_sell
+  bundle
+  volume
+  free_gift
+  subscription
+}
+
+enum OfferPlacement {
+  product_page
+  cart_drawer
+  checkout
+  post_purchase
+  order_status
+}
+
+enum OfferEventType {
+  viewed
+  accepted
+  declined
+  clicked
+  added_to_cart
+  purchased
 }

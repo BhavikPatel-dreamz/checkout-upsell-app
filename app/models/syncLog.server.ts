@@ -37,15 +37,34 @@ export async function startSyncRun(shop: string) {
 }
 
 /** Add one processed chunk's counts to a running run. */
+/** Load one run's saved progress — used to resume after a refresh/tab switch. */
+export async function getSyncRun(runId: string) {
+  return db.syncLog.findUnique({
+    where: { id: runId },
+    select: {
+      id: true,
+      shop: true,
+      status: true,
+      startedAt: true,
+      estimated: true,
+      upserted: true,
+      pages: true,
+      cursor: true,
+    },
+  });
+}
+
+/** Add one processed chunk's counts to a running run. */
 export async function recordChunk(
   runId: string,
-  { upserted, pages }: { upserted: number; pages: number },
+  { upserted, pages, cursor }: { upserted: number; pages: number; cursor: string | null },
 ) {
   await db.syncLog.update({
     where: { id: runId },
     data: {
       upserted: { increment: upserted },
       pages: { increment: pages },
+      cursor,
     },
   });
 }
@@ -70,6 +89,16 @@ export async function failSyncRun(runId: string, message: string) {
       error: message.slice(0, 1000),
       finishedAt: new Date(),
     },
+  });
+}
+
+/** Mark a run paused (user clicked Stop). Does NOT touch the checkpoint —
+ *  upserted/cursor/pages stay exactly as the last completed chunk left them,
+ *  so this is purely a status flip, never a progress change. */
+export async function pauseSyncRun(runId: string) {
+  await db.syncLog.update({
+    where: { id: runId },
+    data: { status: "paused" },
   });
 }
 

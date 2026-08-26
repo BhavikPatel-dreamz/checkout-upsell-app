@@ -1,313 +1,262 @@
-import { useEffect } from "react";
-import type {
-  ActionFunctionArgs,
-  HeadersFunction,
-  LoaderFunctionArgs,
+import { useState, useEffect } from "react";
+import {
+  useLoaderData,
+  useNavigate,
+  useSearchParams,
+  useLocation,
+  type LoaderFunctionArgs,
 } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
-import { boundary } from "@shopify/shopify-app-react-router/server";
+import type { Offer as OfferRecord } from "@prisma/client";
+
 import { authenticate } from "../shopify.server";
+import { listOffers } from "../models/offer.server";
 import {
-  deleteStaleVariants,
-  getSyncStatus,
-  syncProductsChunk,
-} from "../models/productVariant.server";
-import {
-  failSyncRun,
-  finishSyncRun,
-  listSyncLogs,
-  recordChunk,
-  startSyncRun,
-} from "../models/syncLog.server";
+  getOfferViewMetrics,
+  getOfferClickMetrics,
+  getOfferAddedToCartMetrics,
+  getOfferPurchaseMetrics,
+} from "../models/offerAnalytics.server";
+import { findVariantsByProductIds } from "../models/productVariant.server";
+import Dashboard from "../components/Dashboard";
+import "../styles/app._index.css";
 
-// Client-side loop safety: 400 chunks × 250 variants = 100k variants. Shopify's
-// cursor pagination always terminates on its own; this only guards a bug.
-const MAX_CHUNKS = 400;
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
-  const [status, logs] = await Promise.all([
-    getSyncStatus(session.shop),
-    listSyncLogs(session.shop, 10),
-  ]);
-  return { ...status, logs };
-};
+  const offers = await listOffers(session.shop);
 
-// One chunk (one 250-variant page) per POST. The client re-submits with the
-// returned cursor until `done`, so no single request risks the action timeout.
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
-  const shop = session.shop;
-  const form = await request.formData();
-  const intent = String(form.get("intent") ?? "start");
-
-  // Tracked outside the try so a failure mid-chunk can still close the run.
-  let openRunId: string | null =
-    typeof form.get("runId") === "string" ? String(form.get("runId")) : null;
-
-  try {
-    let runId: string;
-    let startedAt: Date;
-    let estimated: number | null;
-    let upsertedSoFar: number;
-    let pagesSoFar: number;
-
-    if (intent === "start") {
-      const run = await startSyncRun(shop);
-      runId = run.runId;
-      startedAt = run.startedAt;
-      estimated = run.estimated;
-      upsertedSoFar = 0;
-      pagesSoFar = 0;
-      openRunId = runId;
-    } else {
-      if (!openRunId) throw new Error("Missing runId for chunk request.");
-      runId = openRunId;
-      // startedAt is round-tripped as ISO so every upsert in the run shares one
-      // timestamp — the basis for correct stale-variant deletion.
-      startedAt = new Date(String(form.get("startedAt")));
-      estimated = form.get("estimated") ? Number(form.get("estimated")) : null;
-      upsertedSoFar = Number(form.get("upserted") ?? 0);
-      pagesSoFar = Number(form.get("pages") ?? 0);
+  // Collect productIds referenced by offers (productSelection or targetProductIds)
+  const productIds = new Set<string>();
+  for (const o of offers) {
+    try {
+      const rules = (o.triggerRules as Record<string, unknown>) ?? {};
+      const selection =
+        (rules.productSelection as { items?: unknown } | undefined) ?? null;
+      const manualSelections = (rules.manualSelections as unknown[] | undefined) ?? [];
+      const items = Array.isArray(selection?.items)
+        ? (selection.items as Array<{ productId?: unknown }>)
+        : Array.isArray(manualSelections)
+          ? (manualSelections as Array<{ productId?: unknown }>)
+          : [];
+      for (const it of items) {
+        if (it && typeof it.productId === "string") productIds.add(it.productId);
+      }
+    } catch (e) {
+      // ignore malformed triggerRules
     }
-
-    const cursor = form.get("cursor") ? String(form.get("cursor")) : null;
-
-    const chunk = await syncProductsChunk(admin, shop, { cursor, syncedAt: startedAt });
-    await recordChunk(runId, { upserted: chunk.upserted, pages: 1 });
-
-    const upserted = upsertedSoFar + chunk.upserted;
-    const pages = pagesSoFar + 1;
-    const startedAtISO = startedAt.toISOString();
-
-    if (chunk.done) {
-      const removed = await deleteStaleVariants(shop, startedAt);
-      await finishSyncRun(runId, { removed });
-      return {
-        ok: true as const,
-        done: true as const,
-        runId,
-        startedAt: startedAtISO,
-        estimated,
-        cursor: null,
-        upserted,
-        removed,
-        pages,
-      };
+    if (Array.isArray(o.targetProductIds)) {
+      for (const pid of o.targetProductIds) if (typeof pid === "string") productIds.add(pid);
     }
-
-    return {
-      ok: true as const,
-      done: false as const,
-      runId,
-      startedAt: startedAtISO,
-      estimated,
-      cursor: chunk.nextCursor,
-      upserted,
-      removed: 0,
-      pages,
-    };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Product sync failed.";
-    if (openRunId) {
-      await failSyncRun(openRunId, message).catch(() => {});
-    }
-    return { ok: false as const, error: message };
   }
-};
 
-function badgeTone(status: string) {
-  if (status === "success") return "success" as const;
-  if (status === "error") return "critical" as const;
-  if (status === "running") return "info" as const;
-  return "neutral" as const;
+  const productRows = await findVariantsByProductIds(session.shop, Array.from(productIds));
+  const productTitleByProductId: Record<string, string> = {};
+  for (const r of productRows) {
+    if (r.productId && r.productTitle) productTitleByProductId[r.productId] = r.productTitle;
+  }
+
+  const [viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics] =
+    await Promise.all([
+      getOfferViewMetrics(session.shop),
+      getOfferClickMetrics(session.shop),
+      getOfferAddedToCartMetrics(session.shop),
+      getOfferPurchaseMetrics(session.shop),
+    ]);
+
+  return {
+    offers,
+    productTitleByProductId,
+    metrics: viewMetrics,
+    clickMetrics,
+    addedToCartMetrics,
+    purchaseMetrics,
+  };
 }
 
-function formatDuration(startedAt: string | Date, finishedAt: string | Date | null) {
-  if (!finishedAt) return "—";
-  const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
-  const secs = Math.max(0, Math.round(ms / 1000));
-  if (secs < 60) return `${secs}s`;
-  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
-}
+export default function OffersPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const {
+    offers,
+    productTitleByProductId,
+    metrics,
+    clickMetrics,
+    addedToCartMetrics,
+    purchaseMetrics,
+  } = useLoaderData<typeof loader>();
+  const [searchParams] = useSearchParams();
+  const [visibleOffers, setVisibleOffers] = useState(offers);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<"Dashboard" | "Help">("Dashboard");
+  const [toast, setToast] = useState<string | null>(null);
 
-export default function DashboardPage() {
-  const { variantCount, lastSyncedAt, logs } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher<typeof action>();
-  const data = fetcher.data;
-
-  const busy = fetcher.state !== "idle";
-  const inProgress = data?.ok === true && data.done === false;
-  const running = busy || inProgress;
-
-  const liveCount = data?.ok === true ? data.upserted : 0;
-  const estimate = data?.ok === true ? data.estimated : null;
-  const pageNo = data?.ok === true ? data.pages : 0;
-  const pct =
-    estimate && estimate > 0
-      ? Math.min(99, Math.round((liveCount / estimate) * 100))
-      : null;
-
-  // Auto-advance: when a non-final chunk returns and the fetcher is idle,
-  // submit the next chunk with the threaded cursor + running totals.
   useEffect(() => {
-    if (fetcher.state !== "idle") return;
-    if (!data || data.ok !== true || data.done) return;
-    if (data.pages >= MAX_CHUNKS) return;
+    setVisibleOffers(offers);
+  }, [offers]);
 
-    const next = new FormData();
-    next.set("intent", "chunk");
-    next.set("runId", data.runId);
-    next.set("startedAt", data.startedAt);
-    if (data.estimated != null) next.set("estimated", String(data.estimated));
-    next.set("upserted", String(data.upserted));
-    next.set("pages", String(data.pages));
-    if (data.cursor) next.set("cursor", data.cursor);
-    fetcher.submit(next, { method: "post" });
-  }, [data, fetcher]);
+  // derive product titles per offer on the client from loader-provided maps
+  function productTitlesForOffer(offer: OfferRecord) {
+    const titles: string[] = [];
+    try {
+      const rules = (offer.triggerRules as Record<string, unknown>) ?? {};
+      const selection =
+        (rules.productSelection as { items?: unknown } | undefined) ?? null;
+      const manualSelections = (rules.manualSelections as unknown[] | undefined) ?? [];
+      const items = Array.isArray(selection?.items)
+        ? (selection.items as Array<{ productId?: unknown }>)
+        : Array.isArray(manualSelections)
+          ? (manualSelections as Array<{ productId?: unknown }>)
+          : [];
+      for (const it of items) {
+        if (it && typeof it.productId === "string") {
+          const t = productTitleByProductId[it.productId] ?? "Product unavailable";
+          if (!titles.includes(t)) titles.push(t);
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    if (Array.isArray(offer.targetProductIds)) {
+      for (const pid of offer.targetProductIds) {
+        const t = productTitleByProductId[pid] ?? "Product unavailable";
+        if (!titles.includes(t)) titles.push(t);
+      }
+    }
+    return titles;
+  }
+
+  const totalViews = metrics.totalViews;
+  const totalAdded = 0;
+  const activeCount = visibleOffers.filter((o) => Boolean(o.isActive)).length;
+
+  function goToCreate() {
+    navigate("/app/offers/new");
+  }
+
+  function editUpsell(id: string) {
+    const params = new URLSearchParams(location.search);
+    params.set("id", id);
+    params.delete("type");
+    const suffix = params.toString();
+    navigate(`/app/offers/new${suffix ? `?${suffix}` : ""}`);
+  }
+
+  async function toggleStatus(id: string) {
+    const offer = offers.find((item) => item.id === id);
+    if (!offer) return;
+
+    const response = await fetch(`/api/offers/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: !offer.isActive }),
+    });
+
+    if (!response.ok) {
+      showToast("Failed to update the offer status");
+      return;
+    }
+
+    const newActive = !offer.isActive;
+    showToast(newActive ? "Upsell activated successfully." : "Upsell deactivated successfully.");
+    window.location.reload();
+  }
+
+  async function deleteUpsell(id: string) {
+    if (!id) {
+      showToast("Offer ID is required.");
+      return;
+    }
+
+    const offer = visibleOffers.find((item) => item.id === id);
+    if (!offer) {
+      showToast("Offer not found.");
+      return;
+    }
+
+    setDeleteTarget({ id, title: offer.name ?? "this upsell" });
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+
+    const { id } = deleteTarget;
+    setDeletingId(id);
+
+    try {
+      const response = await fetch(`/api/offers/${id}`, { method: "DELETE" });
+
+      if (!response.ok) {
+        showToast("Failed to delete the offer");
+        return;
+      }
+
+      setVisibleOffers((current) => current.filter((offer) => offer.id !== id));
+      setDeleteTarget(null);
+      showToast("Upsell deleted successfully.");
+    } finally {
+      setDeletingId((current) => (current === id ? null : current));
+    }
+  }
+
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 2200);
+  }
+
+  // Close the delete-confirmation modal with the Escape key.
+  useEffect(() => {
+    if (!deleteTarget) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setDeleteTarget(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [deleteTarget]);
+
+  // Show toast for newly created offers redirected here with ?created=1
+  useEffect(() => {
+    const created = searchParams.get("created");
+    if (created) {
+      showToast("Upsell created successfully.");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("created");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  function viewDetails(section: string) {
+    document
+      .getElementById("active-upsells-section")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    showToast(`Showing details for: ${section}`);
+  }
 
   return (
-    <s-page heading="Checkout Upsell">
-      <s-section heading="Build higher-value carts with relevant offers">
-        <s-paragraph>
-          Create targeted upsell offers, place them in supported Shopify
-          surfaces, and measure their impact on order value.
-        </s-paragraph>
-      </s-section>
-
-      <s-section heading="Product catalog">
-        <s-stack direction="block" gap="base">
-          <s-paragraph>
-            Sync your products and their variants from Shopify so they can be
-            suggested as upsells. Each variant is stored as its own row.
-          </s-paragraph>
-
-          <s-paragraph tone="neutral" color="subdued">
-            {variantCount > 0
-              ? `${variantCount} variant${variantCount === 1 ? "" : "s"} synced`
-              : "No products synced yet."}
-            {lastSyncedAt
-              ? ` · Last synced ${new Date(lastSyncedAt).toLocaleString()}`
-              : ""}
-          </s-paragraph>
-
-          {running ? (
-            <s-stack direction="block" gap="base">
-              {pct != null ? (
-                <div
-                  role="progressbar"
-                  aria-valuenow={pct}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-label="Product sync progress"
-                  style={{
-                    width: "100%",
-                    height: "8px",
-                    background: "rgba(0, 0, 0, 0.08)",
-                    borderRadius: "4px",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${pct}%`,
-                      height: "100%",
-                      background: "#008060",
-                      borderRadius: "4px",
-                      transition: "width 200ms ease",
-                    }}
-                  />
-                </div>
-              ) : (
-                <s-spinner size="base" accessibilityLabel="Syncing products"></s-spinner>
-              )}
-              <s-paragraph tone="neutral" color="subdued">
-                {pct != null ? `Syncing… ${pct}% · ` : "Syncing… "}
-                {`${liveCount} variant${liveCount === 1 ? "" : "s"}`}
-                {pageNo > 0 ? ` · page ${pageNo}` : ""}
-              </s-paragraph>
-            </s-stack>
-          ) : null}
-
-          {data?.ok === true && data.done === true ? (
-            <s-banner tone="success" heading="Sync complete">
-              {`Synced ${data.upserted} variant${
-                data.upserted === 1 ? "" : "s"
-              }` +
-                (data.removed > 0 ? `, removed ${data.removed} stale` : "") +
-                "."}
-            </s-banner>
-          ) : null}
-
-          {data?.ok === false ? (
-            <s-banner tone="critical" heading="Sync failed">
-              {data.error}
-            </s-banner>
-          ) : null}
-
-          <fetcher.Form method="post">
-            <input type="hidden" name="intent" value="start" />
-            <s-button
-              type="submit"
-              variant="primary"
-              loading={running}
-              disabled={running}
-            >
-              {variantCount > 0 ? "Re-sync products" : "Sync products"}
-            </s-button>
-          </fetcher.Form>
-        </s-stack>
-      </s-section>
-
-      <s-section heading="Sync history">
-        {logs.length > 0 ? (
-          <s-table variant="auto">
-            <s-table-header-row>
-              <s-table-header listSlot="primary">Date</s-table-header>
-              <s-table-header listSlot="labeled">Status</s-table-header>
-              <s-table-header listSlot="labeled">Variants</s-table-header>
-              <s-table-header listSlot="labeled">Removed</s-table-header>
-              <s-table-header listSlot="labeled">Duration</s-table-header>
-            </s-table-header-row>
-            <s-table-body>
-              {logs.map((log) => (
-                <s-table-row key={log.id}>
-                  <s-table-cell>
-                    {new Date(log.startedAt).toLocaleString()}
-                  </s-table-cell>
-                  <s-table-cell>
-                    <s-badge tone={badgeTone(log.status)}>{log.status}</s-badge>
-                  </s-table-cell>
-                  <s-table-cell>{log.upserted}</s-table-cell>
-                  <s-table-cell>{log.removed}</s-table-cell>
-                  <s-table-cell>
-                    {formatDuration(log.startedAt, log.finishedAt)}
-                  </s-table-cell>
-                </s-table-row>
-              ))}
-            </s-table-body>
-          </s-table>
-        ) : (
-          <s-paragraph tone="neutral" color="subdued">
-            No sync runs yet.
-          </s-paragraph>
-        )}
-      </s-section>
-
-      <s-section heading="Getting started">
-        <s-paragraph>
-          Start by creating an offer, then add the upsell block in the Theme
-          Editor when that integration is available.
-        </s-paragraph>
-        <s-button href="/app/offers" variant="primary">
-          View offers
-        </s-button>
-      </s-section>
-    </s-page>
+    <Dashboard
+      productTitleByProductId={productTitleByProductId}
+      metrics={metrics}
+      clickMetrics={clickMetrics}
+      addedToCartMetrics={addedToCartMetrics}
+      purchaseMetrics={purchaseMetrics}
+      visibleOffers={visibleOffers}
+      deletingId={deletingId}
+      deleteTarget={deleteTarget}
+      activeTab={activeTab}
+      toast={toast}
+      onActiveTabChange={setActiveTab}
+      onCreate={goToCreate}
+      onEdit={editUpsell}
+      onToggleStatus={toggleStatus}
+      onDelete={deleteUpsell}
+      onConfirmDelete={confirmDelete}
+      onCancelDelete={() => setDeleteTarget(null)}
+      onViewDetails={viewDetails}
+      onViewAnalytics={() => navigate("/app/analytics")}
+      onViewAllUpsells={() => navigate("/app/upsells")}
+      onViewOfferAnalytics={(offerId) =>
+        navigate(`/app/analytics/${encodeURIComponent(offerId)}`)
+      }
+    />
   );
 }
-
-export const headers: HeadersFunction = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};

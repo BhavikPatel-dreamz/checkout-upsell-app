@@ -2,12 +2,16 @@
 
 client_id = "af17d3edcb1fe476de8388c085611521"
 name = "Checkout Upsell App"
-application_url = "https://example.com"
+application_url = "https://dd-75.dynamicdreamz.net"
 embedded = true
+
+[app_proxy]
+url = "https://dd-75.dynamicdreamz.net"
+subpath = "checkout-upsell"
+prefix = "apps"
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
 [webhooks]
 api_version = "2026-10"
@@ -20,9 +24,13 @@ api_version = "2026-10"
   uri = "/webhooks/app/uninstalled"
   topics = [ "app/uninstalled" ]
 
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/paid"
+  topics = [ "orders/paid" ]
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products,write_metaobjects,write_metaobject_definitions"
+scopes = "write_products,write_metaobjects,write_metaobject_definitions,read_orders"
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]
