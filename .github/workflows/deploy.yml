@@ -1,0 +1,82 @@
+name: Deploy Shopify Checkout Upsell App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main-shopify-checkout-upsell-app
+  cancel-in-progress: true
+
+env:
+  VPS_APP_PATH: "/var/www/html/shopify-checkout-upsell-app"
+  PM2_PROCESS_NAME: "shopify-checkout-upsell-app"
+
+jobs:
+  build:
+    name: Build and test on GitHub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build (CI — no DB migrate)
+        run: pnpm run build:ci
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          SHOPIFY_API_KEY: ci-placeholder
+          SHOPIFY_API_SECRET: ci-placeholder
+          SHOPIFY_APP_URL: https://appbuilder-xyxx.dreamzapps.com
+          SCOPES: read_products
+
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    runs-on: [self-hosted]
+    steps:
+      - name: Sync code from main
+        run: |
+          if [ -d "${{ env.VPS_APP_PATH }}/.git" ]; then
+            cd "${{ env.VPS_APP_PATH }}"
+            git fetch origin
+            git reset --hard "origin/main"
+            git clean -fd
+          else
+            git clone -b main git@github.com:BhavikPatel-dreamz/checkout-upsell-app.git "${{ env.VPS_APP_PATH }}"
+          fi
+
+      - name: Install, migrate, and build on server
+        run: |
+          cd "${{ env.VPS_APP_PATH }}"
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm run build
+          pnpm run ota:migrate
+
+      - name: Restart app
+        run: |
+          cd "${{ env.VPS_APP_PATH }}"
+          if pm2 list | grep -q "${{ env.PM2_PROCESS_NAME }}"; then
+            pm2 restart "${{ env.PM2_PROCESS_NAME }}"
+          else
+            pm2 start pnpm --name "${{ env.PM2_PROCESS_NAME }}" -- start
+          fi
+          pm2 save
