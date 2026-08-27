@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
   useLoaderData,
-  useNavigate,
   useSearchParams,
   useLocation,
   type LoaderFunctionArgs,
@@ -73,7 +72,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function OffersPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const {
     offers,
@@ -129,16 +127,12 @@ export default function OffersPage() {
   const totalAdded = 0;
   const activeCount = visibleOffers.filter((o) => Boolean(o.isActive)).length;
 
-  function goToCreate() {
-    navigate("/app/offers/new");
-  }
-
-  function editUpsell(id: string) {
+  function editUpsellUrl(id: string) {
     const params = new URLSearchParams(location.search);
     params.set("id", id);
     params.delete("type");
     const suffix = params.toString();
-    navigate(`/app/offers/new${suffix ? `?${suffix}` : ""}`);
+    return `/app/offers/new${suffix ? `?${suffix}` : ""}`;
   }
 
   async function toggleStatus(id: string) {
@@ -245,18 +239,16 @@ export default function OffersPage() {
       activeTab={activeTab}
       toast={toast}
       onActiveTabChange={setActiveTab}
-      onCreate={goToCreate}
-      onEdit={editUpsell}
+      createUrl="/app/offers/new"
+      editUrl={editUpsellUrl}
       onToggleStatus={toggleStatus}
       onDelete={deleteUpsell}
       onConfirmDelete={confirmDelete}
       onCancelDelete={() => setDeleteTarget(null)}
       onViewDetails={viewDetails}
-      onViewAnalytics={() => navigate("/app/analytics")}
-      onViewAllUpsells={() => navigate("/app/upsells")}
-      onViewOfferAnalytics={(offerId) =>
-        navigate(`/app/analytics/${encodeURIComponent(offerId)}`)
-      }
+      analyticsUrl="/app/analytics"
+      allUpsellsUrl="/app/upsells"
+      offerAnalyticsUrl={(offerId) => `/app/analytics/${encodeURIComponent(offerId)}`}
     />
   );
 }

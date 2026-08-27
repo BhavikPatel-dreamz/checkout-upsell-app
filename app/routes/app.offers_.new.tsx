@@ -13,7 +13,7 @@
  */
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { useFetcher, useLoaderData, useNavigate, redirect } from "react-router";
+import { useFetcher, useLoaderData, redirect } from "react-router";
 import type { OfferPlacement, OfferType } from "@prisma/client";
 
 import { authenticate } from "../shopify.server";
@@ -246,7 +246,6 @@ export default function CreateOfferPage() {
       mode: "create" | "edit";
       isSelecting: boolean;
     }>();
-  const navigate = useNavigate();
   const fetcher = useFetcher<{ errors?: ErrorMap }>();
 
   const errors = fetcher.data?.errors || {};
@@ -255,10 +254,6 @@ export default function CreateOfferPage() {
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     fetcher.submit(e.currentTarget, { method: "post" });
-  }
-
-  function handleCancel() {
-    navigate("/app");
   }
 
   if (isSelecting) {
@@ -289,7 +284,7 @@ export default function CreateOfferPage() {
           fetcherErrors={errors}
         />
 
-        <OfferActions mode={mode} submitting={submitting} onCancel={handleCancel} />
+        <OfferActions mode={mode} submitting={submitting} cancelUrl="/app" />
       </fetcher.Form>
     </OfferFormPage>
   );

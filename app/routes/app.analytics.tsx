@@ -1,4 +1,4 @@
-import { useLoaderData, useNavigate, useRevalidator, type LoaderFunctionArgs } from "react-router";
+import { useLoaderData, useRevalidator, type LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
 import {
@@ -55,14 +55,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function AnalyticsPage() {
-  const navigate = useNavigate();
   const revalidator = useRevalidator();
   const { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, productMetaMap } =
     useLoaderData<typeof loader>();
 
-  const openOfferDetails = (offerId: string) => {
-    navigate(`/app/analytics/${encodeURIComponent(offerId)}`);
-  };
+  const offerDetailUrl = (offerId: string) =>
+    `/app/analytics/${encodeURIComponent(offerId)}`;
 
   return (
     <AnalyticsDashboard
@@ -72,7 +70,7 @@ export default function AnalyticsPage() {
       purchaseMetrics={purchaseMetrics}
       trendMetrics={trendMetrics}
       productMetaMap={productMetaMap}
-      onOpenOfferDetails={openOfferDetails}
+      offerDetailUrl={offerDetailUrl}
       onRefresh={() => void revalidator.revalidate()}
       isRefreshing={revalidator.state === "loading"}
     />

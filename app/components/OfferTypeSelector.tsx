@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import type { OfferPlacement, OfferType } from "@prisma/client";
 
 import { offerTypeOptions, OFFER_TYPE_CONFIG } from "../config/offerTypes";
@@ -17,19 +17,15 @@ import { PLACEMENT_LABELS } from "../types/offer";
 const CREATE_PLACEMENTS: OfferPlacement[] = ["checkout", "post_purchase"];
 
 export default function OfferTypeSelector() {
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [selectedType, setSelectedType] = useState<OfferType>("cross_sell");
   const [placement, setPlacement] = useState<OfferPlacement>("checkout");
 
-  function handleContinue() {
+  function getContinueUrl() {
     const params = new URLSearchParams();
     params.set("offerType", selectedType);
     params.set("placement", placement);
-    navigate(`/app/offers/new?${params.toString()}`);
-  }
-
-  function handleCancel() {
-    navigate("/app");
+    return `/app/offers/new?${params.toString()}`;
   }
 
   return (
@@ -83,12 +79,12 @@ export default function OfferTypeSelector() {
       </div>
 
       <div style={styles.actionsRow}>
-        <button type="button" style={styles.submitButton} onClick={handleContinue}>
+        <Link type="button" to={getContinueUrl()} style={styles.submitButton}>
           Continue
-        </button>
-        <button type="button" style={styles.cancelButton} onClick={handleCancel}>
+        </Link>
+        <Link type="button" to="/app" style={styles.cancelButton}>
           Cancel
-        </button>
+        </Link>
       </div>
 
       <p style={styles.typeHint}>

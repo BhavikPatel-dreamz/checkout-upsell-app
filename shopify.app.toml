@@ -5,11 +5,6 @@ name = "Checkout Upsell App"
 application_url = "https://dd-75.dynamicdreamz.net"
 embedded = true
 
-[app_proxy]
-url = "https://dd-75.dynamicdreamz.net"
-subpath = "checkout-upsell"
-prefix = "apps"
-
 [build]
 automatically_update_urls_on_dev = true
 
@@ -30,10 +25,15 @@ api_version = "2026-10"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products,write_metaobjects,write_metaobject_definitions,read_orders"
+scopes = "read_orders,write_metaobject_definitions,write_metaobjects,write_products"
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]
+
+[app_proxy]
+url = "https://dd-75.dynamicdreamz.net"
+subpath = "checkout-upsell"
+prefix = "apps"
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"

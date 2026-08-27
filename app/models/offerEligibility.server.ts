@@ -98,9 +98,9 @@ export async function findEligibleCrossSellOffers(options: {
       if (seenVariantIds.has(sel.variantId)) continue;
 
       const pv = await db.productVariant.findFirst({
-        where: { shop, variantId: sel.variantId },
+        where: { shop, variantId: sel.variantId, availableForSale: true },
       });
-      if (!pv) continue; // variant doesn't exist in this shop's catalog
+      if (!pv) continue; // variant doesn't exist or is unavailable in this shop's catalog
 
       // Skip if the upsell product is the same as a trigger product in the cart
       if (cartProductIdSet.has(pv.productId)) continue;

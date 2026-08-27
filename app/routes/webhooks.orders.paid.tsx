@@ -96,11 +96,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     console.log(`[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} identified as upsell line`);
 
-    let offer: { id: string; name: string } | null = null;
+    let offer: { id: string; name: string; placement: OfferPlacement } | null = null;
     try {
       offer = await db.offer.findFirst({
         where: { shop, id: offerId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, placement: true },
       });
     } catch (err: any) {
       insertFailure = true;
@@ -143,7 +143,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         continue;
       }
 
-      console.log(`[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} attempting purchased OfferEvent create`);
+      const eventPlacement = offer.placement ?? OfferPlacement.checkout;
+      console.log(`[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} attempting purchased OfferEvent create (placement=${eventPlacement})`);
       const created = await db.offerEvent.create({
         data: {
           shop,
@@ -155,7 +156,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           guestKey: purchaseGuestKey,
           productId,
           variantId,
-          placement: OfferPlacement.checkout,
+          placement: eventPlacement,
         },
       });
       console.log(`[orders/paid] order=${orderId} purchased OfferEvent created id=${created.id}`);

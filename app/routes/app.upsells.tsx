@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLoaderData, useNavigate, type LoaderFunctionArgs } from "react-router";
+import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router";
 
 import { authenticate } from "../shopify.server";
 import { listOffers } from "../models/offer.server";
@@ -40,7 +40,6 @@ const formatRevenue = (value: number) =>
 
 export default function AllUpsellsPage() {
   const { offers, productTitleById, views, purchases, revenue } = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
   const [visibleOffers, setVisibleOffers] = useState(offers);
   const [query, setQuery] = useState("");
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -112,9 +111,9 @@ export default function AllUpsellsPage() {
             <h1>All Upsells</h1>
             <p>{visibleOffers.length} offer{visibleOffers.length === 1 ? "" : "s"} configured</p>
           </div>
-          <button type="button" className="allUpsellsNewButton" onClick={() => navigate("/app/offers/new")}>
+          <Link to="/app/offers/new" className="allUpsellsNewButton" style={{ textDecoration: "none" }}>
             <span aria-hidden="true">⊕</span> New Upsell
-          </button>
+          </Link>
         </header>
 
         <label className="allUpsellsSearch">
@@ -160,9 +159,9 @@ export default function AllUpsellsPage() {
                   {conversionRate == null ? "—" : `${(conversionRate * 100).toFixed(1)}%`}
                 </strong>
                 <strong>{formatRevenue(offerRevenue)}</strong>
-                <button type="button" className="allUpsellsDetails" onClick={() => navigate(`/app/analytics/${encodeURIComponent(offer.id)}`)}>
+                <Link to={`/app/analytics/${encodeURIComponent(offer.id)}`} className="allUpsellsDetails" style={{ textDecoration: "none" }}>
                   Details →
-                </button>
+                </Link>
               </div>
             ))
           )}

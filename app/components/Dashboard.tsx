@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import type { Offer as OfferRecord } from "@prisma/client";
 
 import { PLACEMENT_LABELS, getOfferTypeConfig } from "../types/offer";
@@ -27,16 +28,16 @@ type DashboardProps = {
   activeTab: "Dashboard" | "Help";
   toast: string | null;
   onActiveTabChange: (tab: "Dashboard" | "Help") => void;
-  onCreate: () => void;
-  onEdit: (id: string) => void;
+  createUrl: string;
+  editUrl: (id: string) => string;
   onToggleStatus: (id: string) => void;
   onDelete: (id: string) => void;
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
   onViewDetails: (section: string) => void;
-  onViewAnalytics: () => void;
-  onViewAllUpsells: () => void;
-  onViewOfferAnalytics: (offerId: string) => void;
+  analyticsUrl: string;
+  allUpsellsUrl: string;
+  offerAnalyticsUrl: (offerId: string) => string;
 };
 
 
@@ -52,16 +53,16 @@ export default function Dashboard({
   activeTab,
   toast,
   onActiveTabChange,
-  onCreate,
-  onEdit,
+  createUrl,
+  editUrl,
   onToggleStatus,
   onDelete,
   onConfirmDelete,
   onCancelDelete,
   onViewDetails,
-  onViewAnalytics,
-  onViewAllUpsells,
-  onViewOfferAnalytics,
+  analyticsUrl,
+  allUpsellsUrl,
+  offerAnalyticsUrl,
 }: DashboardProps) {
   function productTitlesForOffer(offer: OfferRecord) {
     const titles: string[] = [];
@@ -194,7 +195,7 @@ export default function Dashboard({
           </div>
 
           <div className="actionRow">
-            <button className="actionCard actionCardPrimary" onClick={onCreate}>
+            <Link to={createUrl} className="actionCard actionCardPrimary" style={{ textDecoration: "none", color: "inherit" }}>
               <span className="actionIcon actionIconPrimary">
                 <BoltIcon />
               </span>
@@ -205,11 +206,12 @@ export default function Dashboard({
                 </span>
               </span>
               <span className="actionChevron actionChevronPrimary">›</span>
-            </button>
+            </Link>
 
-            <button
+            <Link
+              to={analyticsUrl}
               className="actionCard"
-              onClick={onViewAnalytics}
+              style={{ textDecoration: "none", color: "inherit" }}
             >
               <span className="actionIcon">
                 <ChartIcon />
@@ -219,9 +221,9 @@ export default function Dashboard({
                 <span className="actionCardSubtitle">Funnel · Charts · Insights</span>
               </span>
               <span className="actionChevron">›</span>
-            </button>
+            </Link>
 
-            <button className="actionCard" onClick={onViewAllUpsells}>
+            <Link to={allUpsellsUrl} className="actionCard" style={{ textDecoration: "none", color: "inherit" }}>
               <span className="actionIcon">
                 <ListIcon />
               </span>
@@ -232,7 +234,7 @@ export default function Dashboard({
                 </span>
               </span>
               <span className="actionChevron">›</span>
-            </button>
+            </Link>
           </div>
 
           {topPerformer && (
@@ -260,12 +262,13 @@ export default function Dashboard({
                   </div>
                   <div className="featuredStatLabel">Purchases</div>
                 </div>
-                <button
+                <Link
+                  to={offerAnalyticsUrl(topPerformer.id)}
                   className="featuredLink"
-                  onClick={() => onViewOfferAnalytics(topPerformer.id)}
+                  style={{ textDecoration: "none" }}
                 >
                   View details →
-                </button>
+                </Link>
               </div>
             </div>
           )}
@@ -273,12 +276,13 @@ export default function Dashboard({
           <div id="active-upsells-section" className="tableSection">
             <div className="tableSectionHeader">
               <h2 className="sectionHeading">Active Upsells</h2>
-              <button
+              <Link
+                to={allUpsellsUrl}
                 className="viewAllLink"
-                onClick={onViewAllUpsells}
+                style={{ textDecoration: "none" }}
               >
                 View all →
-              </button>
+              </Link>
             </div>
 
             {visibleOffers.length === 0 ? (
@@ -319,9 +323,9 @@ export default function Dashboard({
                       </div>
 
                       <div className="offerActions">
-                        <button className="linkButton" onClick={() => onEdit(offer.id)}>
+                        <Link to={editUrl(offer.id)} className="linkButton" style={{ textDecoration: "none" }}>
                           Edit
-                        </button>
+                        </Link>
                         <button
                           className={
                             deletingId === offer.id

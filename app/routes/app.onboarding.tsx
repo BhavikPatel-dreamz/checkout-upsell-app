@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router";
+import { Link } from "react-router";
 import "../styles/app._index.css";
 
 const STEPS = [
@@ -98,8 +98,6 @@ const FAQ_ITEMS = [
 ];
 
 export default function OnboardingPage() {
-  const navigate = useNavigate();
-
   return (
     <div className="appPageShell" style={styles.page}>
       <div className="appPageContent" style={styles.content}>
@@ -141,13 +139,12 @@ export default function OnboardingPage() {
                 <h3 style={styles.stepTitle}>{step.title}</h3>
                 <p style={styles.stepDescription}>{step.description}</p>
                 {step.link ? (
-                  <button
-                    type="button"
-                    style={styles.stepLink}
-                    onClick={() => navigate(step.link)}
+                  <Link
+                    to={step.link}
+                    style={{ ...styles.stepLink, textDecoration: "none", color: "inherit" }}
                   >
                     {step.linkLabel} →
-                  </button>
+                  </Link>
                 ) : (
                   <button
                     type="button"
@@ -201,13 +198,12 @@ export default function OnboardingPage() {
               <div style={styles.guideNote}>
                 <strong>Tip:</strong> You don't need to sync every product. Only the products you want to use as trigger or upsell products need to be synced.
               </div>
-              <button
-                type="button"
-                style={styles.primaryButton}
-                onClick={() => navigate("/app/product-sync")}
+              <Link
+                to="/app/product-sync"
+                style={{ ...styles.primaryButton, textDecoration: "none", color: "inherit" }}
               >
                 Go to Product Sync
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -272,13 +268,12 @@ export default function OnboardingPage() {
                 <strong>Note:</strong> Currently, Cross-Sell is fully supported. Other offer types are available in the form but will be expanded with additional features in future updates.
               </div>
 
-              <button
-                type="button"
-                style={styles.primaryButton}
-                onClick={() => navigate("/app/offers/new")}
+              <Link
+                to="/app/offers/new"
+                style={{ ...styles.primaryButton, textDecoration: "none", color: "inherit" }}
               >
                 Create Your First Offer
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -404,13 +399,12 @@ export default function OnboardingPage() {
                 />
               </div>
 
-              <button
-                type="button"
-                style={styles.primaryButton}
-                onClick={() => navigate("/app/analytics")}
+              <Link
+                to="/app/analytics"
+                style={{ ...styles.primaryButton, textDecoration: "none", color: "inherit" }}
               >
                 View Analytics
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -432,20 +426,18 @@ export default function OnboardingPage() {
             Follow the steps above, or jump straight into creating your first offer.
           </p>
           <div style={styles.ctaButtons} className="onboardingCtaButtons">
-            <button
-              type="button"
-              style={styles.primaryButton}
-              onClick={() => navigate("/app/product-sync")}
+            <Link
+              to="/app/product-sync"
+              style={{ ...styles.primaryButton, textDecoration: "none", color: "inherit" }}
             >
               Sync Products
-            </button>
-            <button
-              type="button"
-              style={styles.secondaryButton}
-              onClick={() => navigate("/app/offers/new")}
+            </Link>
+            <Link
+              to="/app/offers/new"
+              style={{ ...styles.secondaryButton, textDecoration: "none", color: "inherit" }}
             >
               Create an Offer
-            </button>
+            </Link>
           </div>
         </div>
       </div>
