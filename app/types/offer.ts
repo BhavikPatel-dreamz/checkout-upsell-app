@@ -20,6 +20,7 @@ export {
   isOfferPlacement,
   normalizeOfferType,
   offerTypeOptions,
+  offerRequiresTriggerProducts,
 } from "../config/offerTypes";
 
 /** Human-readable labels for each offer placement. */

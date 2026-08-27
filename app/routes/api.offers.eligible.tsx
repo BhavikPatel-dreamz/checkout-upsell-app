@@ -65,7 +65,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const guestKey = url.searchParams.get("guestKey")?.trim() || null;
   const clientId = url.searchParams.get("clientId")?.trim() || null;
 
-  const eligible = await findEligibleCrossSellOffers({ shop, placement, productIds, variantIds });
+  const eligible = await findEligibleCrossSellOffers({
+    shop,
+    placement,
+    productIds,
+    variantIds,
+    identity: { customerId, guestKey, clientId },
+  });
   const offers = await rankEligibleOffers({
     shop,
     offers: eligible,

@@ -3,7 +3,7 @@ import { BrowseActivityType, OfferPlacement, OfferType, PrismaClient } from "@pr
 import { createOffer } from "../app/models/offer.server";
 import { recordBrowseActivity, loadRecentActivity } from "../app/models/browseActivity.server";
 import { rankEligibleOffers } from "../app/models/offerRanker.server";
-import type { EligibleOfferPayload } from "../app/models/offerEligibility.server";
+import type { EligibleOfferPayload } from "../app/models/eligibleOffer";
 
 const db = new PrismaClient();
 const SHOP = "activity-ranker-test.myshopify.com";
@@ -97,5 +97,92 @@ describe("browse activity and ranker", () => {
       identity: { guestKey: "guest-1" },
     });
     expect(ranked[0].offerId).toBe(offerB.id);
+  });
+
+  it("skips near-duplicate activity from dual ingest", async () => {
+    const first = await recordBrowseActivity({
+      shop: SHOP,
+      eventType: BrowseActivityType.product_viewed,
+      clientId: "client-dup",
+      productId: "gid://shopify/Product/7",
+      variantId: "gid://shopify/ProductVariant/7",
+      consented: true,
+    });
+    const second = await recordBrowseActivity({
+      shop: SHOP,
+      eventType: BrowseActivityType.product_viewed,
+      clientId: "client-dup",
+      productId: "gid://shopify/Product/7",
+      variantId: "gid://shopify/ProductVariant/7",
+      consented: true,
+    });
+    expect(first.recorded).toBe(true);
+    expect(second.recorded).toBe(false);
+    expect(second.skipped).toBe("duplicate");
+  });
+
+  it("stores optional variant_changed and time_on_page events", async () => {
+    const variant = await recordBrowseActivity({
+      shop: SHOP,
+      eventType: BrowseActivityType.variant_changed,
+      guestKey: "guest-extra",
+      productId: "gid://shopify/Product/8",
+      variantId: "gid://shopify/ProductVariant/81",
+      consented: true,
+    });
+    const dwell = await recordBrowseActivity({
+      shop: SHOP,
+      eventType: BrowseActivityType.time_on_page,
+      guestKey: "guest-extra",
+      productId: "gid://shopify/Product/8",
+      query: "45",
+      consented: true,
+    });
+    expect(variant.recorded).toBe(true);
+    expect(dwell.recorded).toBe(true);
+  });
+
+  it("ranks an AI Recommend pool by activity and keeps pool order without activity", async () => {
+    const { rankAiRecommendPool } = await import("../app/models/offerRanker.server");
+    const { applyLlmPoolOrder, parseLlmPoolIds } = await import("../app/models/offerLlmPicker.server");
+
+    const pool = [
+      offerPayload("offer-ai", "gid://shopify/Product/1"),
+      offerPayload("offer-ai", "gid://shopify/Product/2"),
+    ];
+    pool[0].variantId = "gid://shopify/ProductVariant/1";
+    pool[1].variantId = "gid://shopify/ProductVariant/2";
+    pool[1].productId = "gid://shopify/Product/2";
+
+    const fallback = await rankAiRecommendPool({
+      shop: SHOP,
+      offerId: "offer-ai",
+      pool,
+      identity: { guestKey: "guest-pool" },
+    });
+    expect(fallback.map((item) => item.productId)).toEqual([
+      "gid://shopify/Product/1",
+      "gid://shopify/Product/2",
+    ]);
+
+    await recordBrowseActivity({
+      shop: SHOP,
+      eventType: BrowseActivityType.product_viewed,
+      guestKey: "guest-pool",
+      productId: "gid://shopify/Product/2",
+      consented: true,
+    });
+
+    const ranked = await rankAiRecommendPool({
+      shop: SHOP,
+      offerId: "offer-ai",
+      pool,
+      identity: { guestKey: "guest-pool" },
+    });
+    expect(ranked[0].productId).toBe("gid://shopify/Product/2");
+
+    const parsed = parseLlmPoolIds('["gid://shopify/ProductVariant/2"]', new Set(["gid://shopify/ProductVariant/1", "gid://shopify/ProductVariant/2"]));
+    expect(applyLlmPoolOrder(pool, parsed)[0].variantId).toBe("gid://shopify/ProductVariant/2");
+    expect(parseLlmPoolIds("not json", new Set(["gid://shopify/ProductVariant/1"]))).toEqual([]);
   });
 });

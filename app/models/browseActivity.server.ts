@@ -114,6 +114,23 @@ export async function recordBrowseActivity(
   const productId = toShopifyGid("Product", trimOrNull(input.productId));
   const variantId = toShopifyGid("ProductVariant", trimOrNull(input.variantId));
   const collectionId = toShopifyGid("Collection", trimOrNull(input.collectionId));
+  const query = trimOrNull(input.query)?.slice(0, 200) ?? null;
+
+  const duplicateSince = new Date(Date.now() - 15_000);
+  const duplicate = await db.browseActivity.findFirst({
+    where: {
+      ...identityWhere(shop, { customerId, guestKey, clientId }, duplicateSince),
+      eventType: eventType as BrowseActivityType,
+      productId,
+      variantId,
+      collectionId,
+      query,
+    },
+    select: { id: true },
+  });
+  if (duplicate) {
+    return { recorded: false, skipped: "duplicate", id: duplicate.id };
+  }
 
   const created = await db.browseActivity.create({
     data: {
@@ -125,7 +142,7 @@ export async function recordBrowseActivity(
       productId,
       variantId,
       collectionId,
-      query: trimOrNull(input.query)?.slice(0, 200) ?? null,
+      query,
       occurredAt: parseOccurredAt(input.occurredAt),
     },
   });

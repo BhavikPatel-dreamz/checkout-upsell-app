@@ -5,7 +5,11 @@ const EVENT_TYPES = new Set([
   "collection_viewed",
   "search_submitted",
   "product_added_to_cart",
+  "variant_changed",
+  "time_on_page",
 ]);
+
+const GUEST_COOKIE = "checkout-upsell-guest-key";
 
 function toGid(type, value) {
   if (!value) return null;
@@ -26,6 +30,7 @@ function myshopifyDomain(init) {
 register(({ analytics, browser, init, settings }) => {
   const shop = myshopifyDomain(init);
   const apiBase = String(settings?.apiBase || "").replace(/\/$/, "");
+  let lastProductView = { productId: null, variantId: null };
 
   function endpoints() {
     const urls = [];
@@ -37,6 +42,15 @@ register(({ analytics, browser, init, settings }) => {
   async function clientIdFromCookie() {
     try {
       const value = await browser.cookie.get("_shopify_y");
+      return value || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function guestKeyFromCookie() {
+    try {
+      const value = await browser.cookie.get(GUEST_COOKIE);
       return value || null;
     } catch {
       return null;
@@ -76,24 +90,49 @@ register(({ analytics, browser, init, settings }) => {
     }
   }
 
-  analytics.subscribe("product_viewed", async (event) => {
-    const variant = event.data?.productVariant;
-    await postActivity({
-      eventType: "product_viewed",
+  async function identityFromEvent(event) {
+    return {
       clientId: event.clientId || (await clientIdFromCookie()),
       customerId: customerGid(),
-      productId: toGid("Product", variant?.product?.id),
-      variantId: toGid("ProductVariant", variant?.id),
+      guestKey: customerGid() ? null : await guestKeyFromCookie(),
+    };
+  }
+
+  analytics.subscribe("product_viewed", async (event) => {
+    const variant = event.data?.productVariant;
+    const productId = toGid("Product", variant?.product?.id);
+    const variantId = toGid("ProductVariant", variant?.id);
+    const id = await identityFromEvent(event);
+    if (
+      lastProductView.productId === productId &&
+      lastProductView.variantId &&
+      variantId &&
+      lastProductView.variantId !== variantId
+    ) {
+      await postActivity({
+        eventType: "variant_changed",
+        ...id,
+        productId,
+        variantId,
+        occurredAt: event.timestamp,
+      });
+    }
+    lastProductView = { productId, variantId };
+    await postActivity({
+      eventType: "product_viewed",
+      ...id,
+      productId,
+      variantId,
       occurredAt: event.timestamp,
     });
   });
 
   analytics.subscribe("collection_viewed", async (event) => {
     const collection = event.data?.collection;
+    const id = await identityFromEvent(event);
     await postActivity({
       eventType: "collection_viewed",
-      clientId: event.clientId || (await clientIdFromCookie()),
-      customerId: customerGid(),
+      ...id,
       collectionId: toGid("Collection", collection?.id),
       occurredAt: event.timestamp,
     });
@@ -101,10 +140,10 @@ register(({ analytics, browser, init, settings }) => {
 
   analytics.subscribe("search_submitted", async (event) => {
     const query = event.data?.searchResult?.query ?? event.data?.query ?? null;
+    const id = await identityFromEvent(event);
     await postActivity({
       eventType: "search_submitted",
-      clientId: event.clientId || (await clientIdFromCookie()),
-      customerId: customerGid(),
+      ...id,
       query: typeof query === "string" ? query : null,
       occurredAt: event.timestamp,
     });
@@ -112,10 +151,10 @@ register(({ analytics, browser, init, settings }) => {
 
   analytics.subscribe("product_added_to_cart", async (event) => {
     const merchandise = event.data?.cartLine?.merchandise;
+    const id = await identityFromEvent(event);
     await postActivity({
       eventType: "product_added_to_cart",
-      clientId: event.clientId || (await clientIdFromCookie()),
-      customerId: customerGid(),
+      ...id,
       productId: toGid("Product", merchandise?.product?.id),
       variantId: toGid("ProductVariant", merchandise?.id),
       occurredAt: event.timestamp,
