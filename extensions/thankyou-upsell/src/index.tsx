@@ -5,7 +5,8 @@ import {
   Text,
   View,
   BlockStack,
-  InlineStack,
+  InlineLayout,
+  ScrollView,
   Button,
 } from "@shopify/ui-extensions-react/checkout";
 import { useState, useEffect, useCallback } from "react";
@@ -42,19 +43,7 @@ function ThankYouUpsellBlock() {
     return null;
   }, [api]);
 
-  const buildAcceptUrl = useCallback((selectedOffer: EligibleOffer): string | null => {
-    const shopDomain = getShopDomain();
-    if (!shopDomain) return null;
-
-    // Build the checkout URL for the UPSELL variant the buyer clicked on —
-    // not the items from the order they already placed.
-    const upsellVariantId = Number(selectedOffer.variantId.replace("gid://shopify/ProductVariant/", ""));
-    if (!upsellVariantId) return null;
-
-    return `https://${shopDomain}/cart/${upsellVariantId}:1?checkout`;
-  }, [getShopDomain]);
-
-  const getCustomerIdentity = useCallback((): { customerId: string | null; guestKey: string | null } => {
+      const getCustomerIdentity = useCallback((): { customerId: string | null; guestKey: string | null } => {
     const apiRecord = api as unknown as Record<string, unknown>;
     const customer = apiRecord.customer as Record<string, unknown> | undefined;
     const customerId =
@@ -78,6 +67,35 @@ function ThankYouUpsellBlock() {
       return { customerId: null, guestKey: `guest-${Date.now()}-${Math.random().toString(16).slice(2)}` };
     }
   }, [api]);
+
+    const buildAcceptUrl = useCallback((selectedOffer: EligibleOffer): string | null => {
+    const shopDomain = getShopDomain();
+    if (!shopDomain) return null;
+
+    const upsellVariantId = Number(selectedOffer.variantId.replace("gid://shopify/ProductVariant/", ""));
+    if (!upsellVariantId) return null;
+
+    const { customerId, guestKey } = getCustomerIdentity();
+    const properties: Record<string, string> = {
+      _upsell_offer_id: selectedOffer.offerId,
+      _upsell_product_id: selectedOffer.productId,
+      _upsell_variant_id: selectedOffer.variantId,
+      _upsell_customer_id: customerId ?? "",
+      _upsell_guest_key: guestKey ?? "",
+    };
+
+    // Cart permalinks require line item properties as a single `properties`
+    // param containing Base64 URL-encoded JSON — not properties[key]=value
+    // pairs. See: https://shopify.dev/docs/apps/build/checkout/create-cart-permalinks
+    const filteredProps = Object.fromEntries(
+      Object.entries(properties).filter(([, value]) => value !== ""),
+    );
+    const json = JSON.stringify(filteredProps);
+    const base64 = btoa(unescape(encodeURIComponent(json)));
+    const base64Url = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+    return `https://${shopDomain}/cart/${upsellVariantId}:1?checkout&properties=${base64Url}`;
+  }, [getShopDomain, getCustomerIdentity]);
 
   const trackClick = useCallback(async (shopDomain: string, clickedOffer: EligibleOffer) => {
     const { customerId, guestKey } = getCustomerIdentity();
@@ -233,78 +251,103 @@ function ThankYouUpsellBlock() {
 
   return (
     <BlockStack spacing="tight" padding={["base", "none"]}>
-      <BlockStack
-        spacing="tight"
-        padding="base"
-        border="base"
-        borderRadius="base"
-        borderColor="secondary"
-        maxInlineSize={400}
-      >
-        <Text emphasis="bold" size="medium">
-          You may also like
-        </Text>
+      <Text emphasis="bold" size="medium">
+        You may also like
+      </Text>
 
-        {offers.map((o) => (
-          <BlockStack key={o.offerId} spacing="tight" padding={"none"}>
-            <InlineStack spacing="base" blockAlignment="start">
-              {o.imageUrl && (
-                <View maxInlineSize={96} minInlineSize={96}>
-                  <Image
-                    source={o.imageUrl}
-                    alt={o.productTitle}
-                    aspectRatio={1}
-                    cornerRadius="base"
-                    fit="cover"
-                  />
+      <ScrollView direction="inline">
+        <InlineLayout
+          spacing="base"
+          blockAlignment="start"
+          columns={offers.map(() => 180)}
+        >
+          {offers.map((o) => (
+            <View
+              key={`${o.offerId}-${o.variantId}`}
+              minBlockSize={330}
+              maxBlockSize={330}
+              overflow="hidden"
+              border="base"
+              borderRadius="base"
+              padding="base"
+            >
+              <BlockStack spacing="tight">
+                <View
+                  minInlineSize={136}
+                  maxInlineSize={136}
+                  minBlockSize={136}
+                  maxBlockSize={136}
+                  cornerRadius="base"
+                >
+                  {o.imageUrl ? (
+                    <Image
+                      source={o.imageUrl}
+                      accessibilityDescription={o.productTitle}
+                      fit="cover"
+                      cornerRadius="base"
+                    />
+                  ) : (
+                    <View
+                      minInlineSize={136}
+                      maxInlineSize={136}
+                      minBlockSize={136}
+                      maxBlockSize={136}
+                      background="subdued"
+                      cornerRadius="base"
+                    />
+                  )}
                 </View>
-              )}
 
-              <BlockStack spacing="extraTight" inlineAlignment="start">
-                {o.promotionalTitle && (
-                  <Text emphasis="bold" size="small" appearance="subdued">
-                    {o.promotionalTitle}
-                  </Text>
-                )}
-                <Text emphasis="strong" size="small">
-                  {o.productTitle}
-                </Text>
-                {o.variantTitle && (
-                  <Text size="small" appearance="subdued">
-                    {o.variantTitle}
-                  </Text>
-                )}
-                {o.price && (
-                  <Text size="small" appearance="subdued">
-                    ${o.price}
-                  </Text>
-                )}
+                <View minBlockSize={96} maxBlockSize={96} overflow="hidden">
+                  <BlockStack spacing="extraTight" inlineAlignment="start">
+                    {o.promotionalTitle && (
+                      <Text emphasis="bold" size="small" appearance="subdued">
+                        {o.promotionalTitle}
+                      </Text>
+                    )}
+                    <Text emphasis="bold" size="small">
+                      {o.productTitle}
+                    </Text>
+                    {o.variantTitle && (
+                      <Text size="small" appearance="subdued">
+                        {o.variantTitle}
+                      </Text>
+                    )}
+                    {o.price && (
+                      <Text size="small" appearance="subdued">
+                        ${o.price}
+                      </Text>
+                    )}
+                  </BlockStack>
+                </View>
+
+                <View minBlockSize={84} maxBlockSize={84} overflow="hidden">
+                  <InlineLayout spacing="extraTight" columns={["fill", "fill"]}>
+                    <Button
+                      kind="primary"
+                      to={buildAcceptUrl(o) ?? undefined}
+                      onPress={() => handleAccept(o)}
+                      disabled={processing}
+                      accessibilityLabel="Add this item to your order"
+                    >
+                      Order
+                    </Button>
+
+                    <Button
+                      kind="secondary"
+                      onPress={handleDismiss}
+                      disabled={processing}
+                      accessibilityLabel="Decline this offer"
+                    >
+                      No thanks
+                    </Button>
+                  </InlineLayout>
+                </View>
               </BlockStack>
-            </InlineStack>
-
-            <InlineStack spacing="tight" blockAlignment="center">
-              <Button
-                kind="primary"
-                to={buildAcceptUrl(o) ?? undefined}
-                onPress={() => handleAccept(o)}
-                disabled={processing}
-                accessibilityLabel="Order only"
-              >
-                Order only
-              </Button>
-
-              <Button
-                kind="tertiary"
-                onPress={handleDismiss}
-                disabled={processing}
-                accessibilityLabel="Decline this offer"
-              >
-                No thanks
-              </Button>
-            </InlineStack>
-          </BlockStack>
-        ))}
-      </BlockStack>
+            </View>
+          ))}
+        </InlineLayout>
+      </ScrollView>
     </BlockStack>
   );
 }
