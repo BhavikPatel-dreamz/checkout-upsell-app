@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { Link } from "react-router";
 import type { OfferPlacement, OfferType } from "@prisma/client";
 import {
   placementHeaderLabel,
@@ -801,20 +802,20 @@ function DealTypeField({ state, errors }: { state: OfferFormState; errors: Error
 export function OfferActions({
   mode,
   submitting,
-  onCancel,
+  cancelUrl,
 }: {
   mode: "create" | "edit";
   submitting: boolean;
-  onCancel: () => void;
+  cancelUrl: string;
 }) {
   return (
     <div style={styles.actionsRow}>
       <button type="submit" style={styles.submitButton} disabled={submitting}>
         {submitting ? "Saving\u2026" : mode === "edit" ? "Save Changes" : "Save Offer"}
       </button>
-      <button type="button" style={styles.cancelButton} onClick={onCancel}>
+      <Link to={cancelUrl} style={{ ...styles.cancelButton, textDecoration: "none", color: "inherit" }}>
         Cancel
-      </button>
+      </Link>
     </div>
   );
 }

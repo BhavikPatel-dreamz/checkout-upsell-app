@@ -1,13 +1,17 @@
 import {
   reactExtension,
-  useApi,
+  useShop,
+  useCartLines,
+  useCustomer,
+  useStorage,
   Image,
   Text,
+  View,
   BlockStack,
   InlineStack,
   Button,
 } from "@shopify/ui-extensions-react/checkout";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 interface EligibleOffer {
   offerId: string;
@@ -22,48 +26,89 @@ interface EligibleOffer {
   offerType: string;
 }
 
+const GUEST_STORAGE_KEY = "checkout-upsell-guest-key";
+const DISMISS_STORAGE_KEY = "checkout-upsell-thankyou-dismissed";
+
 export default reactExtension(
   "purchase.thank-you.block.render",
   () => <ThankYouUpsellBlock />,
 );
 
+function numericIdFromGid(gid: string): string | null {
+  const match = gid.match(/(\d+)\s*$/);
+  return match ? match[1] : null;
+}
+
 function ThankYouUpsellBlock() {
-  const api = useApi();
-  const [offer, setOffer] = useState<EligibleOffer | null>(null);
+  const shop = useShop();
+  const shopDomain = shop.myshopifyDomain;
+  const lines = useCartLines();
+  const customer = useCustomer();
+  const storage = useStorage();
+  const [offers, setOffers] = useState<EligibleOffer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    const apiRecord = api as unknown as Record<string, unknown>;
+  const getCustomerIdentity = useCallback(async (): Promise<{
+    customerId: string | null;
+    guestKey: string | null;
+  }> => {
+    const customerId = customer?.id ?? null;
+    if (customerId) return { customerId, guestKey: null };
 
-    async function trackViewed(shopDomain: string, visibleOffer: EligibleOffer) {
+    try {
+      const stored = await storage.read(GUEST_STORAGE_KEY);
+      if (typeof stored === "string" && stored) {
+        return { customerId: null, guestKey: stored };
+      }
+      const next = `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      await storage.write(GUEST_STORAGE_KEY, next);
+      return { customerId: null, guestKey: next };
+    } catch {
+      return {
+        customerId: null,
+        guestKey: `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      };
+    }
+  }, [customer, storage]);
+
+  const buildAcceptUrl = useCallback(
+    async (selectedOffer: EligibleOffer): Promise<string | null> => {
+      if (!shopDomain) return null;
+      const upsellVariantId = numericIdFromGid(selectedOffer.variantId);
+      if (!upsellVariantId) return null;
+
+      const { customerId, guestKey } = await getCustomerIdentity();
+      const params = new URLSearchParams({
+        id: upsellVariantId,
+        quantity: "1",
+        return_to: "/checkout",
+      });
+      params.set("properties[_upsell_offer_id]", selectedOffer.offerId);
+      params.set("properties[_upsell_product_id]", selectedOffer.productId);
+      params.set("properties[_upsell_variant_id]", selectedOffer.variantId);
+      if (customerId) params.set("properties[_upsell_customer_id]", customerId);
+      if (guestKey) params.set("properties[_upsell_guest_key]", guestKey);
+
+      return `https://${shopDomain}/cart/add?${params.toString()}`;
+    },
+    [shopDomain, getCustomerIdentity],
+  );
+
+  const trackEvent = useCallback(
+    async (path: "clicked" | "added-to-cart" | "viewed", offer: EligibleOffer) => {
+      const { customerId, guestKey } = await getCustomerIdentity();
       try {
-        const customer = apiRecord.customer as Record<string, unknown> | undefined;
-        const customerId =
-          customer && (typeof customer.id === "string" || typeof customer.id === "number")
-            ? String(customer.id)
-            : null;
-        const guestKey = customerId ? null : (() => {
-          try {
-            const stored = window.sessionStorage.getItem("checkout-upsell-guest-key");
-            if (stored) return stored;
-            const next = `guest-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
-            window.sessionStorage.setItem("checkout-upsell-guest-key", next);
-            return next;
-          } catch {
-            return `guest-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-          }
-        })();
-
-        await fetch(`https://${shopDomain}/apps/checkout-upsell/api/offers/viewed`, {
+        await fetch(`https://${shopDomain}/apps/checkout-upsell/api/offers/${path}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             shop: shopDomain,
-            offerId: visibleOffer.offerId,
-            offerName: visibleOffer.offerName,
-            productId: visibleOffer.productId,
-            variantId: visibleOffer.variantId,
+            offerId: offer.offerId,
+            offerName: offer.offerName,
+            productId: offer.productId,
+            variantId: offer.variantId,
             placement: "post_purchase",
             customerId,
             guestKey,
@@ -71,51 +116,88 @@ function ThankYouUpsellBlock() {
           }),
         });
       } catch (err) {
-        console.error("ThankYou upsell impression tracking error:", err);
+        console.error(`ThankYou upsell ${path} tracking error:`, err);
       }
-    }
+    },
+    [shopDomain, getCustomerIdentity],
+  );
+
+  const handleAccept = useCallback(
+    async (selectedOffer: EligibleOffer) => {
+      if (!selectedOffer || processing || !shopDomain) return;
+      setProcessing(true);
+      try {
+        const acceptUrl = await buildAcceptUrl(selectedOffer);
+        void trackEvent("clicked", selectedOffer);
+        if (acceptUrl) {
+          void trackEvent("added-to-cart", selectedOffer);
+        }
+      } finally {
+        setProcessing(false);
+      }
+    },
+    [processing, shopDomain, buildAcceptUrl, trackEvent],
+  );
+
+  const handleDismiss = useCallback(() => {
+    setDismissed(true);
+    void storage.write(DISMISS_STORAGE_KEY, true);
+  }, [storage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void storage.read(DISMISS_STORAGE_KEY).then((value) => {
+      if (!cancelled && value === true) setDismissed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storage]);
+
+  const lineIds = useMemo(() => {
+    const productIds = (lines ?? [])
+      .map((line) => line.merchandise?.product?.id)
+      .filter((id): id is string => Boolean(id));
+    const variantIds = (lines ?? [])
+      .map((line) => line.merchandise?.id)
+      .filter((id): id is string => Boolean(id));
+    return { productIds, variantIds };
+  }, [lines]);
+
+  useEffect(() => {
+    let cancelled = false;
 
     async function fetchOffer() {
       try {
-        const shop = apiRecord.shop as string | undefined;
-        if (!shop) { setLoading(false); return; }
+        if (!shopDomain) {
+          setLoading(false);
+          return;
+        }
 
-        const lines = ((apiRecord.lines ?? []) as Array<Record<string, unknown>>);
-        const productIds = lines
-          .map((l) => {
-            const merchandise = l.merchandise as Record<string, unknown> | undefined;
-            const product = merchandise?.product as Record<string, unknown> | undefined;
-            return product?.id as string | undefined;
-          })
-          .filter(Boolean) as string[];
-        const variantIds = lines
-          .map((l) => {
-            const merchandise = l.merchandise as Record<string, unknown> | undefined;
-            return merchandise?.id as string | undefined;
-          })
-          .filter(Boolean) as string[];
-
-        if (productIds.length === 0 && variantIds.length === 0) {
+        if (lineIds.productIds.length === 0 && lineIds.variantIds.length === 0) {
           setLoading(false);
           return;
         }
 
         const params = new URLSearchParams({
-          shop,
+          shop: shopDomain,
           placement: "post_purchase",
-          productIds: productIds.join(","),
-          variantIds: variantIds.join(","),
+          productIds: lineIds.productIds.join(","),
+          variantIds: lineIds.variantIds.join(","),
         });
 
-        const proxyUrl = `https://${shop}/apps/checkout-upsell/api/offers/eligible`;
-        const res = await fetch(`${proxyUrl}?${params.toString()}`);
-        if (!res.ok) { setLoading(false); return; }
+        const res = await fetch(
+          `https://${shopDomain}/apps/checkout-upsell/api/offers/eligible?${params.toString()}`,
+        );
+        if (!res.ok) {
+          setLoading(false);
+          return;
+        }
 
-        const data = await res.json() as { offers?: EligibleOffer[] };
+        const data = (await res.json()) as { offers?: EligibleOffer[] };
         if (!cancelled && data?.offers && data.offers.length > 0) {
-          const visibleOffer = data.offers[0];
-          setOffer(visibleOffer);
-          void trackViewed(shop, visibleOffer);
+          setOffers(data.offers);
+          for (const offer of data.offers) void trackEvent("viewed", offer);
         }
       } catch (err) {
         console.error("ThankYou upsell fetch error:", err);
@@ -124,65 +206,121 @@ function ThankYouUpsellBlock() {
       }
     }
 
-    fetchOffer();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void fetchOffer();
+    return () => {
+      cancelled = true;
+    };
+  }, [shopDomain, lineIds, trackEvent]);
 
-  if (loading || !offer) return null;
+  if (loading || offers.length === 0 || dismissed) return null;
 
   return (
     <BlockStack spacing="tight" padding={["base", "none"]}>
       <BlockStack
-        spacing="base"
+        spacing="tight"
         padding="base"
         border="base"
         borderRadius="base"
         borderColor="secondary"
+        maxInlineSize={400}
       >
         <Text emphasis="bold" size="medium">
           You may also like
         </Text>
 
-        <InlineStack spacing="base" blockAlignment="start">
-          {offer.imageUrl && (
-            <Image
-              source={offer.imageUrl}
-              alt={offer.productTitle}
-              maxWidth="80px"
-              aspectRatio={1}
-              cornerRadius="base"
-            />
-          )}
+        {offers.map((o) => (
+          <BlockStack key={o.offerId} spacing="tight" padding={"none"}>
+            <InlineStack spacing="base" blockAlignment="start">
+              {o.imageUrl && (
+                <View maxInlineSize={96} minInlineSize={96}>
+                  <Image
+                    source={o.imageUrl}
+                    alt={o.productTitle}
+                    aspectRatio={1}
+                    cornerRadius="base"
+                    fit="cover"
+                  />
+                </View>
+              )}
 
-          <BlockStack spacing="tight">
-            {offer.promotionalTitle && (
-              <Text emphasis="bold" size="small" appearance="subdued">
-                {offer.promotionalTitle}
-              </Text>
-            )}
-            <Text emphasis="strong" size="small">
-              {offer.productTitle}
-            </Text>
-            {offer.variantTitle && (
-              <Text size="small" appearance="subdued">
-                {offer.variantTitle}
-              </Text>
-            )}
-            <Text size="small" appearance="subdued">
-              ${offer.price}
-            </Text>
+              <BlockStack spacing="extraTight" inlineAlignment="start">
+                {o.promotionalTitle && (
+                  <Text emphasis="bold" size="small" appearance="subdued">
+                    {o.promotionalTitle}
+                  </Text>
+                )}
+                <Text emphasis="strong" size="small">
+                  {o.productTitle}
+                </Text>
+                {o.variantTitle && (
+                  <Text size="small" appearance="subdued">
+                    {o.variantTitle}
+                  </Text>
+                )}
+                {o.price && (
+                  <Text size="small" appearance="subdued">
+                    ${o.price}
+                  </Text>
+                )}
+              </BlockStack>
+            </InlineStack>
 
-            <Button
-              kind="primary"
-              disabled={true}
-              accessibilityLabel="Add to order - coming soon"
-            >
-              Add to order
-            </Button>
+            <InlineStack spacing="tight" blockAlignment="center">
+              <AcceptButton
+                offer={o}
+                processing={processing}
+                buildAcceptUrl={buildAcceptUrl}
+                onAccept={handleAccept}
+              />
+
+              <Button
+                kind="tertiary"
+                onPress={handleDismiss}
+                disabled={processing}
+                accessibilityLabel="Decline this offer"
+              >
+                No thanks
+              </Button>
+            </InlineStack>
           </BlockStack>
-        </InlineStack>
+        ))}
       </BlockStack>
     </BlockStack>
+  );
+}
+
+function AcceptButton({
+  offer,
+  processing,
+  buildAcceptUrl,
+  onAccept,
+}: {
+  offer: EligibleOffer;
+  processing: boolean;
+  buildAcceptUrl: (offer: EligibleOffer) => Promise<string | null>;
+  onAccept: (offer: EligibleOffer) => void;
+}) {
+  const [href, setHref] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    void buildAcceptUrl(offer).then((url) => {
+      if (!cancelled) setHref(url ?? undefined);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [offer, buildAcceptUrl]);
+
+  return (
+    <Button
+      kind="primary"
+      to={href}
+      onPress={() => onAccept(offer)}
+      disabled={processing || !href}
+      accessibilityLabel="Add to cart / Checkout"
+    >
+      Add to cart / Checkout
+    </Button>
   );
 }

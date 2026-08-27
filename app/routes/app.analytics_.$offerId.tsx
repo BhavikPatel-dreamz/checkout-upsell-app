@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData, useNavigate } from "react-router";
+import { Link, useLoaderData } from "react-router";
 
 import { authenticate } from "../shopify.server";
 import { getOfferAnalyticsForOffer, getOfferTrendMetrics } from "../models/offerAnalytics.server";
@@ -637,7 +637,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 /* ---------------------------------------------------------------------- */
 
 export default function OfferAnalyticsDetailsPage() {
-  const navigate = useNavigate();
   const { analytics, trendMetrics, productNames } = useLoaderData<typeof loader>();
 
   if (!analytics) {
@@ -666,9 +665,8 @@ export default function OfferAnalyticsDetailsPage() {
           <p style={{ margin: "0 0 1rem", color: colors.subdued, lineHeight: 1.5 }}>
             This offer could not be loaded or no longer exists.
           </p>
-          <button
-            type="button"
-            onClick={() => navigate("/app/analytics")}
+          <Link
+            to="/app/analytics"
             style={{
               background: colors.accent,
               color: "#fff",
@@ -678,10 +676,12 @@ export default function OfferAnalyticsDetailsPage() {
               fontSize: "0.85rem",
               fontWeight: 600,
               cursor: "pointer",
+              textDecoration: "none",
+              display: "inline-block",
             }}
           >
             Back to Analytics
-          </button>
+          </Link>
         </div>
       </div>
     );
@@ -706,9 +706,8 @@ export default function OfferAnalyticsDetailsPage() {
       }}
     >
       {/* Back link */}
-      <button
-        type="button"
-        onClick={() => navigate("/app/analytics")}
+      <Link
+        to="/app/analytics"
         style={{
           background: "none",
           border: "none",
@@ -717,10 +716,12 @@ export default function OfferAnalyticsDetailsPage() {
           fontSize: "0.82rem",
           color: colors.subdued,
           cursor: "pointer",
+          textDecoration: "none",
+          display: "inline-block",
         }}
       >
         ← All Upsells
-      </button>
+      </Link>
 
       {/* Header */}
       <div

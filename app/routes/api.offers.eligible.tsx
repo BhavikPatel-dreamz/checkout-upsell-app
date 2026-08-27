@@ -15,29 +15,29 @@ function parseCsvParam(value: string | null): string[] {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   let shop: string | null = null;
-
-  // 1. Try admin session auth
-  try {
-    const { session } = await authenticate.admin(request);
-    shop = session.shop;
-  } catch (e) {
-    // unauthenticated — fall through
-  }
-
-  // 2. Try Shopify App Proxy header (X-Shopify-Shop-Domain)
-  if (!shop) {
-    const proxyShop = request.headers.get("x-shopify-shop-domain");
-    if (proxyShop && isValidShopDomain(proxyShop)) {
-      shop = proxyShop;
-    }
-  }
-
-  // 3. Fall back to query param
   const url = new URL(request.url);
+
+  // 1. Shopify App Proxy header (X-Shopify-Shop-Domain)
+  const proxyShop = request.headers.get("x-shopify-shop-domain");
+  if (proxyShop && isValidShopDomain(proxyShop)) {
+    shop = proxyShop;
+  }
+
+  // 2. Fall back to query param
   if (!shop) {
     const shopParam = url.searchParams.get("shop");
     if (shopParam && isValidShopDomain(shopParam)) {
       shop = shopParam;
+    }
+  }
+
+  // 3. Try admin session auth (last resort — may throw a redirect)
+  if (!shop) {
+    try {
+      const { session } = await authenticate.admin(request);
+      shop = session.shop;
+    } catch (e) {
+      // unauthenticated — fall through
     }
   }
 
@@ -62,5 +62,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const offers = await findEligibleCrossSellOffers({ shop, placement, productIds, variantIds });
 
-  return Response.json({ offers });
+  return Response.json(
+    { offers },
+    { headers: { "Access-Control-Allow-Origin": "*" } },
+  );
 };

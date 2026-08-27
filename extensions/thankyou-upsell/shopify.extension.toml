@@ -1,9 +1,13 @@
-uid = "27de7a0f-16d2-26c3-ac46-904a094e21ffb93d65db"
+uid = "c8f1a4e2-7b93-4d16-a0e5-3f9c2b8d1a70e6c4b5d8"
 api_version = "2025-07"
+
 [[extensions]]
 name = "Thank You Upsell"
 handle = "thankyou-upsell"
 type = "ui_extension"
+
+  [extensions.capabilities]
+  network_access = true
 
 [[extensions.targeting]]
 target = "purchase.thank-you.block.render"

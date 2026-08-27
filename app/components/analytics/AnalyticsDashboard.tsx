@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { Link } from "react-router";
 
 type ProductMetaMap = {
   titles: Record<string, string>;
@@ -37,7 +38,7 @@ type AnalyticsDashboardProps = {
     purchases: number[];
   };
   productMetaMap: ProductMetaMap;
-  onOpenOfferDetails: (offerId: string) => void;
+  offerDetailUrl: (offerId: string) => string;
   onRefresh?: () => void;
   isRefreshing?: boolean;
 };
@@ -89,7 +90,7 @@ function OfferListRow({
   value,
   valueLabel,
   percentOfMax,
-  onOpen,
+  url,
 }: {
   rank: number;
   label: string;
@@ -97,10 +98,14 @@ function OfferListRow({
   value: number;
   valueLabel: string;
   percentOfMax: number;
-  onOpen?: () => void;
+  url?: string;
 }) {
   return (
-    <div className="analytics-offer-row" onClick={onOpen} role={onOpen ? "button" : undefined}>
+    <Link
+      to={url ?? "#"}
+      className="analytics-offer-row"
+      style={{ textDecoration: "none", color: "inherit", cursor: url ? "pointer" : undefined }}
+    >
       <div className="analytics-offer-main">
         <div className="analytics-rank-badge">{RANK_MEDALS[rank - 1] ?? rank}</div>
         <div className="analytics-offer-meta">
@@ -116,7 +121,7 @@ function OfferListRow({
           {formatMetric(value)} <span className="analytics-offer-value-label">{valueLabel}</span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -158,7 +163,7 @@ export default function AnalyticsDashboard({
   purchaseMetrics: initPurchaseMetrics,
   trendMetrics: initTrendMetrics,
   productMetaMap: initProductMetaMap,
-  onOpenOfferDetails,
+  offerDetailUrl,
   onRefresh,
   isRefreshing = false,
 }: AnalyticsDashboardProps) {
@@ -791,7 +796,7 @@ export default function AnalyticsDashboard({
                     value={offer[selectedRankingMetric]}
                     valueLabel={rankingUnitLabel}
                     percentOfMax={(offer[selectedRankingMetric] / maxRankingValue) * 100}
-                    onOpen={() => onOpenOfferDetails(offer.offerId)}
+                    url={offerDetailUrl(offer.offerId)}
                   />
                 ))
               )}

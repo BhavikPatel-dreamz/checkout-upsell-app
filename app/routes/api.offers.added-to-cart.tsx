@@ -1,4 +1,4 @@
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { OfferPlacement } from "@prisma/client";
 import { badRequest, methodNotAllowed, readJsonBody } from "../lib/http.server";
 import { trackOfferAddedToCart } from "../models/offerAnalytics.server";
@@ -14,10 +14,23 @@ function parsePlacement(value: unknown): OfferPlacement | null {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  if (request.method !== "POST") return methodNotAllowed();
+  const CORS_HEADERS = new Headers({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Shopify-Shop-Domain",
+  });
+  function withCors(response: Response) {
+    CORS_HEADERS.forEach((v, k) => response.headers.set(k, v));
+    return response;
+  }
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+  if (request.method !== "POST") return withCors(methodNotAllowed());
 
   const parsed = await readJsonBody(request);
-  if (!parsed.ok) return badRequest({ body: "Request body must be valid JSON." });
+  if (!parsed.ok) return withCors(badRequest({ body: "Request body must be valid JSON." }));
 
   const body = parsed.body as Record<string, unknown>;
   const shop =
@@ -28,7 +41,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     new URL(request.url).searchParams.get("shop");
 
   if (!shop || !isValidShopDomain(shop)) {
-    return badRequest({ shop: "Shop domain is required." });
+    return withCors(badRequest({ shop: "Shop domain is required." }));
   }
 
   const offerId = typeof body.offerId === "string" ? body.offerId.trim() : "";
@@ -37,7 +50,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const placement = parsePlacement(body.placement);
 
   if (!offerId || !productId || !variantId || !placement) {
-    return badRequest({ body: "offerId, productId, variantId, and placement are required." });
+    return withCors(badRequest({ body: "offerId, productId, variantId, and placement are required." }));
   }
 
   const result = await trackOfferAddedToCart({
@@ -52,5 +65,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     isGuest: body.isGuest === true || (typeof body.customerId !== "string" && typeof body.guestKey === "string"),
   });
 
-  return Response.json({ counted: result.counted, duplicate: result.duplicate });
+  return withCors(Response.json({ counted: result.counted, duplicate: result.duplicate }));
+};
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const CORS_HEADERS = new Headers({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Shopify-Shop-Domain",
+  });
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
+  return new Response(null, { status: 405, headers: CORS_HEADERS });
 };
