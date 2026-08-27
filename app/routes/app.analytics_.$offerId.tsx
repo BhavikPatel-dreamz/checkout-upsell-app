@@ -496,7 +496,7 @@ function ConversionFunnel({
     { label: "Added to Cart", value: funnel.addedToCart },
     { label: "Purchases", value: funnel.purchases },
   ];
-  const maxValue = stages[0].value || 1;
+    const maxValue = Math.max(...stages.map((s) => s.value), 1);
   // Floor rises with each stage so long labels always have room to render
   // on one line, even as the trapezoid narrows toward the bottom.
   const minWidthFloors = [92, 74, 56, 40, 28];

@@ -8,7 +8,8 @@ import {
   Text,
   View,
   BlockStack,
-  InlineStack,
+  InlineLayout,
+  ScrollView,
   Button,
 } from "@shopify/ui-extensions-react/checkout";
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -219,75 +220,100 @@ function ThankYouUpsellBlock() {
 
   return (
     <BlockStack spacing="tight" padding={["base", "none"]}>
-      <BlockStack
-        spacing="tight"
-        padding="base"
-        border="base"
-        borderRadius="base"
-        borderColor="secondary"
-        maxInlineSize={400}
-      >
-        <Text emphasis="bold" size="medium">
-          You may also like
-        </Text>
+      <Text emphasis="bold" size="medium">
+        You may also like
+      </Text>
 
-        {offers.map((o) => (
-          <BlockStack key={o.offerId} spacing="tight" padding={"none"}>
-            <InlineStack spacing="base" blockAlignment="start">
-              {o.imageUrl && (
-                <View maxInlineSize={96} minInlineSize={96}>
-                  <Image
-                    source={o.imageUrl}
-                    alt={o.productTitle}
-                    aspectRatio={1}
-                    cornerRadius="base"
-                    fit="cover"
-                  />
+      <ScrollView direction="inline">
+        <InlineLayout
+          spacing="base"
+          blockAlignment="start"
+          columns={offers.map(() => 180)}
+        >
+          {offers.map((o) => (
+            <View
+              key={`${o.offerId}-${o.variantId}`}
+              minBlockSize={330}
+              maxBlockSize={330}
+              overflow="hidden"
+              border="base"
+              borderRadius="base"
+              padding="base"
+            >
+              <BlockStack spacing="tight">
+                <View
+                  minInlineSize={136}
+                  maxInlineSize={136}
+                  minBlockSize={136}
+                  maxBlockSize={136}
+                  cornerRadius="base"
+                >
+                  {o.imageUrl ? (
+                    <Image
+                      source={o.imageUrl}
+                      accessibilityDescription={o.productTitle}
+                      fit="cover"
+                      cornerRadius="base"
+                    />
+                  ) : (
+                    <View
+                      minInlineSize={136}
+                      maxInlineSize={136}
+                      minBlockSize={136}
+                      maxBlockSize={136}
+                      background="subdued"
+                      cornerRadius="base"
+                    />
+                  )}
                 </View>
-              )}
 
-              <BlockStack spacing="extraTight" inlineAlignment="start">
-                {o.promotionalTitle && (
-                  <Text emphasis="bold" size="small" appearance="subdued">
-                    {o.promotionalTitle}
-                  </Text>
-                )}
-                <Text emphasis="strong" size="small">
-                  {o.productTitle}
-                </Text>
-                {o.variantTitle && (
-                  <Text size="small" appearance="subdued">
-                    {o.variantTitle}
-                  </Text>
-                )}
-                {o.price && (
-                  <Text size="small" appearance="subdued">
-                    ${o.price}
-                  </Text>
-                )}
+                <View minBlockSize={96} maxBlockSize={96} overflow="hidden">
+                  <BlockStack spacing="extraTight" inlineAlignment="start">
+                    {o.promotionalTitle && (
+                      <Text emphasis="bold" size="small" appearance="subdued">
+                        {o.promotionalTitle}
+                      </Text>
+                    )}
+                    <Text emphasis="bold" size="small">
+                      {o.productTitle}
+                    </Text>
+                    {o.variantTitle && (
+                      <Text size="small" appearance="subdued">
+                        {o.variantTitle}
+                      </Text>
+                    )}
+                    {o.price && (
+                      <Text size="small" appearance="subdued">
+                        ${o.price}
+                      </Text>
+                    )}
+                  </BlockStack>
+                </View>
+
+                <View minBlockSize={84} maxBlockSize={84} overflow="hidden">
+                  <InlineLayout spacing="extraTight" columns={["fill", "fill"]}>
+                    <AcceptButton
+                      offer={o}
+                      processing={processing}
+                      buildAcceptUrl={buildAcceptUrl}
+                      onAccept={handleAccept}
+                    />
+
+                    <Button
+                      kind="secondary"
+                      onPress={handleDismiss}
+                      disabled={processing}
+                      accessibilityLabel="Decline this offer"
+                    >
+                      No thanks
+                    </Button>
+                  </InlineLayout>
+                </View>
               </BlockStack>
-            </InlineStack>
-
-            <InlineStack spacing="tight" blockAlignment="center">
-              <AcceptButton
-                offer={o}
-                processing={processing}
-                buildAcceptUrl={buildAcceptUrl}
-                onAccept={handleAccept}
-              />
-
-              <Button
-                kind="tertiary"
-                onPress={handleDismiss}
-                disabled={processing}
-                accessibilityLabel="Decline this offer"
-              >
-                No thanks
-              </Button>
-            </InlineStack>
-          </BlockStack>
-        ))}
-      </BlockStack>
+            </View>
+          ))}
+        </InlineLayout>
+      </ScrollView>
     </BlockStack>
   );
 }
@@ -321,9 +347,9 @@ function AcceptButton({
       to={href}
       onPress={() => onAccept(offer)}
       disabled={processing || !href}
-      accessibilityLabel="Add to cart / Checkout"
+      accessibilityLabel="Add this item to your order"
     >
-      Add to cart / Checkout
+      Order
     </Button>
   );
 }
