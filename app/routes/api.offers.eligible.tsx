@@ -3,6 +3,7 @@ import { OfferPlacement } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import { badRequest } from "../lib/http.server";
 import { findEligibleCrossSellOffers } from "../models/offerEligibility.server";
+import { rankEligibleOffers } from "../models/offerRanker.server";
 
 function isValidShopDomain(value: unknown): value is string {
   return typeof value === "string" && /^[a-z0-9-]+\.myshopify\.com$/.test(value);
@@ -60,7 +61,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return badRequest({ cart: "At least one of productIds or variantIds is required (comma-separated)." });
   }
 
-  const offers = await findEligibleCrossSellOffers({ shop, placement, productIds, variantIds });
+  const customerId = url.searchParams.get("customerId")?.trim() || null;
+  const guestKey = url.searchParams.get("guestKey")?.trim() || null;
+  const clientId = url.searchParams.get("clientId")?.trim() || null;
+
+  const eligible = await findEligibleCrossSellOffers({ shop, placement, productIds, variantIds });
+  const offers = await rankEligibleOffers({
+    shop,
+    offers: eligible,
+    identity: { customerId, guestKey, clientId },
+  });
 
   return Response.json(
     { offers },
