@@ -18,10 +18,10 @@ const STEPS = [
     link: "/app/offers/new",
     linkLabel: "Create an Offer",
   },
-  {
+    {
     id: 3,
     title: "Add Theme Extension",
-    description: "Enable the cart upsell in the Theme Editor and the thank-you upsell in the Checkout Editor.",
+    description: "Enable the cart upsell, thank-you upsell, and the activity pixel so smart ranking can use browse data.",
     icon: "theme",
     link: null,
     linkLabel: "View Instructions",
@@ -88,7 +88,12 @@ const FAQ_ITEMS = [
   {
     question: "How do I track if my offers are working?",
     answer:
-      "The Analytics page shows views, clicks, add-to-cart events, and purchases for each offer. You can also see revenue attributed to each upsell.",
+      "The Analytics page shows the full funnel: views → clicks → add to cart → purchases, plus view→purchase. Optional browse→offer shows how often storefront browsing later led to an offer view. Smart ranking uses browse activity and these offer stats to reorder eligible offers — it does not create a separate AI conversion event.",
+  },
+  {
+    question: "What is smart ranking?",
+    answer:
+      "You still pick trigger products and upsell products. Eligibility stays trigger-based. Smart ranking only reorders (and caps) those eligible offers using recent browse activity and shop-wide offer conversion. If there is no browse data, offers stay in the current eligibility order.",
   },
   {
     question: "What permissions does this app need?",
@@ -302,11 +307,16 @@ export default function OnboardingPage() {
                 />
                 <GuideStep
                   number={3}
+                  title="Connect browse tracking"
+                  description="Open the app in Shopify admin once so the Activity Pixel is created (Settings → Customer events should show Connected). Then in Theme Editor → App embeds, enable Upsell activity. That embed records product, collection, search, and cart-add on the storefront even if the pixel is delayed. Tracking respects Shopify analytics consent."
+                />
+                <GuideStep
+                  number={4}
                   title="Position the blocks"
                   description="On cart, place the block near the cart items or checkout button. On thank-you, keep it near the order confirmation so it is easy to see."
                 />
                 <GuideStep
-                  number={4}
+                  number={5}
                   title="Save and preview"
                   description="Save both editors. Add a trigger product to the cart to test cart upsells, then complete a test order to see thank-you offers."
                 />
@@ -334,6 +344,13 @@ export default function OnboardingPage() {
                     <div>
                       <strong>Product Discount Function</strong>
                       <span style={styles.extensionDesc}> — Automatically applies discounts to qualifying upsell products.</span>
+                    </div>
+                  </div>
+                  <div style={styles.extensionItem}>
+                    <div style={styles.extensionDot} />
+                    <div>
+                      <strong>Activity Pixel</strong>
+                      <span style={styles.extensionDesc}> — Web pixel that records browse activity for smart ranking (no extra theme snippet).</span>
                     </div>
                   </div>
                 </div>

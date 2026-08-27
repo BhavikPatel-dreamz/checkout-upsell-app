@@ -38,6 +38,18 @@ type AnalyticsDashboardProps = {
     purchases: number[];
   };
   productMetaMap: ProductMetaMap;
+  funnelRates?: {
+    viewToClick: number | null;
+    clickToAddedToCart: number | null;
+    addedToCartToPurchase: number | null;
+    viewToPurchase: number | null;
+  };
+  browseToOffer?: {
+    browseIdentities: number;
+    offerViewIdentities: number;
+    overlap: number;
+    browseToOfferRate: number | null;
+  };
   offerDetailUrl: (offerId: string) => string;
   onRefresh?: () => void;
   isRefreshing?: boolean;
@@ -163,6 +175,8 @@ export default function AnalyticsDashboard({
   purchaseMetrics: initPurchaseMetrics,
   trendMetrics: initTrendMetrics,
   productMetaMap: initProductMetaMap,
+  funnelRates: initFunnelRates,
+  browseToOffer: initBrowseToOffer,
   offerDetailUrl,
   onRefresh,
   isRefreshing = false,
@@ -180,7 +194,8 @@ export default function AnalyticsDashboard({
   const [clickMetrics, setClickMetrics] = useState(initClickMetrics);
   const [addedToCartMetrics, setAddedToCartMetrics] = useState(initAddedToCartMetrics);
   const [purchaseMetrics, setPurchaseMetrics] = useState(initPurchaseMetrics);
-  const [productMetaMap, setProductMetaMap] = useState(initProductMetaMap);
+  const [browseToOffer, setBrowseToOffer] = useState(initBrowseToOffer);
+  const [funnelRates, setFunnelRates] = useState(initFunnelRates);
 
   const totalViews = viewMetrics.totalViews;
   const totalClicks = clickMetrics.totalClicks;
@@ -361,6 +376,8 @@ export default function AnalyticsDashboard({
           if (data.purchaseMetrics) setPurchaseMetrics(data.purchaseMetrics);
           if (data.trendMetrics) setLocalTrendMetrics(data.trendMetrics);
           if (data.productMetaMap) setProductMetaMap(data.productMetaMap);
+          if (data.funnelRates) setFunnelRates(data.funnelRates);
+          if (data.browseToOffer) setBrowseToOffer(data.browseToOffer);
         }
       } catch {
         // ignore fetch errors; keep existing metrics
@@ -424,12 +441,14 @@ export default function AnalyticsDashboard({
     : Array.from({ length: Math.min(pointCount, 6) }, (_, index) => `D${index + 1}`);
 
   const stageConversionRows = [
-    { label: "Views → Clicked", rate: totalViews > 0 ? totalClicks / totalViews : null },
-    { label: "Clicked → Added to Cart", rate: totalClicks > 0 ? totalAddedToCart / totalClicks : null },
-    { label: "Added to Cart → Purchased", rate: totalAddedToCart > 0 ? totalPurchases / totalAddedToCart : null },
+    { label: "Views → Clicked", rate: funnelRates?.viewToClick ?? (totalViews > 0 ? totalClicks / totalViews : null) },
+    { label: "Clicked → Added to Cart", rate: funnelRates?.clickToAddedToCart ?? (totalClicks > 0 ? totalAddedToCart / totalClicks : null) },
+    { label: "Added to Cart → Purchased", rate: funnelRates?.addedToCartToPurchase ?? (totalAddedToCart > 0 ? totalPurchases / totalAddedToCart : null) },
+    { label: "Views → Purchased", rate: funnelRates?.viewToPurchase ?? conversionRate },
   ];
 
-  const lowestStageIndex = stageConversionRows.reduce((lowestIdx, row, idx, arr) => {
+  const sequentialStageCount = 3;
+  const lowestStageIndex = stageConversionRows.slice(0, sequentialStageCount).reduce((lowestIdx, row, idx, arr) => {
     if (row.rate == null) return lowestIdx;
     if (lowestIdx === -1 || (arr[lowestIdx].rate ?? Infinity) > row.rate) return idx;
     return lowestIdx;
@@ -517,7 +536,7 @@ export default function AnalyticsDashboard({
           <div>
             <h1 className="analytics-title">Upsell Analytics</h1>
             <p className="analytics-subtitle">
-              Understand how your upsell offers are performing and which products generate the most conversions.
+              Smart ranking reorders eligible offers from browse activity and offer conversion. You still choose trigger and upsell products.
             </p>
           </div>
 
@@ -760,6 +779,12 @@ export default function AnalyticsDashboard({
               <span>Overall conversion rate</span>
               <strong>{formatPercent(conversionRate)}</strong>
             </div>
+            {browseToOffer ? (
+              <div className="analytics-funnel-footer">
+                <span>Browse → offer view</span>
+                <strong>{formatPercent(browseToOffer.browseToOfferRate)}</strong>
+              </div>
+            ) : null}
           </aside>
         </section>
 

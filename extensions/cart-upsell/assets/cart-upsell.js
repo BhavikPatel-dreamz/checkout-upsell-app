@@ -29,10 +29,20 @@
     return "gid://shopify/Customer/" + value;
   }
 
+  function getClientId() {
+    try {
+      var match = document.cookie.match(/(?:^|; )_shopify_y=([^;]*)/);
+      return match ? decodeURIComponent(match[1]) : null;
+    } catch (_err) {
+      return null;
+    }
+  }
+
   function identity() {
     var customerId = customerGid(getConfig().customerId);
-    if (customerId) return { customerId: customerId, guestKey: null, isGuest: false };
-    return { customerId: null, guestKey: getGuestKey(), isGuest: true };
+    var clientId = getClientId();
+    if (customerId) return { customerId: customerId, guestKey: null, clientId: clientId, isGuest: false };
+    return { customerId: null, guestKey: getGuestKey(), clientId: clientId, isGuest: true };
   }
 
   function productGid(id) {
@@ -99,7 +109,7 @@
         variantId: offer.variantId,
         placement: placement,
         customerId: id.customerId,
-        guestKey: id.guestKey,
+        guestKey: id.guestKey || id.clientId,
         isGuest: id.isGuest,
       }),
     }).catch(function (err) {
@@ -130,6 +140,10 @@
       productIds: productIds.join(","),
       variantIds: variantIds.join(","),
     });
+    var id = identity();
+    if (id.customerId) params.set("customerId", id.customerId);
+    if (id.guestKey) params.set("guestKey", id.guestKey);
+    if (id.clientId) params.set("clientId", id.clientId);
 
     return fetch(config.eligibilityUrl + "?" + params.toString(), {
       credentials: "same-origin",
@@ -206,7 +220,7 @@
         _upsell_product_id: offer.productId,
         _upsell_variant_id: offer.variantId,
         _upsell_customer_id: id.customerId || "",
-        _upsell_guest_key: id.guestKey || "",
+        _upsell_guest_key: id.guestKey || id.clientId || "",
       },
     };
 

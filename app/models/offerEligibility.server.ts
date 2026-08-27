@@ -21,7 +21,7 @@ export interface EligibleOfferPayload {
  * Only supports manual product selections (triggerRules.manualSelections).
  * Scopes all queries by `shop`.
  */
-const MAX_UPSELL_PRODUCTS = 5;
+export const MAX_UPSELL_PRODUCTS = 5;
 
 export async function findEligibleCrossSellOffers(options: {
   shop: string;
@@ -62,7 +62,6 @@ export async function findEligibleCrossSellOffers(options: {
   const seenVariantIds = new Set<string>(); // dedup across offers
 
   for (const offer of offers) {
-    if (results.length >= MAX_UPSELL_PRODUCTS) break;
 
     // Trigger products: the cart must contain at least one of them for the
     // offer to fire. A manually configured cross-sell always declares its
@@ -88,7 +87,6 @@ export async function findEligibleCrossSellOffers(options: {
 
     // For each selection, verify the variant exists in ProductVariant for this shop
     for (const sel of manualSelections) {
-      if (results.length >= MAX_UPSELL_PRODUCTS) break;
       if (!sel || typeof sel.variantId !== "string") continue;
 
       // Skip if already in cart

@@ -179,12 +179,15 @@ function ThankYouUpsellBlock() {
           return;
         }
 
+        const { customerId, guestKey } = await getCustomerIdentity();
         const params = new URLSearchParams({
           shop: shopDomain,
           placement: "post_purchase",
           productIds: lineIds.productIds.join(","),
           variantIds: lineIds.variantIds.join(","),
         });
+        if (customerId) params.set("customerId", customerId);
+        if (guestKey) params.set("guestKey", guestKey);
 
         const res = await fetch(
           `https://${shopDomain}/apps/checkout-upsell/api/offers/eligible?${params.toString()}`,
@@ -210,7 +213,7 @@ function ThankYouUpsellBlock() {
     return () => {
       cancelled = true;
     };
-  }, [shopDomain, lineIds, trackEvent]);
+  }, [shopDomain, lineIds, trackEvent, getCustomerIdentity]);
 
   if (loading || offers.length === 0 || dismissed) return null;
 

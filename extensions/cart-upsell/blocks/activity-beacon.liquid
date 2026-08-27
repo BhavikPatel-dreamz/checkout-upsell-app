@@ -1,0 +1,20 @@
+<script>
+  window.CHECKOUT_UPSELL_ACTIVITY = {
+    shop: {{ shop.permanent_domain | json }},
+    customerId: {% if customer %}"gid://shopify/Customer/{{ customer.id }}"{% else %}null{% endif %},
+    template: {% if template.name %}{{ template.name | json }}{% else %}{{ template | json }}{% endif %},
+    productId: {% if product %}"gid://shopify/Product/{{ product.id }}"{% else %}null{% endif %},
+    variantId: {% if product.selected_or_first_available_variant %}"gid://shopify/ProductVariant/{{ product.selected_or_first_available_variant.id }}"{% else %}null{% endif %},
+    collectionId: {% if collection %}"gid://shopify/Collection/{{ collection.id }}"{% else %}null{% endif %},
+    query: {% if search.terms %}{{ search.terms | json }}{% else %}null{% endif %},
+    activityUrl: "/apps/checkout-upsell/api/activity"
+  };
+</script>
+
+{% schema %}
+{
+  "name": "Upsell activity",
+  "target": "head",
+  "javascript": "activity-beacon.js"
+}
+{% endschema %}
