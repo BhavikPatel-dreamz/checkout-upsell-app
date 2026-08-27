@@ -8,6 +8,7 @@ import {
   getOfferTrendMetrics,
   getOfferViewMetrics,
 } from "../models/offerAnalytics.server";
+import { getBrowseToOfferMetrics } from "../models/browseActivity.server";
 import AnalyticsDashboard from "../components/analytics/AnalyticsDashboard";
 import "../styles/analytics.css";
 
@@ -50,13 +51,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
   );
 
   const productMetaMap = await getProductMetaMap(session.shop, productIds);
+  const browseToOffer = await getBrowseToOfferMetrics(session.shop);
+  const funnelRates = {
+    viewToClick: viewMetrics.totalViews > 0 ? clickMetrics.totalClicks / viewMetrics.totalViews : null,
+    clickToAddedToCart:
+      clickMetrics.totalClicks > 0 ? addedToCartMetrics.totalAddedToCart / clickMetrics.totalClicks : null,
+    addedToCartToPurchase:
+      addedToCartMetrics.totalAddedToCart > 0
+        ? purchaseMetrics.totalPurchases / addedToCartMetrics.totalAddedToCart
+        : null,
+    viewToPurchase: viewMetrics.totalViews > 0 ? purchaseMetrics.totalPurchases / viewMetrics.totalViews : null,
+  };
 
-  return { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, productMetaMap };
+  return { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, productMetaMap, funnelRates, browseToOffer };
 }
 
 export default function AnalyticsPage() {
   const revalidator = useRevalidator();
-  const { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, productMetaMap } =
+  const { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, productMetaMap, funnelRates, browseToOffer } =
     useLoaderData<typeof loader>();
 
   const offerDetailUrl = (offerId: string) =>
@@ -70,6 +82,8 @@ export default function AnalyticsPage() {
       purchaseMetrics={purchaseMetrics}
       trendMetrics={trendMetrics}
       productMetaMap={productMetaMap}
+      funnelRates={funnelRates}
+      browseToOffer={browseToOffer}
       offerDetailUrl={offerDetailUrl}
       onRefresh={() => void revalidator.revalidate()}
       isRefreshing={revalidator.state === "loading"}

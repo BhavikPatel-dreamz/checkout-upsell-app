@@ -18,10 +18,10 @@ const STEPS = [
     link: "/app/offers/new",
     linkLabel: "Create an Offer",
   },
-  {
+    {
     id: 3,
     title: "Add Theme Extension",
-    description: "Enable the upsell block in your Shopify Theme Editor so offers appear in your store.",
+    description: "Enable the cart upsell, thank-you upsell, and the activity pixel so smart ranking can use browse data.",
     icon: "theme",
     link: null,
     linkLabel: "View Instructions",
@@ -78,7 +78,7 @@ const FAQ_ITEMS = [
   {
     question: "How do offers appear to customers?",
     answer:
-      "Offers appear via Shopify theme extensions. You need to add the upsell block in your Theme Editor (Online Store → Customize → add the Checkout Upsell block). Pre-purchase offers show on the checkout or cart page. Post-purchase offers show on the thank-you page.",
+      "Cart upsells are a theme app block: add Cart Upsell in the Theme Editor (Online Store → Themes → Customize → cart template). Thank-you upsells are a checkout UI extension: add Thank You Upsell in the Checkout Editor (Settings → Checkout → Customize). Cart offers show on the cart page; post-purchase offers show on the thank-you page.",
   },
   {
     question: "Can I edit or disable an offer after creating it?",
@@ -88,7 +88,12 @@ const FAQ_ITEMS = [
   {
     question: "How do I track if my offers are working?",
     answer:
-      "The Analytics page shows views, clicks, add-to-cart events, and purchases for each offer. You can also see revenue attributed to each upsell.",
+      "The Analytics page shows the full funnel: views → clicks → add to cart → purchases, plus view→purchase. Optional browse→offer shows how often storefront browsing later led to an offer view. Smart ranking uses browse activity and these offer stats to reorder eligible offers — it does not create a separate AI conversion event.",
+  },
+  {
+    question: "What is smart ranking?",
+    answer:
+      "You still pick trigger products and upsell products. Eligibility stays trigger-based. Smart ranking only reorders (and caps) those eligible offers using recent browse activity and shop-wide offer conversion. If there is no browse data, offers stay in the current eligibility order.",
   },
   {
     question: "What permissions does this app need?",
@@ -284,31 +289,36 @@ export default function OnboardingPage() {
               <div style={styles.guideHeader} className="onboardingGuideHeader">
               <div style={styles.guideIcon}><ThemeIcon /></div>
               <div>
-                <h2 style={styles.guideTitle}>Step 3: Add the Theme Extension</h2>
-                <p style={styles.guideSubtitle}>Make offers visible in your storefront</p>
+                <h2 style={styles.guideTitle}>Step 3: Add storefront upsells</h2>
+                <p style={styles.guideSubtitle}>Cart block in Theme Editor; thank-you block in Checkout Editor</p>
               </div>
             </div>
             <div style={styles.guideBody}>
               <div style={styles.guideSteps}>
                 <GuideStep
                   number={1}
-                  title="Open Theme Editor"
-                  description='From your Shopify Admin, go to Online Store → Themes → click "Customize" on your active theme.'
+                  title="Add Cart Upsell in Theme Editor"
+                  description='From Shopify Admin, go to Online Store → Themes → Customize. Open the cart template, click Add block, and add Cart Upsell.'
                 />
                 <GuideStep
                   number={2}
-                  title="Add the Upsell Block"
-                  description="In the Theme Editor, navigate to the Checkout or Cart page (for pre-purchase offers) or the Thank You page (for post-purchase offers). Click 'Add block' and find the Checkout Upsell block."
+                  title="Add Thank You Upsell in Checkout Editor"
+                  description="From Shopify Admin, go to Settings → Checkout → Customize. Open the Thank you page, add the Thank You Upsell app block, and save."
                 />
                 <GuideStep
                   number={3}
-                  title="Position the Block"
-                  description="Drag the block to where you want the upsell to appear. A good spot is near the order summary or below the checkout button."
+                  title="Connect browse tracking"
+                  description="Open the app in Shopify admin once so the Activity Pixel is created (Settings → Customer events should show Connected). Then in Theme Editor → App embeds, enable Upsell activity. That embed records product, collection, search, and cart-add on the storefront even if the pixel is delayed. Tracking respects Shopify analytics consent."
                 />
                 <GuideStep
                   number={4}
-                  title="Save and Preview"
-                  description='Click "Save" in the Theme Editor. Add a product to your cart that matches a trigger product in your offer to see the upsell in action.'
+                  title="Position the blocks"
+                  description="On cart, place the block near the cart items or checkout button. On thank-you, keep it near the order confirmation so it is easy to see."
+                />
+                <GuideStep
+                  number={5}
+                  title="Save and preview"
+                  description="Save both editors. Add a trigger product to the cart to test cart upsells, then complete a test order to see thank-you offers."
                 />
               </div>
 
@@ -319,14 +329,14 @@ export default function OnboardingPage() {
                     <div style={styles.extensionDot} />
                     <div>
                       <strong>Pre-Purchase Upsell</strong>
-                      <span style={styles.extensionDesc}> — Shows on the checkout or cart page before the customer completes their order.</span>
+                      <span style={styles.extensionDesc}> — Cart Upsell theme app block on the cart page (Theme Editor).</span>
                     </div>
                   </div>
                   <div style={styles.extensionItem}>
                     <div style={styles.extensionDot} />
                     <div>
                       <strong>Post-Purchase Upsell</strong>
-                      <span style={styles.extensionDesc}> — Shows on the thank-you page after the order is placed.</span>
+                      <span style={styles.extensionDesc}> — Thank You Upsell checkout UI extension (Checkout Editor), after the order is placed.</span>
                     </div>
                   </div>
                   <div style={styles.extensionItem}>
@@ -334,6 +344,13 @@ export default function OnboardingPage() {
                     <div>
                       <strong>Product Discount Function</strong>
                       <span style={styles.extensionDesc}> — Automatically applies discounts to qualifying upsell products.</span>
+                    </div>
+                  </div>
+                  <div style={styles.extensionItem}>
+                    <div style={styles.extensionDot} />
+                    <div>
+                      <strong>Activity Pixel</strong>
+                      <span style={styles.extensionDesc}> — Web pixel that records browse activity for smart ranking (no extra theme snippet).</span>
                     </div>
                   </div>
                 </div>
