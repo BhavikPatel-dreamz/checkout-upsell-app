@@ -194,6 +194,7 @@ export default function AnalyticsDashboard({
   const [clickMetrics, setClickMetrics] = useState(initClickMetrics);
   const [addedToCartMetrics, setAddedToCartMetrics] = useState(initAddedToCartMetrics);
   const [purchaseMetrics, setPurchaseMetrics] = useState(initPurchaseMetrics);
+  const [productMetaMap, setProductMetaMap] = useState(initProductMetaMap);
   const [browseToOffer, setBrowseToOffer] = useState(initBrowseToOffer);
   const [funnelRates, setFunnelRates] = useState(initFunnelRates);
 
