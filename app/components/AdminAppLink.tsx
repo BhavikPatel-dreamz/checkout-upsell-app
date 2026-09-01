@@ -1,4 +1,7 @@
+import { useAppBridge } from "@shopify/app-bridge-react";
 import type { CSSProperties, ReactNode } from "react";
+import { Link, NavLink } from "react-router";
+
 
 function appPath(path: string): string {
   return path.startsWith("/") ? path : `/${path}`;
@@ -20,9 +23,12 @@ export function AdminAppLink({
   style?: CSSProperties;
   children: ReactNode;
 }) {
+  
   return (
-    <s-link href={appPath(to)} className={className} style={style}>
+    <Link to={to} className={className} style={style}>
       {children}
-    </s-link>
+    </Link>
+    
+    
   );
 }

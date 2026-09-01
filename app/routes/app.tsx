@@ -1,10 +1,13 @@
+import { useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
+import { useAppBridge } from "@shopify/app-bridge-react";
 
 import { authenticate } from "../shopify.server";
 import { ensureWebPixel } from "../lib/ensureWebPixel.server";
+
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
@@ -14,15 +17,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
 
+// function RememberAdminAppBase() {
+//   const shopify = useAppBridge();
+//   useEffect(() => {
+//     void shopify.ready.then(() => {
+//       rememberAdminAppBase(shopify.config?.host);
+//     });
+//   }, [shopify]);
+//   return null;
+// }
+
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
 
   return (
     <AppProvider embedded apiKey={apiKey}>
-<s-app-nav>
+      
+      <s-app-nav>
         <s-link href="/app">
           Dashboard
         </s-link>
+        <s-link href="/app/offers/new">Create Upsell</s-link>
+        <s-link href="/app/upsells">All Upsells</s-link>
         <s-link href="/app/product-sync">Product Sync</s-link>
         <s-link href="/app/analytics">Analytics</s-link>
         <s-link href="/app/settings">Settings</s-link>
