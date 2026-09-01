@@ -198,19 +198,10 @@ export default function Dashboard({
           </div>
 
           <div className="actionRow">
-            <a
-              href={createUrl}
+            <Link
+              to={createUrl}
               className="actionCard actionCardPrimary"
               style={{ textDecoration: "none", color: "inherit" }}
-              onClick={(event) => {
-                event.preventDefault();
-                const navigateEvent = new CustomEvent("shopify:navigate", {
-                  bubbles: true,
-                  cancelable: true,
-                  detail: { path: createUrl },
-                });
-                event.currentTarget.dispatchEvent(navigateEvent);
-              }}
             >
               <span className="actionIcon actionIconPrimary">
                 <BoltIcon />
@@ -222,7 +213,7 @@ export default function Dashboard({
                 </span>
               </span>
               <span className="actionChevron actionChevronPrimary">›</span>
-            </a>
+            </Link>
 
             <Link
               to={analyticsUrl}
