@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # `build` runs `prisma generate` itself: pnpm runs @prisma/client's postinstall
+      # from inside its virtual store, where it can't resolve prisma/schema.prisma, so
+      # it writes a stub client exposing PrismaClient but none of the schema enums.
       - name: Build
         run: pnpm run build
 
@@ -68,6 +71,7 @@ jobs:
           rm -rf node_modules
           corepack enable
           pnpm install --frozen-lockfile
+          pnpm exec prisma migrate deploy
           pnpm run build
 
       - name: Start App

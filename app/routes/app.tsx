@@ -1,38 +1,30 @@
-import { useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
-import { useAppBridge } from "@shopify/app-bridge-react";
 
 import { authenticate } from "../shopify.server";
 import { ensureWebPixel } from "../lib/ensureWebPixel.server";
-
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   await ensureWebPixel(admin, session.shop);
 
-  // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  return {
+    // eslint-disable-next-line no-undef
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    // The app's handle in the admin URL (…/apps/<handle>/…). Per app, not per
+    // shop, so it differs between the dev and production app only.
+    // eslint-disable-next-line no-undef
+    appHandle: process.env.SHOPIFY_APP_HANDLE || "",
+  };
 };
-
-// function RememberAdminAppBase() {
-//   const shopify = useAppBridge();
-//   useEffect(() => {
-//     void shopify.ready.then(() => {
-//       rememberAdminAppBase(shopify.config?.host);
-//     });
-//   }, [shopify]);
-//   return null;
-// }
 
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
 
   return (
     <AppProvider embedded apiKey={apiKey}>
-      
       <s-app-nav>
         <s-link href="/app">
           Dashboard
@@ -57,3 +49,6 @@ export function ErrorBoundary() {
 export const headers: HeadersFunction = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
+
+
+
