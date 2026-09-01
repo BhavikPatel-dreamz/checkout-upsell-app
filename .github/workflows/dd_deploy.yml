@@ -26,8 +26,8 @@ jobs:
       - name: Build
         run: |
           cd "${{ env.VPS_APP_PATH }}"
-          npm install
-          npm run build
+          pnpm install --frozen-lockfile
+          pnpm run build
 
       - name: Start App
         run: |
