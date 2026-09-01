@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import type { Offer as OfferRecord } from "@prisma/client";
 
 import { PLACEMENT_LABELS, getOfferTypeConfig } from "../types/offer";
@@ -64,6 +64,8 @@ export default function Dashboard({
   allUpsellsUrl,
   offerAnalyticsUrl,
 }: DashboardProps) {
+  const navigate = useNavigate();
+
   function productTitlesForOffer(offer: OfferRecord) {
     const titles: string[] = [];
     try {
@@ -195,7 +197,15 @@ export default function Dashboard({
           </div>
 
           <div className="actionRow">
-            <Link to={createUrl} className="actionCard actionCardPrimary" style={{ textDecoration: "none", color: "inherit" }}>
+            <a
+              href={createUrl}
+              className="actionCard actionCardPrimary"
+              style={{ textDecoration: "none", color: "inherit" }}
+              onClick={(event) => {
+                event.preventDefault();
+                navigate(createUrl);
+              }}
+            >
               <span className="actionIcon actionIconPrimary">
                 <BoltIcon />
               </span>
@@ -206,7 +216,7 @@ export default function Dashboard({
                 </span>
               </span>
               <span className="actionChevron actionChevronPrimary">›</span>
-            </Link>
+            </a>
 
             <Link
               to={analyticsUrl}
