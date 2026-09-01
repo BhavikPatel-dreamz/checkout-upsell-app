@@ -1,5 +1,6 @@
 import { OfferEventType, OfferPlacement, Prisma } from "@prisma/client";
 import db from "../db.server";
+import { getBrowseToOfferMetrics } from "./browseActivity.server";
 
 const VIEW_DEDUPE_WINDOW_MS = 1000 * 60 * 60 * 24;
 
@@ -120,6 +121,13 @@ export interface OfferAnalyticsDetail {
     clickThroughRate: number | null;
     addToCartRate: number | null;
     purchaseRate: number | null;
+    viewToPurchaseRate: number | null;
+  };
+  browseToOffer: {
+    browseIdentities: number;
+    offerViewIdentities: number;
+    overlap: number;
+    browseToOfferRate: number | null;
   };
   totalRevenue: number;
   products: OfferAnalyticsDetailProduct[];
@@ -254,6 +262,8 @@ export async function getOfferAnalyticsForOffer(shop: string, offerId: string): 
   const clickThroughRate = totals.totalViews > 0 ? totals.totalClicks / totals.totalViews : null;
   const addToCartRate = totals.totalClicks > 0 ? totals.totalAddedToCart / totals.totalClicks : null;
   const purchaseRate = totals.totalAddedToCart > 0 ? totals.totalPurchases / totals.totalAddedToCart : null;
+  const viewToPurchaseRate = totals.totalViews > 0 ? totals.totalPurchases / totals.totalViews : null;
+  const browseToOffer = await getBrowseToOfferMetrics(shop, { offerId });
 
   return {
     offer: {
@@ -278,7 +288,9 @@ export async function getOfferAnalyticsForOffer(shop: string, offerId: string): 
       clickThroughRate,
       addToCartRate,
       purchaseRate,
+      viewToPurchaseRate,
     },
+    browseToOffer,
     totalRevenue,
     products,
   };
@@ -861,6 +873,7 @@ export async function getOfferTrendMetrics(shop: string, days = 12, filters?: An
 export interface DashboardFilterParams {
   days?: number;
   status?: string;
+  product?: string;
 }
 
 export interface DashboardMetricsResult {
@@ -874,6 +887,18 @@ export interface DashboardMetricsResult {
     clicks: number[];
     addedToCart: number[];
     purchases: number[];
+  };
+  funnelRates: {
+    viewToClick: number | null;
+    clickToAddedToCart: number | null;
+    addedToCartToPurchase: number | null;
+    viewToPurchase: number | null;
+  };
+  browseToOffer: {
+    browseIdentities: number;
+    offerViewIdentities: number;
+    overlap: number;
+    browseToOfferRate: number | null;
   };
 }
 
@@ -901,13 +926,24 @@ export async function getFilteredDashboardMetrics(
     offerIds,
   };
 
-  const [viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics] = await Promise.all([
+  const [viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, browseToOffer] = await Promise.all([
     getOfferViewMetrics(shop, filters),
     getOfferClickMetrics(shop, filters),
     getOfferAddedToCartMetrics(shop, filters),
     getOfferPurchaseMetrics(shop, filters),
     getOfferTrendMetrics(shop, days, filters),
+    getBrowseToOfferMetrics(shop, { dateFrom }),
   ]);
 
-  return { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics };
+  const funnelRates = {
+    viewToClick: viewMetrics.totalViews > 0 ? clickMetrics.totalClicks / viewMetrics.totalViews : null,
+    clickToAddedToCart: clickMetrics.totalClicks > 0 ? addedToCartMetrics.totalAddedToCart / clickMetrics.totalClicks : null,
+    addedToCartToPurchase:
+      addedToCartMetrics.totalAddedToCart > 0
+        ? purchaseMetrics.totalPurchases / addedToCartMetrics.totalAddedToCart
+        : null,
+    viewToPurchase: viewMetrics.totalViews > 0 ? purchaseMetrics.totalPurchases / viewMetrics.totalViews : null,
+  };
+
+  return { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, funnelRates, browseToOffer };
 }

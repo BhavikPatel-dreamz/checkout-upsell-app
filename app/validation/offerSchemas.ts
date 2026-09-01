@@ -9,7 +9,7 @@
 
 import type { OfferType } from "@prisma/client";
 
-import { getOfferTypeConfig } from "../config/offerTypes";
+import { getOfferTypeConfig, offerRequiresTriggerProducts } from "../config/offerTypes";
 
 export type ValidationResult<T> =
   | { ok: true; data: T }
@@ -95,6 +95,9 @@ export function validateOfferFields(
     if (!upsellProduct) {
       errors.upsellProduct = "Select how the upsell product is chosen";
     }
+    if (upsellProduct === "related" && getOfferTypeConfig(offerType).poolOnly) {
+      errors.upsellProduct = "AI Recommend uses a manual product pool only.";
+    }
     if (upsellProduct === "manual") {
       const manual = Array.isArray(fieldValue(body, "manualSelections")) ? fieldValue(body, "manualSelections") as unknown[] : [];
       if (manual.length === 0) {
@@ -105,7 +108,7 @@ export function validateOfferFields(
     }
   }
 
-  if (offerType === "cross_sell") {
+  if (offerRequiresTriggerProducts(offerType)) {
     const targetIds = Array.isArray(fieldValue(body, "targetProductIds"))
       ? (fieldValue(body, "targetProductIds") as unknown[])
       : [];

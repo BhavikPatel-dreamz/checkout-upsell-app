@@ -487,7 +487,7 @@ function ConversionFunnel({
   funnel,
 }: {
   totalShown: number;
-  funnel: { views: number; clicks: number; addedToCart: number; purchases: number; purchaseRate: number | null };
+  funnel: { views: number; clicks: number; addedToCart: number; purchases: number; purchaseRate: number | null; viewToPurchaseRate?: number | null };
 }) {
   const stages = [
     { label: "Shown", value: totalShown },
@@ -496,7 +496,7 @@ function ConversionFunnel({
     { label: "Added to Cart", value: funnel.addedToCart },
     { label: "Purchases", value: funnel.purchases },
   ];
-  const maxValue = stages[0].value || 1;
+    const maxValue = Math.max(...stages.map((s) => s.value), 1);
   // Floor rises with each stage so long labels always have room to render
   // on one line, even as the trapezoid narrows toward the bottom.
   const minWidthFloors = [92, 74, 56, 40, 28];
@@ -584,7 +584,7 @@ function ConversionFunnel({
         }}
       >
         <span style={{ fontSize: "0.8rem", color: colors.subdued }}>Overall conversion rate</span>
-        <span style={{ fontSize: "1rem", fontWeight: 700, color: colors.green }}>{formatRate(funnel.purchaseRate)}</span>
+        <span style={{ fontSize: "1rem", fontWeight: 700, color: colors.green }}>{formatRate(funnel.viewToPurchaseRate ?? funnel.purchaseRate)}</span>
       </div>
     </div>
   );
@@ -775,11 +775,11 @@ export default function OfferAnalyticsDetailsPage() {
           <div>
             <div style={{ fontSize: "0.85rem", fontWeight: 700, color: colors.text }}>Overall Conversion Rate</div>
             <div style={{ fontSize: "0.72rem", color: colors.green, marginTop: "0.15rem" }}>
-              Impressions → Purchases · Last 30 days
+              Impressions → Purchases · Smart ranking uses browse + offer stats
             </div>
           </div>
           <div style={{ fontSize: "2rem", fontWeight: 800, color: colors.green }}>
-            {formatRate(funnel.purchaseRate)}
+            {formatRate(funnel.viewToPurchaseRate)}
           </div>
         </div>
 
@@ -791,7 +791,8 @@ export default function OfferAnalyticsDetailsPage() {
           <MiniStat label="CTR" value={formatRate(funnel.clickThroughRate)} />
           <MiniStat label="Add to Cart" value={formatCompact(funnel.addedToCart)} />
           <MiniStat label="Purchases" value={formatCompact(funnel.purchases)} />
-          <MiniStat label="Revenue" value={formatCurrency(totalRevenue)} />
+          <MiniStat label="View → Purchase" value={formatRate(funnel.viewToPurchaseRate)} />
+          <MiniStat label="Browse → Offer" value={formatRate(analytics.browseToOffer?.browseToOfferRate ?? null)} />
         </Row>
 
         {/* Charts row */}

@@ -7,6 +7,7 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 import { env } from "./env.server";
+import { ensureWebPixel } from "./lib/ensureWebPixel.server";
 
 const shopify = shopifyApp({
   apiKey: env.shopifyApiKey,
@@ -19,6 +20,11 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   future: {
     expiringOfflineAccessTokens: true,
+  },
+  hooks: {
+    afterAuth: async ({ admin, session }) => {
+      await ensureWebPixel(admin, session.shop);
+    },
   },
   ...(env.shopCustomDomain
     ? { customShopDomains: [env.shopCustomDomain] }

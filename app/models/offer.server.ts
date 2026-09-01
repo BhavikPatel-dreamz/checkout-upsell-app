@@ -3,6 +3,7 @@
 
 import { Prisma, OfferType, OfferPlacement } from "@prisma/client";
 import db from "../db.server";
+import { getOfferTypeConfig, offerRequiresTriggerProducts } from "../config/offerTypes";
 import { validateOfferFields } from "../validation/offerSchemas";
 
 const OFFER_TYPES = Object.values(OfferType);
@@ -98,7 +99,9 @@ function normalizeTriggerRules(input: OfferFormPayload): Record<string, unknown>
     triggerRules.displayLocation = input.displayLocation;
   }
   if (typeof input.upsellProduct === "string") {
-    triggerRules.upsellProduct = input.upsellProduct;
+    const type = input.type;
+    triggerRules.upsellProduct =
+      type && getOfferTypeConfig(type).poolOnly ? "manual" : input.upsellProduct;
   }
   if (Array.isArray(input.manualSelections) && input.manualSelections.length > 0) {
     const items = input.manualSelections
@@ -216,7 +219,7 @@ export function validateCreateOffer(
     asStringArray(b.triggerProductIds) ??
     [];
 
-  if (normalizedType === OfferType.cross_sell && targetProductIds.length === 0) {
+  if (offerRequiresTriggerProducts(normalizedType) && targetProductIds.length === 0) {
     errors.targetProductIds = "Select at least one trigger product.";
   }
 
@@ -298,7 +301,10 @@ export function validateUpdateOffer(
     if (arr === null) {
       errors.targetProductIds = "targetProductIds must be an array of strings.";
     } else {
-      if ((b.type === OfferType.cross_sell || b.type === undefined) && arr.length === 0) {
+      if (
+        (b.type === undefined || offerRequiresTriggerProducts(b.type as OfferType)) &&
+        arr.length === 0
+      ) {
         errors.targetProductIds = "Select at least one trigger product.";
       } else {
         data.targetProductIds = arr;

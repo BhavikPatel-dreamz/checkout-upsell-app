@@ -180,7 +180,7 @@ export default function OfferForm({
   );
 
   const [upsellProduct, setUpsellProduct] = useState<"manual" | "related" | "">(
-    (initialData?.upsellProduct as any) ?? ""
+    typeConfig.poolOnly ? "manual" : ((initialData?.upsellProduct as any) ?? "")
   );
   const [triggerPickerProductId, setTriggerPickerProductId] = useState("");
   const [pickerProductId, setPickerProductId] = useState("");
@@ -394,7 +394,7 @@ export default function OfferForm({
 
       <CommonOfferFields state={state} errors={errors} locationOptions={locationOptions} />
 
-      {offerType === "cross_sell" && (
+      {getOfferTypeConfig(offerType).requiresTriggerProducts && (
         <div style={styles.section}>
           <TriggerProductField
             products={products}
@@ -408,6 +408,12 @@ export default function OfferForm({
         </div>
       )}
 
+      {getOfferTypeConfig(offerType).poolOnly && (
+        <p style={{ fontSize: 13, color: "#5C5F62", margin: "0 0 12px" }}>
+          This type uses browse activity to choose which pool product to show. It does not create new offers by itself.
+        </p>
+      )}
+
       {typeSpecificFieldIds.length > 0 && (
         <div style={styles.section}>
           <div style={styles.sectionHeading}>Offer Configuration</div>
@@ -417,6 +423,7 @@ export default function OfferForm({
             products={products}
             hasSyncedProducts={hasSyncedProducts}
             fieldIds={typeSpecificFieldIds}
+            poolOnly={Boolean(typeConfig.poolOnly)}
           />
         </div>
       )}
@@ -581,12 +588,14 @@ function TypeSpecificFields({
   products,
   hasSyncedProducts,
   fieldIds,
+  poolOnly,
 }: {
   state: OfferFormState;
   errors: ErrorMap;
   products: Product[];
   hasSyncedProducts: boolean;
   fieldIds: string[];
+  poolOnly?: boolean;
 }) {
   return (
     <>
@@ -596,6 +605,7 @@ function TypeSpecificFields({
           errors={errors}
           products={products}
           hasSyncedProducts={hasSyncedProducts}
+          poolOnly={poolOnly}
         />
       )}
       {fieldIds.includes("dealType") && <DealTypeField state={state} errors={errors} />}
@@ -608,19 +618,21 @@ function UpsellProductField({
   errors,
   products,
   hasSyncedProducts,
+  poolOnly,
 }: {
   state: OfferFormState;
   errors: ErrorMap;
   products: Product[];
   hasSyncedProducts: boolean;
+  poolOnly?: boolean;
 }) {
   const pickerProduct = products.find((p) => p.id === state.pickerProductId);
 
   return (
-    <Field label="Upsell Product" required error={errors.upsellProduct}>
+    <Field label={poolOnly ? "Upsell product pool" : "Upsell Product"} required error={errors.upsellProduct}>
       <div style={styles.checkCol}>
         <Checkbox
-          label="Manual selection"
+          label={poolOnly ? "Products AI may recommend (manual pool)" : "Manual selection"}
           checked={state.upsellProduct === "manual"}
           onClick={() => state.setUpsellProduct("manual")}
         />
@@ -698,11 +710,13 @@ function UpsellProductField({
           </div>
         )}
 
+        {!poolOnly && (
         <Checkbox
           label="Related Item form shopify based on items in order"
           checked={state.upsellProduct === "related"}
           onClick={() => state.setUpsellProduct("related")}
         />
+        )}
       </div>
       <input type="hidden" name="upsellProduct" value={state.upsellProduct} />
     </Field>

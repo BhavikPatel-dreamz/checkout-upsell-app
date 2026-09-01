@@ -52,6 +52,26 @@ model Offer {
   @@index([shop, placement, isActive])
 }
 
+model BrowseActivity {
+  id           String              @id @default(cuid())
+  shop         String
+  eventType    BrowseActivityType
+  customerId   String?
+  guestKey     String?
+  clientId     String?
+  productId    String?
+  variantId    String?
+  collectionId String?
+  query        String?
+  occurredAt   DateTime            @default(now())
+  createdAt    DateTime            @default(now())
+
+  @@index([shop, occurredAt])
+  @@index([shop, customerId, occurredAt])
+  @@index([shop, guestKey, occurredAt])
+  @@index([shop, clientId, occurredAt])
+}
+
 model OfferEvent {
   id         String          @id @default(cuid())
   offerId    String
@@ -308,6 +328,7 @@ enum OfferType {
   volume
   free_gift
   subscription
+  ai_recommend
 }
 
 enum OfferPlacement {
@@ -325,4 +346,13 @@ enum OfferEventType {
   clicked
   added_to_cart
   purchased
+}
+
+enum BrowseActivityType {
+  product_viewed
+  collection_viewed
+  search_submitted
+  product_added_to_cart
+  variant_changed
+  time_on_page
 }

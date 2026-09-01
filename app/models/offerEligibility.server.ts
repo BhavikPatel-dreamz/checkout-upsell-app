@@ -1,49 +1,51 @@
 import { OfferPlacement, OfferType } from "@prisma/client";
 import db from "../db.server";
+import { getOfferTypeConfig } from "../config/offerTypes";
+import type { IdentityLookup } from "./browseActivity.server";
+import { MAX_UPSELL_PRODUCTS, type EligibleOfferPayload } from "./eligibleOffer";
+import { rankAiRecommendPool } from "./offerRanker.server";
 
-export interface EligibleOfferPayload {
-  offerId: string;
-  offerName: string;
-  productId: string;
-  variantId: string;
-  productHandle: string | null;
-  productTitle: string;
-  variantTitle: string | null;
-  imageUrl: string | null;
-  price: string | null;
-  promotionalTitle?: string | null;
-  offerType: OfferType;
-  discountValue?: number | null;
-}
+export { MAX_UPSELL_PRODUCTS, type EligibleOfferPayload } from "./eligibleOffer";
 
 /**
- * Find eligible cross-sell offers for a shop given the cart product/variant ids
- * Only supports manual product selections (triggerRules.manualSelections).
- * Scopes all queries by `shop`.
+ * Find eligible cart upsells for a shop given the cart product/variant ids.
+ * Cross-sell returns every available pool SKU (later ranked across offers).
+ * AI Recommend matches the same trigger products, then scores/caps the pool.
  */
-const MAX_UPSELL_PRODUCTS = 5;
+
+function manualSelectionsFromRules(triggerRules: Record<string, unknown>): Array<{
+  productId?: string;
+  variantId?: string;
+}> {
+  const manualSelections = Array.isArray(triggerRules?.manualSelections)
+    ? triggerRules.manualSelections
+    : Array.isArray((triggerRules?.productSelection as { items?: unknown })?.items)
+    ? (triggerRules.productSelection as { items: unknown[] }).items
+    : [];
+  return Array.isArray(manualSelections) ? (manualSelections as Array<{ productId?: string; variantId?: string }>) : [];
+}
 
 export async function findEligibleCrossSellOffers(options: {
   shop: string;
   placement: OfferPlacement;
-  productIds?: string[]; // product GIDs in cart
-  variantIds?: string[]; // variant GIDs in cart
+  productIds?: string[];
+  variantIds?: string[];
+  identity?: IdentityLookup;
 }) {
   const { shop, placement, productIds = [], variantIds = [] } = options;
+  const identity = options.identity ?? {};
 
-  // Load active cross-sell offers for this shop + placement
   const offers = await db.offer.findMany({
     where: {
       shop,
       isActive: true,
-      type: OfferType.cross_sell,
+      type: { in: [OfferType.cross_sell, OfferType.ai_recommend] },
       placement,
     },
   });
 
   if (!offers || offers.length === 0) return [];
 
-  // If variantIds provided, map them to productIds owned by those variants
   let derivedProductIds: string[] = [];
   if (variantIds && variantIds.length > 0) {
     const rows = await db.productVariant.findMany({
@@ -53,61 +55,36 @@ export async function findEligibleCrossSellOffers(options: {
     derivedProductIds = rows.map((r) => r.productId);
   }
 
-  // Set of productIds present in cart (explicit + derived from variants)
   const cartProductIds = Array.from(new Set([...(productIds || []), ...derivedProductIds]));
   const cartVariantIdSet = new Set(variantIds);
   const cartProductIdSet = new Set(cartProductIds);
 
   const results: EligibleOfferPayload[] = [];
-  const seenVariantIds = new Set<string>(); // dedup across offers
+  const seenVariantIds = new Set<string>();
 
   for (const offer of offers) {
-    if (results.length >= MAX_UPSELL_PRODUCTS) break;
-
-    // Trigger products: the cart must contain at least one of them for the
-    // offer to fire. A manually configured cross-sell always declares its
-    // trigger product(s) — empty targetProductIds never matches all carts.
     const targets: string[] = Array.isArray(offer.targetProductIds) ? offer.targetProductIds : [];
     if (targets.length === 0) continue;
     if (!cartProductIds.some((id) => targets.includes(id))) continue;
 
-    // Inspect triggerRules and only support manual selections for now
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const triggerRules = (offer.triggerRules ?? {}) as Record<string, any>;
+    const triggerRules = (offer.triggerRules ?? {}) as Record<string, unknown>;
+    const selections = manualSelectionsFromRules(triggerRules);
+    if (selections.length === 0) continue;
 
-    // Support both shapes produced by buildOfferPayload:
-    // - triggerRules.manualSelections = [{ productId, variantId }, ...]
-    // - triggerRules.productSelection.items = [{ productId, variantId }, ...]
-    const manualSelections = Array.isArray(triggerRules?.manualSelections)
-      ? triggerRules.manualSelections
-      : Array.isArray(triggerRules?.productSelection?.items)
-      ? triggerRules.productSelection.items
-      : [];
+    const pool: EligibleOfferPayload[] = [];
 
-    if (!manualSelections || manualSelections.length === 0) continue;
-
-    // For each selection, verify the variant exists in ProductVariant for this shop
-    for (const sel of manualSelections) {
-      if (results.length >= MAX_UPSELL_PRODUCTS) break;
+    for (const sel of selections) {
       if (!sel || typeof sel.variantId !== "string") continue;
-
-      // Skip if already in cart
       if (cartVariantIdSet.has(sel.variantId)) continue;
-
-      // Skip if we've already added this variant (dedup across offers)
       if (seenVariantIds.has(sel.variantId)) continue;
 
       const pv = await db.productVariant.findFirst({
         where: { shop, variantId: sel.variantId, availableForSale: true },
       });
-      if (!pv) continue; // variant doesn't exist or is unavailable in this shop's catalog
-
-      // Skip if the upsell product is the same as a trigger product in the cart
+      if (!pv) continue;
       if (cartProductIdSet.has(pv.productId)) continue;
 
-      seenVariantIds.add(sel.variantId);
-
-      results.push({
+      pool.push({
         offerId: offer.id,
         offerName: offer.name,
         productId: pv.productId,
@@ -117,10 +94,28 @@ export async function findEligibleCrossSellOffers(options: {
         variantTitle: pv.variantTitle ?? null,
         imageUrl: pv.imageUrl ?? null,
         price: pv.price ? pv.price.toString() : null,
-        promotionalTitle: (triggerRules && typeof triggerRules.promotionalTitle === "string") ? triggerRules.promotionalTitle : null,
+        promotionalTitle:
+          typeof triggerRules.promotionalTitle === "string" ? triggerRules.promotionalTitle : null,
         offerType: offer.type,
-        discountValue: typeof triggerRules?.discountValue === "number" ? triggerRules.discountValue : null,
+        discountValue: typeof triggerRules.discountValue === "number" ? triggerRules.discountValue : null,
       });
+    }
+
+    const capped =
+      offer.type === OfferType.ai_recommend || getOfferTypeConfig(offer.type).poolOnly
+        ? await rankAiRecommendPool({
+            shop,
+            offerId: offer.id,
+            pool,
+            identity,
+            max: MAX_UPSELL_PRODUCTS,
+          })
+        : pool;
+
+    for (const item of capped) {
+      if (seenVariantIds.has(item.variantId)) continue;
+      seenVariantIds.add(item.variantId);
+      results.push(item);
     }
   }
 

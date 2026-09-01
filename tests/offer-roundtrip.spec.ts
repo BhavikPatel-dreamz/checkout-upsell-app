@@ -27,6 +27,7 @@ describe("unified offer create → read → update → delete round-trip", () =>
       displayOnCheckout: true,
       displayLocation: "thank_you_page",
       upsellProduct: "manual",
+      targetProductIds: ["gid://shopify/Product/7965255041205"],
       manualSelections: [
         {
           productId: "gid://shopify/Product/7965255041205",
@@ -60,6 +61,7 @@ describe("unified offer create → read → update → delete round-trip", () =>
       displayOnCheckout: true,
       displayLocation: "thank_you_page",
       upsellProduct: "manual",
+      targetProductIds: ["gid://shopify/Product/7965255041205"],
       manualSelections: [
         {
           productId: "gid://shopify/Product/7965255041205",

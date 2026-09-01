@@ -40,7 +40,7 @@ export default function OfferTypeSelector() {
       <div style={styles.cardGrid}>
         {offerTypeOptions().map((option) => {
           const active = option.value === selectedType;
-          const disabled = option.value !== "cross_sell";
+          const disabled = option.value !== "cross_sell" && option.value !== "ai_recommend";
           return (
             <button
               key={option.value}

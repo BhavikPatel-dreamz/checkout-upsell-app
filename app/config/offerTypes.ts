@@ -29,6 +29,10 @@ export interface OfferTypeConfig {
   defaultPlacement: OfferPlacement;
   /** The ordered list of fields the unified form renders for this type. */
   fields: OfferFieldId[];
+  /** Cart must contain at least one configured trigger product. */
+  requiresTriggerProducts?: boolean;
+  /** Upsell SKUs must be a merchant-picked pool (no Shopify related-item mode). */
+  poolOnly?: boolean;
 }
 
 /**
@@ -50,6 +54,7 @@ export const OFFER_TYPE_CONFIG: Record<OfferType, OfferTypeConfig> = {
     description: "Suggest a related product when an item is added to the cart.",
     defaultPlacement: OfferPlacement.checkout,
     fields: [...COMMON_OFFER_FIELDS, "upsellProduct", "dealType"],
+    requiresTriggerProducts: true,
   },
   bundle: {
     label: "Bundle",
@@ -75,7 +80,20 @@ export const OFFER_TYPE_CONFIG: Record<OfferType, OfferTypeConfig> = {
     defaultPlacement: OfferPlacement.checkout,
     fields: [...COMMON_OFFER_FIELDS, "upsellProduct", "dealType"],
   },
+  ai_recommend: {
+    label: "AI Recommend Upsell",
+    description:
+      "Uses browse activity to choose which product from your pool to show. It does not create new offers by itself.",
+    defaultPlacement: OfferPlacement.checkout,
+    fields: [...COMMON_OFFER_FIELDS, "upsellProduct", "dealType"],
+    requiresTriggerProducts: true,
+    poolOnly: true,
+  },
 };
+
+export function offerRequiresTriggerProducts(offerType: OfferType): boolean {
+  return Boolean(OFFER_TYPE_CONFIG[offerType]?.requiresTriggerProducts);
+}
 
 /** Guard for an arbitrary value being a valid canonical offer type. */
 export function isOfferType(value: unknown): value is OfferType {

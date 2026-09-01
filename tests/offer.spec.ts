@@ -28,6 +28,7 @@ const sample = {
   conditions: [],
   displayOnCheckout: true,
   upsellProduct: "manual",
+  targetProductIds: ["gid://shopify/Product/99"],
   manualSelections: [{ productId: "gid://shopify/Product/1", variantId: "gid://shopify/ProductVariant/1" }],
   offerType: "free",
   discountValue: null,
@@ -81,7 +82,7 @@ describe("type-aware build + validation", () => {
     }
   });
 
-  it("requires at least one trigger product for cross-sell offers", () => {
+  it("requires at least one trigger product for cross-sell offers", async () => {
     const result = validateCreateOffer({
       name: "No Trigger Offer",
       type: OfferType.cross_sell,
@@ -98,6 +99,31 @@ describe("type-aware build + validation", () => {
     if (!result.ok) {
       expect(result.errors.targetProductIds).toBe("Select at least one trigger product.");
     }
+  });
+
+  it("requires a trigger product and a manual pool for AI Recommend offers", () => {
+    const noTrigger = validateCreateOffer({
+      name: "AI Offer",
+      type: OfferType.ai_recommend,
+      placement: "checkout" as any,
+      targetProductIds: [],
+      triggerRules: {
+        upsellProduct: "manual",
+        manualSelections: [{ productId: "gid://shopify/Product/1", variantId: "gid://shopify/ProductVariant/1" }],
+      },
+      isActive: true,
+    });
+    expect(noTrigger.ok).toBe(false);
+    if (!noTrigger.ok) {
+      expect(noTrigger.errors.targetProductIds).toBe("Select at least one trigger product.");
+    }
+
+    const related = validateOfferFields({
+      ...sample,
+      type: OfferType.ai_recommend,
+      upsellProduct: "related",
+    }, OfferType.ai_recommend);
+    expect(related.upsellProduct).toBe("AI Recommend uses a manual product pool only.");
   });
 
   it("limits manual upsell selections to five products", () => {
