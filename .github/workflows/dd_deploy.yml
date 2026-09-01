@@ -7,11 +7,49 @@ on:
 env:
   VPS_APP_PATH: "/var/www/html/checkout-upsell-app"
   PM2_PROCESS_NAME: "checkout-upsell-app"
-  
+
 jobs:
+  # 1. Validate on GitHub's own runner FIRST — nothing on the server is touched yet.
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      # Optional but recommended — add if you have these scripts
+      # - name: Lint
+      #   run: pnpm run lint
+      # - name: Test
+      #   run: pnpm run test
+
+  # 2. Only runs if validate succeeded. Deploys + builds again on the VPS itself,
+  #    since the validate job's build artifacts aren't on the server.
   deploy:
+    needs: validate
     runs-on: [self-hosted]
     steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Sync Code
         run: |
           if [ -d "${{ env.VPS_APP_PATH }}/.git" ]; then
@@ -23,11 +61,11 @@ jobs:
               git clone -b main git@github.com:BhavikPatel-dreamz/checkout-upsell-app.git "${{ env.VPS_APP_PATH }}"
           fi
 
-      - name: Build
+      - name: Build on server
         run: |
           cd "${{ env.VPS_APP_PATH }}"
-          npm install
-          npm run build
+          pnpm install --frozen-lockfile
+          pnpm run build
 
       - name: Start App
         run: |

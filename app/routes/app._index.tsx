@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
   useLoaderData,
   useSearchParams,
-  useLocation,
   type LoaderFunctionArgs,
 } from "react-router";
 import type { Offer as OfferRecord } from "@prisma/client";
@@ -72,7 +71,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function OffersPage() {
-  const location = useLocation();
   const {
     offers,
     productTitleByProductId,
@@ -128,12 +126,13 @@ export default function OffersPage() {
   const activeCount = visibleOffers.filter((o) => Boolean(o.isActive)).length;
 
   function editUpsellUrl(id: string) {
-    const params = new URLSearchParams(location.search);
-    params.set("id", id);
-    params.delete("type");
-    const suffix = params.toString();
-    return `/app/offers/new${suffix ? `?${suffix}` : ""}`;
+    return `/app/offers/new?id=${encodeURIComponent(id)}`;
   }
+
+  function createNewOfferUrl() {
+    return "/app/offers/new";
+  }
+
 
   async function toggleStatus(id: string) {
     const offer = offers.find((item) => item.id === id);
@@ -239,7 +238,7 @@ export default function OffersPage() {
       activeTab={activeTab}
       toast={toast}
       onActiveTabChange={setActiveTab}
-      createUrl="/app/offers/new"
+      createUrl={createNewOfferUrl()}
       editUrl={editUpsellUrl}
       onToggleStatus={toggleStatus}
       onDelete={deleteUpsell}

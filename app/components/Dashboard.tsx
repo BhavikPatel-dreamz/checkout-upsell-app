@@ -1,7 +1,8 @@
-import { Link } from "react-router";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import type { Offer as OfferRecord } from "@prisma/client";
 
 import { PLACEMENT_LABELS, getOfferTypeConfig } from "../types/offer";
+import { AdminAppLink } from "./AdminAppLink";
 
 type DashboardProps = {
   productTitleByProductId: Record<string, string>;
@@ -64,6 +65,8 @@ export default function Dashboard({
   allUpsellsUrl,
   offerAnalyticsUrl,
 }: DashboardProps) {
+  useAppBridge();
+
   function productTitlesForOffer(offer: OfferRecord) {
     const titles: string[] = [];
     try {
@@ -195,7 +198,11 @@ export default function Dashboard({
           </div>
 
           <div className="actionRow">
-            <Link to={createUrl} className="actionCard actionCardPrimary" style={{ textDecoration: "none", color: "inherit" }}>
+            <AdminAppLink
+              to={createUrl}
+              className="actionCard actionCardPrimary"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
               <span className="actionIcon actionIconPrimary">
                 <BoltIcon />
               </span>
@@ -206,9 +213,9 @@ export default function Dashboard({
                 </span>
               </span>
               <span className="actionChevron actionChevronPrimary">›</span>
-            </Link>
+            </AdminAppLink>
 
-            <Link
+            <AdminAppLink
               to={analyticsUrl}
               className="actionCard"
               style={{ textDecoration: "none", color: "inherit" }}
@@ -221,9 +228,9 @@ export default function Dashboard({
                 <span className="actionCardSubtitle">Funnel · Charts · Insights</span>
               </span>
               <span className="actionChevron">›</span>
-            </Link>
+            </AdminAppLink>
 
-            <Link to={allUpsellsUrl} className="actionCard" style={{ textDecoration: "none", color: "inherit" }}>
+            <AdminAppLink to={allUpsellsUrl} className="actionCard" style={{ textDecoration: "none", color: "inherit" }}>
               <span className="actionIcon">
                 <ListIcon />
               </span>
@@ -234,7 +241,7 @@ export default function Dashboard({
                 </span>
               </span>
               <span className="actionChevron">›</span>
-            </Link>
+            </AdminAppLink>
           </div>
 
           {topPerformer && (
@@ -262,13 +269,13 @@ export default function Dashboard({
                   </div>
                   <div className="featuredStatLabel">Purchases</div>
                 </div>
-                <Link
+                <AdminAppLink
                   to={offerAnalyticsUrl(topPerformer.id)}
                   className="featuredLink"
                   style={{ textDecoration: "none" }}
                 >
                   View details →
-                </Link>
+                </AdminAppLink>
               </div>
             </div>
           )}
@@ -276,13 +283,13 @@ export default function Dashboard({
           <div id="active-upsells-section" className="tableSection">
             <div className="tableSectionHeader">
               <h2 className="sectionHeading">Active Upsells</h2>
-              <Link
+              <AdminAppLink
                 to={allUpsellsUrl}
                 className="viewAllLink"
                 style={{ textDecoration: "none" }}
               >
                 View all →
-              </Link>
+              </AdminAppLink>
             </div>
 
             {visibleOffers.length === 0 ? (
@@ -323,9 +330,9 @@ export default function Dashboard({
                       </div>
 
                       <div className="offerActions">
-                        <Link to={editUrl(offer.id)} className="linkButton" style={{ textDecoration: "none" }}>
+                        <AdminAppLink to={editUrl(offer.id)} className="linkButton" style={{ textDecoration: "none" }}>
                           Edit
-                        </Link>
+                        </AdminAppLink>
                         <button
                           className={
                             deletingId === offer.id

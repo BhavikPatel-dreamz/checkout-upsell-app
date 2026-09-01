@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router";
+import { useLoaderData, type LoaderFunctionArgs } from "react-router";
 
 import { authenticate } from "../shopify.server";
 import { listOffers } from "../models/offer.server";
@@ -9,6 +9,7 @@ import {
   getOfferRevenueByOffer,
   getOfferViewMetrics,
 } from "../models/offerAnalytics.server";
+import { AdminAppLink } from "../components/AdminAppLink";
 import "../styles/app._index.css";
 import "../styles/upsells.css";
 
@@ -111,9 +112,9 @@ export default function AllUpsellsPage() {
             <h1>All Upsells</h1>
             <p>{visibleOffers.length} offer{visibleOffers.length === 1 ? "" : "s"} configured</p>
           </div>
-          <Link to="/app/offers/new" className="allUpsellsNewButton" style={{ textDecoration: "none" }}>
+          <AdminAppLink to="/app/offers/new" className="allUpsellsNewButton" style={{ textDecoration: "none" }}>
             <span aria-hidden="true">⊕</span> New Upsell
-          </Link>
+          </AdminAppLink>
         </header>
 
         <label className="allUpsellsSearch">
@@ -159,9 +160,9 @@ export default function AllUpsellsPage() {
                   {conversionRate == null ? "—" : `${(conversionRate * 100).toFixed(1)}%`}
                 </strong>
                 <strong>{formatRevenue(offerRevenue)}</strong>
-                <Link to={`/app/analytics/${encodeURIComponent(offer.id)}`} className="allUpsellsDetails" style={{ textDecoration: "none" }}>
+                <AdminAppLink to={`/app/analytics/${encodeURIComponent(offer.id)}`} className="allUpsellsDetails" style={{ textDecoration: "none" }}>
                   Details →
-                </Link>
+                </AdminAppLink>
               </div>
             ))
           )}
