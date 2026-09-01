@@ -1,4 +1,5 @@
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import type { Offer as OfferRecord } from "@prisma/client";
 
 import { PLACEMENT_LABELS, getOfferTypeConfig } from "../types/offer";
@@ -64,7 +65,7 @@ export default function Dashboard({
   allUpsellsUrl,
   offerAnalyticsUrl,
 }: DashboardProps) {
-  const navigate = useNavigate();
+  useAppBridge();
 
   function productTitlesForOffer(offer: OfferRecord) {
     const titles: string[] = [];
@@ -203,7 +204,12 @@ export default function Dashboard({
               style={{ textDecoration: "none", color: "inherit" }}
               onClick={(event) => {
                 event.preventDefault();
-                navigate(createUrl);
+                const navigateEvent = new CustomEvent("shopify:navigate", {
+                  bubbles: true,
+                  cancelable: true,
+                  detail: { path: createUrl },
+                });
+                event.currentTarget.dispatchEvent(navigateEvent);
               }}
             >
               <span className="actionIcon actionIconPrimary">

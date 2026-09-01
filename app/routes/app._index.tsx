@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import {
   useLoaderData,
   useSearchParams,
@@ -140,6 +141,15 @@ export default function OffersPage() {
     params.delete("id");
     params.delete("type");
     const suffix = params.toString();
+
+    if (typeof window !== "undefined") {
+      const appIdx = window.location.pathname.lastIndexOf("/app");
+      if (appIdx !== -1) {
+        const appBase = `${window.location.origin}${window.location.pathname.slice(0, appIdx + 4)}`;
+        return `${appBase}/offers/new${suffix ? `?${suffix}` : ""}`;
+      }
+    }
+
     return `/app/offers/new${suffix ? `?${suffix}` : ""}`;
   }
 
