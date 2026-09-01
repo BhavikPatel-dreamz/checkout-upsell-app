@@ -135,6 +135,15 @@ export default function OffersPage() {
     return `/app/offers/new${suffix ? `?${suffix}` : ""}`;
   }
 
+  function createNewOfferUrl() {
+    const params = new URLSearchParams(location.search);
+    params.delete("id");
+    params.delete("type");
+    const suffix = params.toString();
+    return `/app/offers/new${suffix ? `?${suffix}` : ""}`;
+  }
+
+
   async function toggleStatus(id: string) {
     const offer = offers.find((item) => item.id === id);
     if (!offer) return;
@@ -239,7 +248,7 @@ export default function OffersPage() {
       activeTab={activeTab}
       toast={toast}
       onActiveTabChange={setActiveTab}
-      createUrl="/app/offers/new"
+      createUrl={createNewOfferUrl()}
       editUrl={editUpsellUrl}
       onToggleStatus={toggleStatus}
       onDelete={deleteUpsell}
