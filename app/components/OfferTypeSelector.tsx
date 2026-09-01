@@ -8,11 +8,12 @@
  */
 
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 import type { OfferPlacement, OfferType } from "@prisma/client";
 
 import { offerTypeOptions, OFFER_TYPE_CONFIG } from "../config/offerTypes";
 import { PLACEMENT_LABELS } from "../types/offer";
+import { AdminAppLink } from "./AdminAppLink";
 
 const CREATE_PLACEMENTS: OfferPlacement[] = ["checkout", "post_purchase"];
 
@@ -79,12 +80,12 @@ export default function OfferTypeSelector() {
       </div>
 
       <div style={styles.actionsRow}>
-        <Link type="button" to={getContinueUrl()} style={styles.submitButton}>
+        <AdminAppLink to={getContinueUrl()} style={styles.submitButton}>
           Continue
-        </Link>
-        <Link type="button" to="/app" style={styles.cancelButton}>
+        </AdminAppLink>
+        <AdminAppLink to="/app" style={styles.cancelButton}>
           Cancel
-        </Link>
+        </AdminAppLink>
       </div>
 
       <p style={styles.typeHint}>

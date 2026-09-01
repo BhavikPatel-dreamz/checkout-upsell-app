@@ -16,7 +16,6 @@
  */
 
 import { useState, useEffect } from "react";
-import { Link } from "react-router";
 import type { OfferPlacement, OfferType } from "@prisma/client";
 import {
   placementHeaderLabel,
@@ -28,6 +27,7 @@ import {
   getOfferTypeConfig,
   COMMON_OFFER_FIELDS,
 } from "../config/offerTypes";
+import { AdminAppLink } from "./AdminAppLink";
 
 // ── Public types ──────────────────────────────────────────────────────
 
@@ -813,9 +813,9 @@ export function OfferActions({
       <button type="submit" style={styles.submitButton} disabled={submitting}>
         {submitting ? "Saving\u2026" : mode === "edit" ? "Save Changes" : "Save Offer"}
       </button>
-      <Link to={cancelUrl} style={{ ...styles.cancelButton, textDecoration: "none", color: "inherit" }}>
+      <AdminAppLink to={cancelUrl} style={{ ...styles.cancelButton, textDecoration: "none", color: "inherit" }}>
         Cancel
-      </Link>
+      </AdminAppLink>
     </div>
   );
 }
