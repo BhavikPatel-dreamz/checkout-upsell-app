@@ -1,8 +1,9 @@
 {
   "name": "checkout-upsell-app",
   "private": true,
-  "version":"1.0.0",
+  "version": "1.0.0",
   "scripts": {
+    "preinstall": "node -e \"const ua=process.env.npm_config_user_agent||''; if(!ua.includes('pnpm')){ console.error('This app must be installed with pnpm, not npm. On the server: rm -rf node_modules && pnpm install --frozen-lockfile'); process.exit(1); }\"",
     "build": "react-router build",
     "dev": "shopify app dev --tunnel-url=https://upsale.dynamicdreamz.net:3001",
     "config:link": "shopify app config link",
@@ -11,7 +12,7 @@
     "config:use": "shopify app config use",
     "env": "shopify app env",
     "start": "react-router-serve ./build/server/index.js",
-    "docker-start": "npm run setup && npm run start",
+    "docker-start": "pnpm run setup && pnpm run start",
     "setup": "prisma generate && prisma migrate deploy",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "shopify": "shopify",
@@ -21,8 +22,10 @@
     "typecheck": "react-router typegen && tsc --noEmit"
   },
   "type": "module",
+  "packageManager": "pnpm@9.15.9",
   "engines": {
-    "node": ">=20.19 <22 || >=22.12"
+    "node": ">=20.19 <22 || >=22.12",
+    "pnpm": ">=9"
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",
