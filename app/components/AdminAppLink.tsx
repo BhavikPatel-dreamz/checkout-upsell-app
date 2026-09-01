@@ -1,24 +1,14 @@
-import type { CSSProperties, MouseEvent, ReactNode } from "react";
-import { useNavigate } from "react-router";
+import type { CSSProperties, ReactNode } from "react";
 
 function appPath(path: string): string {
   return path.startsWith("/") ? path : `/${path}`;
 }
 
-function adminHrefForPath(path: string): string {
-  const normalized = appPath(path);
-  if (typeof document === "undefined") return normalized;
-  try {
-    const match = document.referrer.match(
-      /^(https:\/\/admin\.shopify\.com\/store\/[^/]+\/apps\/[^/]+)/,
-    );
-    if (match) return `${match[1]}${normalized}`;
-  } catch {
-    // Stay on the in-app path when the admin referrer is unavailable.
-  }
-  return normalized;
-}
-
+/**
+ * In-app link that App Bridge owns, same as `<s-app-nav>` items.
+ * Relative href keeps the current admin store + app slug
+ * (`.../apps/checkout-upsell-app-36/...`) and avoids the app host URL.
+ */
 export function AdminAppLink({
   to,
   className,
@@ -30,35 +20,9 @@ export function AdminAppLink({
   style?: CSSProperties;
   children: ReactNode;
 }) {
-  const navigate = useNavigate();
-  const path = appPath(to);
-
-  function handleClick(event: MouseEvent<HTMLAnchorElement>) {
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    const navigateEvent = new CustomEvent("shopify:navigate", {
-      bubbles: true,
-      cancelable: true,
-      detail: { url: path },
-    });
-    event.currentTarget.dispatchEvent(navigateEvent);
-    if (navigateEvent.defaultPrevented) return;
-    navigate(path);
-  }
-
   return (
-    <a href={adminHrefForPath(path)} className={className} style={style} onClick={handleClick}>
+    <s-link href={appPath(to)} className={className} style={style}>
       {children}
-    </a>
+    </s-link>
   );
 }
