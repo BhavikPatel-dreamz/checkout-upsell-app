@@ -1,28 +1,41 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { useOutletContext } from "react-router";
 
-type AppOutletContext = {
-  appHandle?: string;
-};
+function appPath(path: string): string {
+  return path.startsWith("/") ? path : `/${path}`;
+}
 
-export function adminAppUrl(
-  appHandle: string,
+function appSlugFromReferrer(): string | null {
+  try {
+    const match = document.referrer.match(
+      /admin\.shopify\.com\/store\/[^/]+\/apps\/([^/?#]+)/,
+    );
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function adminAppUrlFromBridge(
+  config: { host?: string; apiKey?: string } | undefined,
   path: string,
-  hostB64?: string | null,
 ): string {
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  if (hostB64) {
+  const normalized = appPath(path);
+  const appSlug = appSlugFromReferrer() || config?.apiKey;
+  if (config?.host && appSlug) {
     try {
-      const host = atob(hostB64);
+      const host = atob(config.host);
       if (host.startsWith("admin.shopify.com/")) {
-        return `https://${host}/apps/${appHandle}${normalized}`;
+        return `https://${host}/apps/${appSlug}${normalized}`;
       }
     } catch {
       // Fall through to the App Bridge protocol URL.
     }
   }
-  return `shopify://admin/apps/${appHandle}${normalized}`;
+  if (appSlug) {
+    return `shopify://admin/apps/${appSlug}${normalized}`;
+  }
+  return normalized;
 }
 
 export function AdminAppLink({
@@ -37,13 +50,11 @@ export function AdminAppLink({
   children: ReactNode;
 }) {
   const shopify = useAppBridge();
-  const context = useOutletContext<AppOutletContext | undefined>();
-  const appHandle = context?.appHandle || "checkout-upsell-app-36";
-  const [href, setHref] = useState(() => adminAppUrl(appHandle, to));
+  const [href, setHref] = useState(() => appPath(to));
 
   useEffect(() => {
-    setHref(adminAppUrl(appHandle, to, shopify.config?.host));
-  }, [appHandle, shopify, to]);
+    setHref(adminAppUrlFromBridge(shopify.config, to));
+  }, [shopify, to]);
 
   return (
     <a
@@ -52,7 +63,14 @@ export function AdminAppLink({
       style={style}
       onClick={(event) => {
         event.preventDefault();
-        open(adminAppUrl(appHandle, to, shopify.config?.host), "_top");
+        const navigateEvent = new CustomEvent("shopify:navigate", {
+          bubbles: true,
+          cancelable: true,
+          detail: { url: appPath(to) },
+        });
+        event.currentTarget.dispatchEvent(navigateEvent);
+        if (navigateEvent.defaultPrevented) return;
+        open(adminAppUrlFromBridge(shopify.config, to), "_top");
       }}
     >
       {children}

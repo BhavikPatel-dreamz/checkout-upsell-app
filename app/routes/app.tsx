@@ -9,14 +9,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
   // eslint-disable-next-line no-undef
-  return {
-    apiKey: process.env.SHOPIFY_API_KEY || "",
-    appHandle: process.env.SHOPIFY_APP_HANDLE || "checkout-upsell-app-36",
-  };
+  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
 
 export default function App() {
-  const { apiKey, appHandle } = useLoaderData<typeof loader>();
+  const { apiKey } = useLoaderData<typeof loader>();
 
   return (
     <AppProvider embedded apiKey={apiKey}>
@@ -29,7 +26,7 @@ export default function App() {
         <s-link href="/app/settings">Settings</s-link>
         <s-link href="/app/onboarding">Onboarding</s-link>
       </s-app-nav>
-      <Outlet context={{ appHandle }} />
+      <Outlet />
     </AppProvider>
   );
 }

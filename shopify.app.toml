@@ -2,7 +2,6 @@
 
 client_id = "af17d3edcb1fe476de8388c085611521"
 name = "Checkout Upsell App"
-handle = "checkout-upsell-app-36"
 application_url = "https://upsell.dreamzapps.com"
 embedded = true
 
