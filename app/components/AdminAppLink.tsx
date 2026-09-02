@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { useNavigate } from "react-router";
 
 function appPath(path: string): string {
   return path.startsWith("/") ? path : `/${path}`;
@@ -6,8 +7,8 @@ function appPath(path: string): string {
 
 /**
  * Uses Shopify App Bridge's supported programmatic navigation path. App Bridge
- * turns a same-window app-relative `open()` call into embedded Admin navigation
- * and keeps the parent URL and iframe route in sync.
+ * updates the top-level Admin URL. React Router is updated first so the app
+ * route changes immediately without requiring a browser refresh.
  */
 export function AdminAppLink({
   to,
@@ -20,9 +21,11 @@ export function AdminAppLink({
   style?: CSSProperties;
   children: ReactNode;
 }) {
+  const navigate = useNavigate();
   const path = appPath(to);
 
   function handleClick() {
+    navigate(path);
     window.open(path, "_self");
   }
 
