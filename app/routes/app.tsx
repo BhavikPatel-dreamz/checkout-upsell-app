@@ -13,10 +13,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return {
     // eslint-disable-next-line no-undef
     apiKey: process.env.SHOPIFY_API_KEY || "",
-    // The app's handle in the admin URL (…/apps/<handle>/…). Per app, not per
-    // shop, so it differs between the dev and production app only.
-    // eslint-disable-next-line no-undef
-    appHandle: process.env.SHOPIFY_APP_HANDLE || "",
   };
 };
 
@@ -49,6 +45,3 @@ export function ErrorBoundary() {
 export const headers: HeadersFunction = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
-
-
-

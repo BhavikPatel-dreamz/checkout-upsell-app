@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { Link, useLoaderData } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 
 import { authenticate } from "../shopify.server";
 import { getOfferAnalyticsForOffer, getOfferTrendMetrics } from "../models/offerAnalytics.server";
@@ -638,6 +638,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export default function OfferAnalyticsDetailsPage() {
   const { analytics, trendMetrics, productNames } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
 
   if (!analytics) {
     return (
@@ -665,8 +666,9 @@ export default function OfferAnalyticsDetailsPage() {
           <p style={{ margin: "0 0 1rem", color: colors.subdued, lineHeight: 1.5 }}>
             This offer could not be loaded or no longer exists.
           </p>
-          <Link
-            to="/app/analytics"
+          <button
+            type="button"
+            onClick={() => navigate("/app/analytics")}
             style={{
               background: colors.accent,
               color: "#fff",
@@ -681,7 +683,7 @@ export default function OfferAnalyticsDetailsPage() {
             }}
           >
             Back to Analytics
-          </Link>
+          </button>
         </div>
       </div>
     );
@@ -706,8 +708,9 @@ export default function OfferAnalyticsDetailsPage() {
       }}
     >
       {/* Back link */}
-      <Link
-        to="/app/analytics"
+      <button
+        type="button"
+        onClick={() => navigate("/app/analytics")}
         style={{
           background: "none",
           border: "none",
@@ -721,7 +724,7 @@ export default function OfferAnalyticsDetailsPage() {
         }}
       >
         ← All Upsells
-      </Link>
+      </button>
 
       {/* Header */}
       <div
