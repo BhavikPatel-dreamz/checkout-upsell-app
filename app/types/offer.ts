@@ -1,17 +1,16 @@
 /**
  * Centralized offer definitions.
  *
- * The canonical offer types and placements live in the Prisma schema
- * (OfferType / OfferPlacement enums). Offer-type configuration and helpers
- * live in `../config/offerTypes` — re-exported here so every route shares a
- * single source of truth for offer semantics, labels, and display logic.
+ * Offer-type configuration and client-safe enum values live in
+ * `../config/offerTypes` — re-exported here so every route shares a single
+ * source of truth for offer semantics, labels, and display logic.
  */
 
-import { OfferPlacement } from "@prisma/client";
+import { OfferPlacement } from "../config/offerTypes";
 
-export { OfferPlacement };
 export {
   OfferType,
+  OfferPlacement,
   OFFER_TYPE_CONFIG,
   COMMON_OFFER_FIELDS,
   DEAL_TYPE_OPTIONS,
