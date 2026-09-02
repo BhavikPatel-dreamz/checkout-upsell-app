@@ -25,8 +25,9 @@ export function AdminAppLink({
   const path = appPath(to);
 
   function handleClick() {
+    // Use client-side navigation to let React Router run the loader
+    // and render the target route without forcing a full page reload.
     navigate(path);
-    window.open(path, "_self");
   }
 
   return (
