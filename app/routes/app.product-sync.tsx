@@ -29,7 +29,7 @@ import {
 import { authenticate } from "../shopify.server";
 import { productSyncAction } from "../lib/productSync.server";
 import {
-  getShopifyProductCatalog,
+  getShopifyProductSummaries,
   getSyncStatus,
 } from "../models/productVariant.server";
 import db from "../db.server";
@@ -53,13 +53,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
   sevenDaysAgo.setHours(0, 0, 0, 0);
 
-  const [syncStatus, recentLogs, shopifyProducts, syncLogs, activeRun] = await Promise.all([
+  const [syncStatus, recentLogs, shopifyProducts, syncLogs, activeRun, syncedRows] = await Promise.all([
     getSyncStatus(shop),
     db.syncLog.findMany({
       where: { shop, startedAt: { gte: sevenDaysAgo } },
       orderBy: { startedAt: "asc" },
     }),
-    getShopifyProductCatalog(admin, shop),
+    getShopifyProductSummaries(admin, shop),
     db.syncLog.findMany({
       where: { shop },
       orderBy: { startedAt: "desc" },
@@ -79,12 +79,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
         startedAt: true,
       },
     }),
+    // Only productId/variantId are needed to compute synced/not-synced sets below.
+    db.productVariant.findMany({
+      where: { shop },
+      select: { productId: true, variantId: true },
+    }),
   ]);
-
-  const syncedRows = await db.productVariant.findMany({
-    where: { shop },
-    select: { productId: true, variantId: true, productTitle: true, updatedAt: true },
-  });
 
   const syncedVariantIds = new Set(syncedRows.map((row) => row.variantId));
   const syncedProductIds = new Set(syncedRows.map((row) => row.productId));
@@ -102,11 +102,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
         imageUrl: product.featuredMedia?.preview?.image?.url ?? null,
         handle: product.handle,
         status: product.status ?? "UNKNOWN",
-        productDescription: product.description ?? null,
+        productDescription: null,
         totalVariants,
         syncedVariants,
         synced,
-        updatedAt: product.updatedAt ? new Date(product.updatedAt) : new Date(),
+        updatedAt: new Date(),
       };
     })
     .sort((a, b) => a.title.localeCompare(b.title));
