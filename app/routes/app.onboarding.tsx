@@ -148,7 +148,7 @@ export default function OnboardingPage() {
                   <button
                     type="button"
                     onClick={() => navigate(step.link)}
-                    style={{ ...styles.stepLink, textDecoration: "none", color: "inherit" }}
+                    style={{ ...styles.stepLink, textDecoration: "none", }}
                   >
                     {step.linkLabel} →
                   </button>
@@ -208,7 +208,7 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={() => navigate("/app/product-sync")}
-                style={{ ...styles.primaryButton, textDecoration: "none", color: "inherit" }}
+                style={{ ...styles.primaryButton, textDecoration: "none" }}
               >
                 Go to Product Sync
               </button>
@@ -279,7 +279,7 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={() => navigate("/app/offers/new")}
-                style={{ ...styles.primaryButton, textDecoration: "none", color: "inherit" }}
+                style={{ ...styles.primaryButton, textDecoration: "none" }}
               >
                 Create Your First Offer
               </button>
@@ -423,7 +423,7 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 onClick={() => navigate("/app/analytics")}
-                style={{ ...styles.primaryButton, textDecoration: "none", color: "inherit" }}
+                style={{ ...styles.primaryButton, textDecoration: "none"}}
               >
                 View Analytics
               </button>
@@ -451,14 +451,14 @@ export default function OnboardingPage() {
             <button
               type="button"
               onClick={() => navigate("/app/product-sync")}
-              style={{ ...styles.primaryButton, textDecoration: "none", color: "inherit" }}
+              style={{ ...styles.secondaryButton, textDecoration: "none" }}
             >
               Sync Products
             </button>
             <button
               type="button"
               onClick={() => navigate("/app/offers/new")}
-              style={{ ...styles.secondaryButton, textDecoration: "none", color: "inherit" }}
+              style={{ ...styles.secondaryButton, textDecoration: "none"}}
             >
               Create an Offer
             </button>
@@ -1031,7 +1031,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
-    display: "inline-flex",
     alignItems: "center",
   },
   secondaryButton: {
