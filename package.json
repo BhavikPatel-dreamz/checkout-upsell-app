@@ -3,6 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
+    "security:scan": "bash .githooks/pre-commit --ci",
+    "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && bash .githooks/pre-commit --install || true",
     "preinstall": "node -e \"const ua=process.env.npm_config_user_agent||''; if(!ua.includes('pnpm')){ console.error('This app must be installed with pnpm, not npm. On the server: rm -rf node_modules && pnpm install --frozen-lockfile'); process.exit(1); }\"",
     "build": "prisma generate && react-router build",
     "dev": "shopify app dev --tunnel-url=https://upsale.dynamicdreamz.net:3001",
