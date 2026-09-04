@@ -2,11 +2,8 @@
 #
 # .githooks/pre-commit — single-file security hook (version controlled)
 #
-# Install:   bash .githooks/pre-commit --install
-#            (writes .git/hooks/pre-commit trampoline — no git config needed)
-#            npm prepare runs this after clone + npm install
-# Bypass:    SKIP_SECURITY_SCAN=1 git commit ...   or   git commit --no-verify
-# Fast mode: SKIP_SCANNER=1 git commit ...         (skips the npx scanner only)
+# Deploy only:  bash .githooks/pre-commit --ci
+# Local commit: no scan (exits 0). Do not run --install. Do not add npm prepare.
 #
 set -euo pipefail
 
@@ -60,6 +57,11 @@ fi
 CI_MODE=0
 if [ "${1:-}" = "--ci" ] || [ "${GITHUB_ACTIONS:-}" = "true" ] || [ "${CI:-}" = "true" ]; then
   CI_MODE=1
+fi
+
+# Local git commit: do not scan. Scan only when called with --ci (deploy).
+if [ "$CI_MODE" = "0" ]; then
+  exit 0
 fi
 
 # ----------------------------------------------------------------------------
