@@ -124,52 +124,6 @@
     });
   }
 
-  function refreshStorefrontCart() {
-    return fetchCart().then(function (cart) {
-      var detail = { cart: cart, source: "cart-upsell" };
-
-      document.dispatchEvent(new CustomEvent("cart:refresh", { detail: detail }));
-      document.dispatchEvent(new CustomEvent("cart:updated", { detail: detail }));
-      document.dispatchEvent(new CustomEvent("cart:change", { detail: detail }));
-
-      var root = document.getElementById("cart-upsell-root");
-      var currentSection = root && root.closest(".shopify-section");
-      var sectionIds = [];
-      var sectionElements = document.querySelectorAll("[data-section-id]");
-      for (var i = 0; i < sectionElements.length; i++) {
-        var sectionId = sectionElements[i].getAttribute("data-section-id");
-        if (
-          sectionId &&
-          sectionIds.indexOf(sectionId) === -1 &&
-          (!currentSection || !currentSection.contains(sectionElements[i]))
-        ) {
-          sectionIds.push(sectionId);
-        }
-      }
-
-      if (sectionIds.length === 0) return cart;
-
-      var sectionsUrl = new URL(window.location.href);
-      sectionsUrl.search = "sections=" + encodeURIComponent(sectionIds.join(","));
-      return fetch(sectionsUrl.toString(), { credentials: "same-origin" })
-        .then(function (res) {
-          if (!res.ok) throw new Error("cart sections failed");
-          return res.json();
-        })
-        .then(function (sections) {
-          sectionIds.forEach(function (sectionId) {
-            var section = document.getElementById("shopify-section-" + sectionId);
-            if (section && sections[sectionId]) section.outerHTML = sections[sectionId];
-          });
-          return cart;
-        })
-        .catch(function (err) {
-          console.error("Cart section refresh error:", err);
-          return cart;
-        });
-    });
-  }
-
   function fetchEligible(cart) {
     var config = getConfig();
     var items = cart.items || [];
@@ -287,9 +241,7 @@
         });
       })
       .then(function () {
-        return refreshStorefrontCart().then(function () {
-          return load();
-        });
+        return load();
       })
       .catch(function (err) {
         console.error("Cart upsell add error:", err);
