@@ -2,6 +2,10 @@
   var GUEST_STORAGE_KEY = "checkout-upsell-guest-key";
   var viewedOfferIds = {};
 
+  var spinnerStyle = document.createElement("style");
+  spinnerStyle.textContent = "@keyframes cart-upsell-spin { to { transform: rotate(360deg); } }";
+  document.head.appendChild(spinnerStyle);
+
   function getConfig() {
     return window.CART_UPSELL_CONFIG || {};
   }
@@ -124,6 +128,38 @@
     });
   }
 
+  function refreshCartMarkup() {
+    var selectors = [
+      "cart-items",
+      "#main-cart-items",
+      "#main-cart-footer",
+      "[data-cart-items]",
+      "[data-cart-form]",
+      ".cart__items",
+      ".cart__footer",
+      "form[action=\"/cart\"]",
+    ];
+    var url = new URL(window.location.href);
+    url.searchParams.set("_cart_refresh", Date.now());
+    return fetch(url.toString(), {
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error("cart page refresh failed");
+        return res.text();
+      })
+      .then(function (html) {
+        var parsed = new DOMParser().parseFromString(html, "text/html");
+        for (var i = 0; i < selectors.length; i++) {
+          var current = document.querySelector(selectors[i]);
+          var next = parsed.querySelector(selectors[i]);
+          if (current && next) current.replaceWith(next);
+        }
+      });
+  }
+
   function fetchEligible(cart) {
     var config = getConfig();
     var items = cart.items || [];
@@ -210,7 +246,12 @@
 
   function addOfferToCart(offer, button) {
     hideError();
-    if (button) button.disabled = true;
+    if (button) {
+      button.disabled = true;
+      button.dataset.originalLabel = button.textContent;
+      button.innerHTML =
+        '<span style="display:inline-block;width:12px;height:12px;margin-right:6px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;vertical-align:-2px;animation:cart-upsell-spin .7s linear infinite;"></span>Adding...';
+    }
     var id = identity();
     var body = {
       id: numericVariantId(offer.variantId),
@@ -244,14 +285,22 @@
         return load();
       })
       .then(function () {
-        window.location.reload();
+        return fetchCart().then(function (cart) {
+          return refreshCartMarkup().then(function () {
+            document.dispatchEvent(new CustomEvent("cart:refresh", { bubbles: true }));
+            document.dispatchEvent(new CustomEvent("cart:updated", { bubbles: true, detail: { cart: cart } }));
+          });
+        });
       })
       .catch(function (err) {
         console.error("Cart upsell add error:", err);
         showError("Could not add this product to your cart. Please try again.");
       })
       .then(function () {
-        if (button) button.disabled = false;
+        if (button) {
+          button.disabled = false;
+          button.textContent = button.dataset.originalLabel || "Add to cart";
+        }
       });
   }
 
@@ -293,6 +342,35 @@
       });
   }
 
+  function watchCartChanges() {
+    ["cart:updated", "cart:refresh", "cart:change"].forEach(function (eventName) {
+      document.addEventListener(eventName, load);
+    });
+
+    if (typeof window.fetch !== "function") return;
+    var originalFetch = window.fetch;
+    window.fetch = function () {
+      var input = arguments[0];
+      var url = typeof input === "string" ? input : input && input.url;
+      var result = originalFetch.apply(this, arguments);
+      if (url && /\/cart\/(change|update|clear)(?:\.js)?(?:\?|$)/.test(String(url))) {
+        result.then(function (response) {
+          if (response.ok) load();
+          return response;
+        });
+      }
+      return result;
+    };
+
+    document.addEventListener("click", function (event) {
+      var target = event.target && event.target.closest
+        ? event.target.closest('[data-cart-remove], a[href*="/cart/change"], button[name="remove"]')
+        : null;
+      if (target) setTimeout(load, 500);
+    });
+  }
+
+  watchCartChanges();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", load);
   } else {
