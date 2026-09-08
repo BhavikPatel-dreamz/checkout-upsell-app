@@ -243,6 +243,9 @@
       .then(function () {
         return load();
       })
+      .then(function () {
+        window.location.reload();
+      })
       .catch(function (err) {
         console.error("Cart upsell add error:", err);
         showError("Could not add this product to your cart. Please try again.");
