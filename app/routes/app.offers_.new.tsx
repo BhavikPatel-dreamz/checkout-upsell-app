@@ -212,9 +212,13 @@ export async function action({ request }: ActionFunctionArgs) {
   // ── Build payload ────────────────────────────────────────────────
   const built = buildOfferPayload(payload);
 
-  // Respect the placement sent from the form (pre-purchase vs post-purchase).
+  // Respect the placement sent from the form.
   const placementRaw = String(formData.get("placement") || "");
-  if (placementRaw === "post_purchase" || placementRaw === "checkout") {
+  if (
+    placementRaw === "post_purchase" ||
+    placementRaw === "product_page" ||
+    placementRaw === "checkout"
+  ) {
     built.placement = placementRaw as OfferPlacement;
   }
 

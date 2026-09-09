@@ -48,14 +48,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // Required: placement
   const placementParam = url.searchParams.get("placement");
-  if (!placementParam) return badRequest({ placement: "placement is required (checkout | post_purchase)." });
+  if (!placementParam) return badRequest({ placement: "placement is required (checkout | product_page | post_purchase)." });
 
-  const placement = (placementParam === "post_purchase" ? OfferPlacement.post_purchase : placementParam === "checkout" ? OfferPlacement.checkout : null);
-  if (!placement) return badRequest({ placement: "placement must be one of: checkout, post_purchase" });
+  const placement =
+    placementParam === "post_purchase"
+      ? OfferPlacement.post_purchase
+      : placementParam === "product_page"
+        ? OfferPlacement.product_page
+        : placementParam === "checkout"
+          ? OfferPlacement.checkout
+          : null;
+  if (!placement) return badRequest({ placement: "placement must be one of: checkout, product_page, post_purchase" });
 
   // Parse cart product / variant ids
   const productIds = parseCsvParam(url.searchParams.get("productIds"));
   const variantIds = parseCsvParam(url.searchParams.get("variantIds"));
+  const excludeProductIds = parseCsvParam(url.searchParams.get("excludeProductIds"));
+  const excludeVariantIds = parseCsvParam(url.searchParams.get("excludeVariantIds"));
 
   if (productIds.length === 0 && variantIds.length === 0) {
     return badRequest({ cart: "At least one of productIds or variantIds is required (comma-separated)." });
@@ -70,12 +79,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     placement,
     productIds,
     variantIds,
+    excludeProductIds,
+    excludeVariantIds,
     identity: { customerId, guestKey, clientId },
   });
   const offers = await rankEligibleOffers({
     shop,
     offers: eligible,
     identity: { customerId, guestKey, clientId },
+    max: placement === OfferPlacement.product_page ? eligible.length : undefined,
   });
 
   return Response.json(
