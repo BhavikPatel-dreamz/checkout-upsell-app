@@ -48,17 +48,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // Required: placement
   const placementParam = url.searchParams.get("placement");
-  if (!placementParam) return badRequest({ placement: "placement is required (checkout | product_page | post_purchase)." });
+  if (!placementParam) return badRequest({ placement: "placement is required (checkout | cart_drawer | product_page | post_purchase)." });
 
   const placement =
     placementParam === "post_purchase"
       ? OfferPlacement.post_purchase
       : placementParam === "product_page"
         ? OfferPlacement.product_page
+        : placementParam === "cart_drawer"
+          ? OfferPlacement.cart_drawer
         : placementParam === "checkout"
           ? OfferPlacement.checkout
           : null;
-  if (!placement) return badRequest({ placement: "placement must be one of: checkout, product_page, post_purchase" });
+        if (!placement) return badRequest({ placement: "placement must be one of: checkout, cart_drawer, product_page, post_purchase" });
 
   // Parse cart product / variant ids
   const productIds = parseCsvParam(url.searchParams.get("productIds"));

@@ -9,6 +9,7 @@ function isValidShopDomain(value: unknown): value is string {
 
 function parsePlacement(value: unknown): OfferPlacement | null {
   if (value === "checkout") return OfferPlacement.checkout;
+  if (value === "cart_drawer") return OfferPlacement.cart_drawer;
   if (value === "product_page") return OfferPlacement.product_page;
   if (value === "post_purchase") return OfferPlacement.post_purchase;
   return null;

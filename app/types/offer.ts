@@ -62,11 +62,14 @@ export function displayLocationOptions(
       return [
         { value: "checkout_page", label: "On Checkout Page" },
         { value: "cart_drawer", label: "On Cart Page" },
+        { value: "cart_drawer_upsell", label: "On Cart Drawer" },
       ];
     case OfferPlacement.post_purchase:
       return [{ value: "thank_you_page", label: "On Thank You Page" }];
     case OfferPlacement.product_page:
       return [{ value: "product_page", label: "On Product Page" }];
+    case OfferPlacement.cart_drawer:
+      return [{ value: "cart_drawer_upsell", label: "On Cart Drawer" }];
     default:
       return [{ value: "checkout_page", label: "On Checkout Page" }];
   }
