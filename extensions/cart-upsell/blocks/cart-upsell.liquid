@@ -1,10 +1,113 @@
-<div id="cart-upsell-root" class="cart-upsell-block" style="display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin: 16px 0;">
-  <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">{{ "cart_upsell.title" | t }}</h3>
+<div
+  id="cart-upsell-root"
+  class="cart-upsell-block"
+  style="
+    display: none;
+    --cu-border-color: {{ block.settings.border_color }};
+    --cu-corner-radius: {{ block.settings.block_corner_radius }}px;
+    --cu-heading-color: {{ block.settings.heading_color }};
+    --cu-heading-size: {{ block.settings.heading_font_size }}px;
+    --cu-card-bg: {{ block.settings.card_bg_color }};
+    --cu-card-border: 1px solid {{ block.settings.card_border_color }};
+    --cu-card-radius: {{ block.settings.card_corner_radius }}px;
+    --cu-title-color: {{ block.settings.title_color }};
+    --cu-subtext-color: {{ block.settings.subtext_color }};
+    --cu-price-color: {{ block.settings.price_color }};
+    --cu-btn-bg: {{ block.settings.button_bg_color }};
+    --cu-btn-text: {{ block.settings.button_text_color }};
+    --cu-btn-radius: {{ block.settings.button_corner_radius }}px;
+    --cu-error-color: {{ block.settings.error_color }};
+    border: 1px solid var(--cu-border-color);
+    border-radius: var(--cu-corner-radius);
+    padding: 16px;
+    margin: 16px 0;
+  "
+>
+  <h3 class="cart-upsell-heading">
+    {% if block.settings.heading_text != blank %}{{ block.settings.heading_text }}{% else %}{{ "cart_upsell.title" | t }}{% endif %}
+  </h3>
 
-  <div id="cart-upsell-items" style="display: flex; flex-direction: row; gap: 12px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity;"></div>
+  <div id="cart-upsell-items" class="cart-upsell-items"></div>
 
-  <div id="cart-upsell-error" class="cart-upsell-error" style="display: none; color: #d32f2f; font-size: 12px; margin-top: 8px;"></div>
+  <div id="cart-upsell-error" class="cart-upsell-error"></div>
 </div>
+
+<style>
+  .cart-upsell-heading {
+    margin: 0 0 12px 0;
+    font-size: var(--cu-heading-size);
+    font-weight: 600;
+    color: var(--cu-heading-color);
+  }
+
+  .cart-upsell-items {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .cart-upsell-error {
+    display: none;
+    color: var(--cu-error-color);
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  .cart-upsell-card {
+    flex: 0 0 180px;
+    scroll-snap-align: start;
+    background: var(--cu-card-bg);
+    border: var(--cu-card-border);
+    border-radius: var(--cu-card-radius);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cart-upsell-card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+  }
+
+  .cart-upsell-promo {
+    font-size: 12px;
+    color: var(--cu-subtext-color);
+    font-weight: 600;
+  }
+
+  .cart-upsell-product-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cu-title-color);
+  }
+
+  .cart-upsell-variant {
+    font-size: 12px;
+    color: var(--cu-subtext-color);
+  }
+
+  .cart-upsell-price {
+    font-size: 13px;
+    color: var(--cu-price-color);
+  }
+
+  .cart-upsell-add-btn {
+    margin-top: auto;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: var(--cu-btn-radius);
+    background: var(--cu-btn-bg);
+    color: var(--cu-btn-text);
+    cursor: pointer;
+    font-size: 13px;
+  }
+</style>
 
 <script>
   window.CART_UPSELL_CONFIG = {
@@ -14,7 +117,7 @@
     addedToCartUrl: "/apps/checkout-upsell/api/offers/added-to-cart",
     customerId: {% if customer %}"gid://shopify/Customer/{{ customer.id }}"{% else %}null{% endif %},
     shop: {{ shop.permanent_domain | json }},
-    addToCartLabel: {{ "cart_upsell.add_to_cart" | t | json }}
+    addToCartLabel: {% if block.settings.add_to_cart_text != blank %}{{ block.settings.add_to_cart_text | json }}{% else %}{{ "cart_upsell.add_to_cart" | t | json }}{% endif %}
   };
 </script>
 
@@ -25,6 +128,29 @@
   "enabled_on": {
     "templates": ["cart"]
   },
-  "javascript": "cart-upsell.js"
+  "javascript": "cart-upsell.js",
+  "settings": [
+    { "type": "header", "content": "Heading" },
+    { "type": "text", "id": "heading_text", "label": "Heading text", "default": "You might also like" },
+    { "type": "color", "id": "heading_color", "label": "Heading color", "default": "#111111" },
+    { "type": "range", "id": "heading_font_size", "label": "Heading font size", "min": 12, "max": 24, "step": 1, "unit": "px", "default": 16 },
+    { "type": "header", "content": "Block container" },
+    { "type": "color", "id": "border_color", "label": "Container border color", "default": "#e0e0e0" },
+    { "type": "range", "id": "block_corner_radius", "label": "Container corner radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 8 },
+    { "type": "header", "content": "Card styling" },
+    { "type": "color", "id": "card_bg_color", "label": "Card background", "default": "#ffffff" },
+    { "type": "color", "id": "card_border_color", "label": "Card border color", "default": "#eeeeee" },
+    { "type": "range", "id": "card_corner_radius", "label": "Card corner radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 8 },
+    { "type": "color", "id": "title_color", "label": "Product title color", "default": "#111111" },
+    { "type": "color", "id": "subtext_color", "label": "Secondary text color", "default": "#666666" },
+    { "type": "color", "id": "price_color", "label": "Price color", "default": "#111111" },
+    { "type": "header", "content": "Button" },
+    { "type": "text", "id": "add_to_cart_text", "label": "Add to cart button text", "default": "Add to cart" },
+    { "type": "color", "id": "button_bg_color", "label": "Background", "default": "#111111" },
+    { "type": "color", "id": "button_text_color", "label": "Text color", "default": "#ffffff" },
+    { "type": "range", "id": "button_corner_radius", "label": "Button corner radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 6 },
+    { "type": "header", "content": "Error message" },
+    { "type": "color", "id": "error_color", "label": "Error text color", "default": "#d32f2f" }
+  ]
 }
 {% endschema %}

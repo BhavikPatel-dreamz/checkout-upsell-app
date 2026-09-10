@@ -95,13 +95,13 @@
         var e = document.getElementById("product-upsell-root"), n = document.getElementById("product-upsell-items");
         !e || !n || (n.innerHTML = "", t.forEach(function(r) {
           var a = document.createElement("div");
-          a.style.cssText = "flex:0 0 180px;scroll-snap-align:start;border:1px solid #eee;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px", a.innerHTML = (r.imageUrl ? '<img src="' + d(r.imageUrl) + '" alt="' + d(r.productTitle) + '" style="width:100%;height:140px;object-fit:cover;border-radius:6px">' : "") + (r.promotionalTitle ? '<div style="font-size:12px;color:#666;font-weight:600">' + d(r.promotionalTitle) + "</div>" : "") + '<div style="font-size:14px;font-weight:600">' + d(r.productTitle) + "</div>" + (r.variantTitle ? '<div style="font-size:12px;color:#666">' + d(r.variantTitle) + "</div>" : "") + (r.price ? '<div style="font-size:13px">$' + d(r.price) + "</div>" : "");
+          a.className = "product-upsell-card", a.innerHTML = (r.imageUrl ? '<img src="' + d(r.imageUrl) + '" alt="' + d(r.productTitle) + '">' : "") + (r.promotionalTitle ? '<div class="product-upsell-promo">' + d(r.promotionalTitle) + "</div>" : "") + '<div class="product-upsell-product-title">' + d(r.productTitle) + "</div>" + (r.variantTitle ? '<div class="product-upsell-variant">' + d(r.variantTitle) + "</div>" : "") + (r.price ? '<div class="product-upsell-price">$' + d(r.price) + "</div>" : "");
           var i = document.createElement("button");
-          i.type = "button", i.textContent = o.addToCartLabel || "Add to cart", i.style.cssText = "margin-top:auto;padding:8px 12px;border:0;border-radius:6px;background:#111;color:#fff;cursor:pointer;font-size:13px", i.onclick = function() {
+          i.type = "button", i.textContent = o.addToCartLabel || "Add to cart", i.className = "product-upsell-add-btn", i.onclick = function() {
             T(r, i);
           }, a.appendChild(i);
           var c = document.createElement("button");
-          c.type = "button", c.textContent = o.viewLabel || "View product", c.style.cssText = "padding:8px 12px;border:1px solid #111;border-radius:6px;background:#fff;color:#111;cursor:pointer;font-size:13px", c.onclick = function() {
+          c.type = "button", c.textContent = o.viewLabel || "View product", c.className = "product-upsell-view-btn", c.onclick = function() {
             r.productHandle && s(o.clickedUrl, r).finally(function() {
               location.href = "/products/" + encodeURIComponent(r.productHandle) + "?variant=" + y(r.variantId);
             });

@@ -197,35 +197,34 @@
 
     offers.forEach(function (offer) {
       var card = document.createElement("div");
-      card.style.cssText =
-        "flex: 0 0 180px; scroll-snap-align: start; border: 1px solid #eee; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;";
+      card.className = "cart-upsell-card";
 
       var imgHtml = offer.imageUrl
         ? '<img src="' +
           escapeHtml(offer.imageUrl) +
           '" alt="' +
           escapeHtml(offer.productTitle) +
-          '" style="width:100%;height:140px;object-fit:cover;border-radius:6px;" />'
+          '" />'
         : "";
 
       var promo = offer.promotionalTitle
-        ? '<div style="font-size:12px;color:#666;font-weight:600;">' +
+        ? '<div class="cart-upsell-promo">' +
           escapeHtml(offer.promotionalTitle) +
           "</div>"
         : "";
 
       var variant = offer.variantTitle
-        ? '<div style="font-size:12px;color:#666;">' + escapeHtml(offer.variantTitle) + "</div>"
+        ? '<div class="cart-upsell-variant">' + escapeHtml(offer.variantTitle) + "</div>"
         : "";
 
       var price = offer.price
-        ? '<div style="font-size:13px;">$' + escapeHtml(offer.price) + "</div>"
+        ? '<div class="cart-upsell-price">$' + escapeHtml(offer.price) + "</div>"
         : "";
 
       card.innerHTML =
         imgHtml +
         promo +
-        '<div style="font-size:14px;font-weight:600;">' +
+        '<div class="cart-upsell-product-title">' +
         escapeHtml(offer.productTitle) +
         "</div>" +
         variant +
@@ -234,8 +233,7 @@
       var button = document.createElement("button");
       button.type = "button";
       button.textContent = label;
-      button.style.cssText =
-        "margin-top:auto;padding:8px 12px;border:0;border-radius:6px;background:#111;color:#fff;cursor:pointer;font-size:13px;";
+      button.className = "cart-upsell-add-btn";
       button.addEventListener("click", function () {
         addOfferToCart(offer, button);
       });

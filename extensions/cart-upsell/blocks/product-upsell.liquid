@@ -1,8 +1,124 @@
-<div id="product-upsell-root" class="product-upsell-block" style="display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin: 16px 0;">
-  <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">{{ "product_upsell.title" | t }}</h3>
-  <div id="product-upsell-items" style="display: flex; flex-direction: row; gap: 12px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity;"></div>
-  <div id="product-upsell-error" style="display: none; color: #d32f2f; font-size: 12px; margin-top: 8px;"></div>
+<div
+  id="product-upsell-root"
+  class="product-upsell-block"
+  style="
+    display: none;
+    --pu-border-color: {{ block.settings.border_color }};
+    --pu-corner-radius: {{ block.settings.block_corner_radius }}px;
+    --pu-heading-color: {{ block.settings.heading_color }};
+    --pu-heading-size: {{ block.settings.heading_font_size }}px;
+    --pu-card-bg: {{ block.settings.card_bg_color }};
+    --pu-card-border: 1px solid {{ block.settings.card_border_color }};
+    --pu-card-radius: {{ block.settings.card_corner_radius }}px;
+    --pu-title-color: {{ block.settings.title_color }};
+    --pu-subtext-color: {{ block.settings.subtext_color }};
+    --pu-price-color: {{ block.settings.price_color }};
+    --pu-add-btn-bg: {{ block.settings.add_button_bg_color }};
+    --pu-add-btn-text: {{ block.settings.add_button_text_color }};
+    --pu-view-btn-bg: {{ block.settings.view_button_bg_color }};
+    --pu-view-btn-text: {{ block.settings.view_button_text_color }};
+    --pu-view-btn-border: {{ block.settings.view_button_border_color }};
+    --pu-btn-radius: {{ block.settings.button_corner_radius }}px;
+    --pu-error-color: {{ block.settings.error_color }};
+    border: 1px solid var(--pu-border-color);
+    border-radius: var(--pu-corner-radius);
+    padding: 16px;
+    margin: 16px 0;
+  "
+>
+  <h3 class="product-upsell-heading">
+    {% if block.settings.heading_text != blank %}{{ block.settings.heading_text }}{% else %}{{ "product_upsell.title" | t }}{% endif %}
+  </h3>
+  <div id="product-upsell-items" class="product-upsell-items"></div>
+  <div id="product-upsell-error" class="product-upsell-error"></div>
 </div>
+
+<style>
+  .product-upsell-heading {
+    margin: 0 0 12px 0;
+    font-size: var(--pu-heading-size);
+    font-weight: 600;
+    color: var(--pu-heading-color);
+  }
+
+  .product-upsell-items {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .product-upsell-error {
+    display: none;
+    color: var(--pu-error-color);
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  .product-upsell-card {
+    flex: 0 0 180px;
+    scroll-snap-align: start;
+    background: var(--pu-card-bg);
+    border: var(--pu-card-border);
+    border-radius: var(--pu-card-radius);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .product-upsell-card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 6px;
+  }
+
+  .product-upsell-promo {
+    font-size: 12px;
+    color: var(--pu-subtext-color);
+    font-weight: 600;
+  }
+
+  .product-upsell-product-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--pu-title-color);
+  }
+
+  .product-upsell-variant {
+    font-size: 12px;
+    color: var(--pu-subtext-color);
+  }
+
+  .product-upsell-price {
+    font-size: 13px;
+    color: var(--pu-price-color);
+  }
+
+  .product-upsell-add-btn {
+    margin-top: auto;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: var(--pu-btn-radius);
+    background: var(--pu-add-btn-bg);
+    color: var(--pu-add-btn-text);
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .product-upsell-view-btn {
+    padding: 8px 12px;
+    border: 1px solid var(--pu-view-btn-border);
+    border-radius: var(--pu-btn-radius);
+    background: var(--pu-view-btn-bg);
+    color: var(--pu-view-btn-text);
+    cursor: pointer;
+    font-size: 13px;
+  }
+</style>
 
 <script>
   window.PRODUCT_UPSELL_CONFIG = {
@@ -14,8 +130,8 @@
     shop: {{ shop.permanent_domain | json }},
     productId: {% if product %}"gid://shopify/Product/{{ product.id }}"{% else %}null{% endif %},
     variantId: {% if product.selected_or_first_available_variant %}"gid://shopify/ProductVariant/{{ product.selected_or_first_available_variant.id }}"{% else %}null{% endif %},
-    addToCartLabel: {{ "product_upsell.add_to_cart" | t | json }},
-    viewLabel: {{ "product_upsell.view" | t | json }}
+    addToCartLabel: {% if block.settings.add_to_cart_text != blank %}{{ block.settings.add_to_cart_text | json }}{% else %}{{ "product_upsell.add_to_cart" | t | json }}{% endif %},
+    viewLabel: {% if block.settings.view_product_text != blank %}{{ block.settings.view_product_text | json }}{% else %}{{ "product_upsell.view" | t | json }}{% endif %}
   };
 </script>
 
@@ -26,6 +142,33 @@
   "enabled_on": {
     "templates": ["product"]
   },
-  "javascript": "product-upsell.js"
+  "javascript": "product-upsell.js",
+  "settings": [
+    { "type": "header", "content": "Heading" },
+    { "type": "text", "id": "heading_text", "label": "Heading text", "default": "You might also like" },
+    { "type": "color", "id": "heading_color", "label": "Heading color", "default": "#111111" },
+    { "type": "range", "id": "heading_font_size", "label": "Heading font size", "min": 12, "max": 24, "step": 1, "unit": "px", "default": 16 },
+    { "type": "header", "content": "Block container" },
+    { "type": "color", "id": "border_color", "label": "Container border color", "default": "#e0e0e0" },
+    { "type": "range", "id": "block_corner_radius", "label": "Container corner radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 8 },
+    { "type": "header", "content": "Card styling" },
+    { "type": "color", "id": "card_bg_color", "label": "Card background", "default": "#ffffff" },
+    { "type": "color", "id": "card_border_color", "label": "Card border color", "default": "#eeeeee" },
+    { "type": "range", "id": "card_corner_radius", "label": "Card corner radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 8 },
+    { "type": "color", "id": "title_color", "label": "Product title color", "default": "#111111" },
+    { "type": "color", "id": "subtext_color", "label": "Secondary text color", "default": "#666666" },
+    { "type": "color", "id": "price_color", "label": "Price color", "default": "#111111" },
+    { "type": "header", "content": "Buttons" },
+    { "type": "text", "id": "add_to_cart_text", "label": "Add to cart button text", "default": "Add to cart" },
+    { "type": "color", "id": "add_button_bg_color", "label": "Add to cart background", "default": "#111111" },
+    { "type": "color", "id": "add_button_text_color", "label": "Add to cart text color", "default": "#ffffff" },
+    { "type": "text", "id": "view_product_text", "label": "View product button text", "default": "View product" },
+    { "type": "color", "id": "view_button_bg_color", "label": "View product background", "default": "#ffffff" },
+    { "type": "color", "id": "view_button_text_color", "label": "View product text color", "default": "#111111" },
+    { "type": "color", "id": "view_button_border_color", "label": "View product border color", "default": "#111111" },
+    { "type": "range", "id": "button_corner_radius", "label": "Button corner radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 6 },
+    { "type": "header", "content": "Error message" },
+    { "type": "color", "id": "error_color", "label": "Error text color", "default": "#d32f2f" }
+  ]
 }
 {% endschema %}

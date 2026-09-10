@@ -9,6 +9,42 @@ type = "ui_extension"
   [extensions.capabilities]
   network_access = true
 
-[[extensions.targeting]]
-target = "purchase.thank-you.block.render"
-module = "./src/index.tsx"
+  [[extensions.targeting]]
+  target = "purchase.thank-you.block.render"
+  module = "./src/index.tsx"
+
+  [[extensions.settings.fields]]
+  key = "heading_text"
+  type = "single_line_text_field"
+  name = "Heading text"
+  description = "Shown above the upsell offers."
+
+  [[extensions.settings.fields]]
+  key = "button_label"
+  type = "single_line_text_field"
+  name = "Button label"
+  description = "Text shown on the accept/add button for each offer."
+
+  [[extensions.settings.fields]]
+  key = "use_secondary_button"
+  type = "boolean"
+  name = "Use secondary button style"
+  description = "Off shows a solid primary button, on shows an outlined secondary button."
+
+  [[extensions.settings.fields]]
+  key = "price_standard_appearance"
+  type = "boolean"
+  name = "Use standard price text style"
+  description = "Off shows a subdued price, on shows standard emphasis."
+
+  [[extensions.settings.fields]]
+  key = "card_spacing"
+  type = "single_line_text_field"
+  name = "Card spacing"
+  description = "Enter tight, base, or loose. Defaults to tight if left blank or invalid."
+
+  [[extensions.settings.fields]]
+  key = "show_border"
+  type = "boolean"
+  name = "Show card border"
+  description = "Toggle the border around each offer card."

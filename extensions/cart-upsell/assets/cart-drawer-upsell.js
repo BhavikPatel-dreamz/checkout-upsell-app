@@ -236,26 +236,38 @@
     var container = items();
     if (!container) return;
     container.innerHTML = "";
-    container.style.display = "flex";
-    container.style.flexDirection = "row";
-    container.style.gap = "12px";
-    container.style.overflowX = "auto";
-    container.style.overflowY = "hidden";
-    container.style.paddingBottom = "8px";
-    container.style.scrollSnapType = "x proximity";
     offers.forEach(function (offer) {
       var card = document.createElement("div");
-      card.style.cssText = "flex:0 0 300px;box-sizing:border-box;scroll-snap-align:start;display:flex;gap:10px;align-items:flex-start;border:1px solid #eee;border-radius:6px;padding:10px;min-height:150px;";
-      var image = offer.imageUrl ? '<img src="' + escapeHtml(offer.imageUrl) + '" alt="' + escapeHtml(offer.productTitle) + '" style="width:64px;height:64px;object-fit:cover;border-radius:4px;flex:none;">' : "";
-      var productUrl = offer.productHandle ? "/products/" + encodeURIComponent(offer.productHandle) + "?variant=" + encodeURIComponent(numericId(offer.variantId)) : "";
-      var view = productUrl ? '<a href="' + escapeHtml(productUrl) + '" style="font-size:12px;display:block;margin-top:4px;">' + escapeHtml(config().viewLabel || "View product") + "</a>" : "";
-      card.innerHTML = image + '<div style="min-width:0;flex:1;"><div style="font-size:12px;color:#666;">' + escapeHtml(offer.promotionalTitle || "") + '</div><div style="font-size:14px;font-weight:600;">' + escapeHtml(offer.productTitle) + '</div><div style="font-size:12px;color:#666;">' + escapeHtml(offer.variantTitle || "") + (offer.price ? " · $" + escapeHtml(offer.price) : "") + '</div>' + view + '</div>';
+      card.className = "cart-drawer-upsell-card";
+
+      var image = offer.imageUrl
+        ? '<img src="' + escapeHtml(offer.imageUrl) + '" alt="' + escapeHtml(offer.productTitle) + '">'
+        : "";
+      var productUrl = offer.productHandle
+        ? "/products/" + encodeURIComponent(offer.productHandle) + "?variant=" + encodeURIComponent(numericId(offer.variantId))
+        : "";
+      var view = productUrl
+        ? '<a class="cart-drawer-upsell-view" href="' + escapeHtml(productUrl) + '">' + escapeHtml(config().viewLabel || "View product") + "</a>"
+        : "";
+
+      card.innerHTML =
+        image +
+        '<div class="cart-drawer-upsell-details">' +
+          '<div class="cart-drawer-upsell-promo">' + escapeHtml(offer.promotionalTitle || "") + '</div>' +
+          '<div class="cart-drawer-upsell-product-title">' + escapeHtml(offer.productTitle) + '</div>' +
+          '<div class="cart-drawer-upsell-variant">' +
+            escapeHtml(offer.variantTitle || "") +
+            (offer.price ? ' · <span class="cart-drawer-upsell-price">$' + escapeHtml(offer.price) + '</span>' : "") +
+          '</div>' +
+        '</div>';
+
       var button = document.createElement("button");
       button.type = "button";
+      button.className = "cart-drawer-upsell-btn";
       button.textContent = config().addToCartLabel || "Add to cart";
-      button.style.cssText = "display:block;margin-top:8px;padding:8px 10px;border:0;border-radius:4px;background:#111;color:#fff;cursor:pointer;font-size:12px;";
       button.addEventListener("click", function () { add(offer, button); });
-      var details = card.querySelector("div[style*='min-width:0']");
+
+      var details = card.querySelector(".cart-drawer-upsell-details");
       if (details) {
         var viewLink = details.querySelector("a");
         details.appendChild(button);
