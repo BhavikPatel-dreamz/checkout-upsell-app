@@ -18,17 +18,26 @@ function getString(value: unknown): string | null {
  * - Cart AJAX / some integrations: flat object map
  */
 function getLineItemProperties(lineItem: any): Record<string, string> {
-  const raw = lineItem?.properties ?? lineItem?.customAttributes ?? [];
   const props: Record<string, string> = {};
-  if (Array.isArray(raw)) {
-    for (const entry of raw) {
-      const key = getString(entry?.name ?? entry?.key);
-      if (!key) continue;
-      props[key] = getString(entry?.value) ?? "";
-    }
-  } else if (raw && typeof raw === "object") {
-    for (const [key, value] of Object.entries(raw)) {
-      props[key] = getString(value) ?? "";
+  const sources = [
+    lineItem?.properties,
+    lineItem?.customAttributes,
+    lineItem?.custom_attributes,
+    lineItem?.attributes,
+    lineItem?.line_item_properties,
+  ];
+
+  for (const raw of sources) {
+    if (Array.isArray(raw)) {
+      for (const entry of raw) {
+        const key = getString(entry?.name ?? entry?.key);
+        if (!key) continue;
+        props[key.trim().toLowerCase()] = getString(entry?.value) ?? "";
+      }
+    } else if (raw && typeof raw === "object") {
+      for (const [key, value] of Object.entries(raw)) {
+        props[key.trim().toLowerCase()] = getString(value) ?? "";
+      }
     }
   }
   return props;
@@ -195,9 +204,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       `[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} resolved identity: ` +
       `customerId=${purchaseIdentityCustomerId ?? "none"} guestKey=${purchaseGuestKey ?? "none"}`,
     );
-    if (!purchaseIdentityCustomerId && !purchaseGuestKey) {
+    const canAttributeWithoutIdentity =
+      offer.placement === OfferPlacement.product_page ||
+      offer.placement === OfferPlacement.cart_drawer;
+    if (!purchaseIdentityCustomerId && !purchaseGuestKey && !canAttributeWithoutIdentity) {
       console.log(`[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} SKIPPED — no customer/guest identity available to attribute this purchase to.`);
       continue;
+    }
+    if (!purchaseIdentityCustomerId && !purchaseGuestKey) {
+      console.log(
+        `[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} no customer/guest identity supplied; ` +
+        `recording ${offer.placement} purchase using the offer and line-item attribution properties.`,
+      );
     }
 
     const lineItemRevenue = getLineItemRevenue(lineItem);

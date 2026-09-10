@@ -122,7 +122,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
           conditions: Array.isArray(rawRules.conditions)
             ? rawRules.conditions
             : [{ field: "", operator: "", value: "" }],
-          displayLocation: rawRules.displayLocation ?? "checkout_page",
+          displayLocation:
+            offer.placement === "cart_drawer"
+              ? "cart_drawer_upsell"
+              : rawRules.displayLocation ?? "checkout_page",
           upsellProduct: rawRules.upsellProduct ?? "manual",
           triggerProductIds: Array.isArray(offer.targetProductIds)
             ? offer.targetProductIds
@@ -212,10 +215,19 @@ export async function action({ request }: ActionFunctionArgs) {
   // ── Build payload ────────────────────────────────────────────────
   const built = buildOfferPayload(payload);
 
-  // Respect the placement sent from the form (pre-purchase vs post-purchase).
+  // Respect the placement sent from the form.
   const placementRaw = String(formData.get("placement") || "");
-  if (placementRaw === "post_purchase" || placementRaw === "checkout") {
+  const displayLocationRaw = String(formData.get("displayLocation") || "");
+  if (
+    placementRaw === "post_purchase" ||
+    placementRaw === "product_page" ||
+    placementRaw === "checkout" ||
+    placementRaw === "cart_drawer"
+  ) {
     built.placement = placementRaw as OfferPlacement;
+  }
+  if (displayLocationRaw === "cart_drawer_upsell") {
+    built.placement = "cart_drawer";
   }
 
   if (offerId) {

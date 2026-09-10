@@ -291,23 +291,12 @@ function ThankYouUpsellBlock() {
                 </View>
 
                 <View minBlockSize={84} maxBlockSize={84} overflow="hidden">
-                  <InlineLayout spacing="extraTight" columns={["fill", "fill"]}>
-                    <AcceptButton
-                      offer={o}
-                      processing={processing}
-                      buildAcceptUrl={buildAcceptUrl}
-                      onAccept={handleAccept}
-                    />
-
-                    <Button
-                      kind="secondary"
-                      onPress={handleDismiss}
-                      disabled={processing}
-                      accessibilityLabel="Decline this offer"
-                    >
-                      No thanks
-                    </Button>
-                  </InlineLayout>
+                  <AcceptButton
+                    offer={o}
+                    processing={processing}
+                    buildAcceptUrl={buildAcceptUrl}
+                    onAccept={handleAccept}
+                  />
                 </View>
               </BlockStack>
             </View>

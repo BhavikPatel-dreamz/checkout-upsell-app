@@ -115,8 +115,7 @@ function normalizeTriggerRules(input: OfferFormPayload): Record<string, unknown>
       .map((item) => ({
         productId: item.productId,
         variantId: item.variantId,
-      }))
-      .slice(0, 5);
+      }));
 
     if (items.length > 0) {
       triggerRules.manualSelections = items;

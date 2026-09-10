@@ -102,8 +102,6 @@ export function validateOfferFields(
       const manual = Array.isArray(fieldValue(body, "manualSelections")) ? fieldValue(body, "manualSelections") as unknown[] : [];
       if (manual.length === 0) {
         errors.upsellProduct = "Add at least one product";
-      } else if (manual.length > 5) {
-        errors.upsellProduct = "Select up to 5 products.";
       }
     }
   }
