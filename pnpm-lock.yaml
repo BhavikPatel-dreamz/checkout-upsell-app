@@ -114,6 +114,25 @@ importers:
 
   extensions/cart-upsell: {}
 
+  extensions/checkout-upsell:
+    dependencies:
+      '@shopify/ui-extensions':
+        specifier: 2025.7.4
+        version: 2025.7.4
+      '@shopify/ui-extensions-react':
+        specifier: 2025.7.4
+        version: 2025.7.4(@shopify/ui-extensions@2025.7.4)(react-reconciler@0.29.2(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-reconciler:
+        specifier: ^0.29.0
+        version: 0.29.2(react@18.3.1)
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   extensions/thankyou-upsell:
     dependencies:
       '@shopify/ui-extensions':
