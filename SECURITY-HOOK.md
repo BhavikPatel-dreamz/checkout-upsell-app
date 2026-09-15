@@ -6,9 +6,11 @@ Do not reinvent it. Copy the files, then tune only the deploy/Vercel bits.
 **Policy (apply this in every repo):**
 
 - Do **not** scan on `git commit`.
-- Do **not** scan on every push or pull request.
+- Do **not** scan on every pull request. Do **not** add `security-precommit.yml`.
 - Do **not** add `prepare` that installs a Git pre-commit trampoline.
-- Scan **only before deploy** (`bash .githooks/pre-commit --ci`).
+- Scan with `bash .githooks/pre-commit --ci` only on the **`main` deploy path**.
+- On GitHub `validate`: **scan first**, then install / test / build. If the scan fails, skip the GitHub build.
+- On the VPS: scan again after sync, **before** install/build. Failure restores the previous release.
 - Protect `main`: require a pull request; block force pushes and direct pushes.
 
 Working reference: this repo (`App-Builder` / App Builder MR-Supplement).
@@ -20,8 +22,9 @@ Working reference: this repo (`App-Builder` / App Builder MR-Supplement).
 | Layer | When it runs |
 | --- | --- |
 | Local `git commit` | **No scan.** The hook exits immediately unless `--ci`. |
-| Push / pull request | **No scan.** Do not add `security-precommit.yml`. |
-| Deploy (VPS) | After sync of `main`, **before** install/build. Failure restores the previous release. |
+| Pull request | **No scan.** Do not add `security-precommit.yml`. |
+| GitHub `validate` (`main`) | **Scan first** (`--ci`), then install / test / `build:ci`. Infected commits never reach the GitHub build. |
+| Deploy (VPS) | After sync of `main`, **scan again before** install/build. Failure restores the previous release. |
 | Deploy (Vercel) | Inside `build` only when `VERCEL=1` or `GITHUB_ACTIONS=true`. |
 
 Git **cannot** turn on local hooks from a clone/pull (that would be remote code execution). Do not reintroduce `prepare` + `--install` — that made every commit slow.
@@ -88,7 +91,7 @@ Optional hosted build (Vercel): prefix the existing `build` so **hosted** builds
 }
 ```
 
-For GitHub **validate** jobs, use a build script **without** the scan (example: `build:ci`) so CI is fast. The VPS deploy job runs `--ci` after sync.
+For GitHub **validate** jobs, keep `build:ci` **without** an embedded scan. Run `--ci` as its **own workflow step before** `pnpm install` / `build:ci`. The VPS deploy job runs `--ci` again after sync.
 
 ---
 
@@ -99,16 +102,32 @@ Do **not** add a `security-scan` job on every `push` / `pull_request`.
 
 If that workflow already exists in the target repo, **delete it**.
 
-Scan only in the **deploy** workflow on `main`, after code is synced to the server and **before** `pnpm install` / `npm ci` / build.
+Scan only in the **deploy** workflow on `main` (not on every PR):
+
+1. GitHub `validate`: scan **before** install / test / build. If the scan fails, skip those steps.
+2. VPS `deploy`: scan again after code is synced to the server and **before** `pnpm install` / `npm ci` / build.
 
 ---
 
 ## 4. Gate GitHub deploy (VPS / self-hosted)
 
-1. `validate` on `ubuntu-latest` (install + build, **no** malware scan).
-2. `deploy` `needs: [validate]` on the self-hosted runner.
-3. Capture `PREV_SHA`, sync `origin/main`.
-4. Run the scan. On failure, restore `PREV_SHA` and skip install/restart.
+1. `validate` on `ubuntu-latest`: checkout → setup Node → **malware scan** → only then install / test / `build:ci`.
+2. If the scan fails, GitHub does **not** build, and `deploy` does not run.
+3. `deploy` `needs: [validate]` on the self-hosted runner.
+4. Capture `PREV_SHA`, sync `origin/main`.
+5. Scan again on the server. On failure, restore `PREV_SHA` and skip install/restart.
+
+GitHub validate (scan first — do not install or build until this passes):
+
+```yaml
+      - name: Virus / malware scan
+        run: bash .githooks/pre-commit --ci
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+```
+
+VPS deploy (scan after sync — do not install until this passes):
 
 ```yaml
       - name: Virus / malware scan (block server deploy if infected)
@@ -163,6 +182,7 @@ Apply this on every repo that uses this playbook.
 - [ ] Do **not** run `--install`; neutralize `.git/hooks/pre-commit` if an old trampoline exists
 - [ ] Do **not** add `*.woff2` to `.gitignore`
 - [ ] VPS deploy: scan after sync, before install; restore previous SHA on failure
+- [ ] GitHub `validate` on `main`: scan **before** install / test / `build:ci` (skip the GitHub build if infected)
 - [ ] Vercel: scan inside `build` only when `VERCEL=1`
 - [ ] Verify: `bash .githooks/pre-commit --ci` (this **does** scan — expected)
 - [ ] Confirm `git commit` does **not** print scanner output
