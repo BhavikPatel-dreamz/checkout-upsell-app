@@ -28,6 +28,7 @@ import type { OfferPlacement, OfferType } from "@prisma/client";
 import {
   placementHeaderLabel,
   displayLocationOptions,
+  placementFromDisplayLocation,
 } from "../types/offer";
 import {
   DEAL_TYPE_OPTIONS,
@@ -182,8 +183,6 @@ export default function OfferForm({
   fetcherErrors = {},
 }: OfferFormProps) {
   const hasSyncedProducts = products.length > 0;
-  const upsellTypeValue =
-    placement === "post_purchase" ? "post-purchase" : "pre-purchase";
   const locationOptions = displayLocationOptions(placement);
   const typeConfig = getOfferTypeConfig(offerType);
   const typeSpecificFieldIds = typeConfig.fields.filter(
@@ -209,6 +208,9 @@ export default function OfferForm({
   const [displayLocation, setDisplayLocation] = useState<string>(
     initialData?.displayLocation ?? locationOptions[0]?.value ?? "checkout_page"
   );
+  const resolvedPlacement = placementFromDisplayLocation(displayLocation, placement);
+  const upsellTypeValue =
+    resolvedPlacement === "post_purchase" ? "post-purchase" : "pre-purchase";
 
   const [upsellProduct, setUpsellProduct] = useState<"manual" | "related" | "">(
     typeConfig.poolOnly ? "manual" : ((initialData?.upsellProduct as any) ?? "")
@@ -406,7 +408,7 @@ export default function OfferForm({
     <>
       {/* Hidden fields carried by the parent <fetcher.Form> */}
       <input type="hidden" name="upsellType" value={upsellTypeValue} />
-      <input type="hidden" name="placement" value={placement} />
+      <input type="hidden" name="placement" value={resolvedPlacement} />
       <input type="hidden" name="type" value={offerType} />
       <input type="hidden" name="conditions" value={JSON.stringify(conditions)} />
       <input type="hidden" name="targetProductIds" value={JSON.stringify(triggerSelections.map((item) => item.productId))} />
@@ -415,7 +417,7 @@ export default function OfferForm({
       <div style={styles.typeBadgeWrap}>
         <span style={styles.typeBadge}>{OFFER_TYPE_CONFIG[offerType].label}</span>
         <span style={styles.typeBadgeDivider} />
-        <span style={styles.typeBadgeSecondary}>{placementHeaderLabel(placement)}</span>
+        <span style={styles.typeBadgeSecondary}>{placementHeaderLabel(resolvedPlacement)}</span>
       </div>
 
       <SectionRow
@@ -1914,9 +1916,11 @@ export const styles: Record<string, React.CSSProperties> = {
 
   // ── Option card (new checkbox / radio presentation) ─────────────────
   optionCard: {
+    position: "relative",
     display: "inline-flex",
     alignItems: "center",
     gap: 10,
+    border: "1px solid #D4D6DC",
     borderRadius: 10,
     padding: "10px 14px",
     cursor: "pointer",
@@ -1925,7 +1929,9 @@ export const styles: Record<string, React.CSSProperties> = {
     boxSizing: "border-box",
   },
   optionCardSelected: {
+    borderColor: "#008060",
     background: "#F0FAF6",
+    boxShadow: "0 0 0 1px #008060 inset",
   },
   optionCardLabel: {
     fontSize: 14,

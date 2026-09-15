@@ -38,6 +38,7 @@ import {
   normalizeOfferType,
 } from "../config/offerTypes";
 import { validateOfferFields } from "../validation/offerSchemas";
+import { placementFromDisplayLocation } from "../types/offer";
 import "../styles/app._index.css";
 
 // ── Loader ─────────────────────────────────────────────────────────────
@@ -215,20 +216,11 @@ export async function action({ request }: ActionFunctionArgs) {
   // ── Build payload ────────────────────────────────────────────────
   const built = buildOfferPayload(payload);
 
-  // Respect the placement sent from the form.
   const placementRaw = String(formData.get("placement") || "");
-  const displayLocationRaw = String(formData.get("displayLocation") || "");
-  if (
-    placementRaw === "post_purchase" ||
-    placementRaw === "product_page" ||
-    placementRaw === "checkout" ||
-    placementRaw === "cart_drawer"
-  ) {
-    built.placement = placementRaw as OfferPlacement;
-  }
-  if (displayLocationRaw === "cart_drawer_upsell") {
-    built.placement = "cart_drawer";
-  }
+  const fallbackPlacement = isOfferPlacement(placementRaw)
+    ? (placementRaw as OfferPlacement)
+    : built.placement;
+  built.placement = placementFromDisplayLocation(displayLocation, fallbackPlacement);
 
   if (offerId) {
     await updateOffer(session.shop, offerId, {

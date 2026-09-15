@@ -32,6 +32,7 @@ export async function findEligibleCrossSellOffers(options: {
   variantIds?: string[];
   excludeProductIds?: string[];
   excludeVariantIds?: string[];
+  displayLocation?: string;
   identity?: IdentityLookup;
 }) {
   const {
@@ -41,6 +42,7 @@ export async function findEligibleCrossSellOffers(options: {
     variantIds = [],
     excludeProductIds = [],
     excludeVariantIds = [],
+    displayLocation,
   } = options;
   const identity = options.identity ?? {};
 
@@ -79,6 +81,24 @@ export async function findEligibleCrossSellOffers(options: {
     if (!cartProductIds.some((id) => targets.includes(id))) continue;
 
     const triggerRules = (offer.triggerRules ?? {}) as Record<string, unknown>;
+    if (displayLocation) {
+      const savedLocation =
+        typeof triggerRules.displayLocation === "string" ? triggerRules.displayLocation : "";
+      if (displayLocation === "checkout_page") {
+        if (
+          savedLocation === "cart_drawer" ||
+          savedLocation === "cart_drawer_upsell" ||
+          savedLocation === "thank_you_page" ||
+          savedLocation === "product_page"
+        ) {
+          continue;
+        }
+      } else if (displayLocation === "thank_you_page") {
+        if (savedLocation && savedLocation !== "thank_you_page") continue;
+      } else if (savedLocation !== displayLocation) {
+        continue;
+      }
+    }
     const selections = manualSelectionsFromRules(triggerRules);
     if (selections.length === 0) continue;
 

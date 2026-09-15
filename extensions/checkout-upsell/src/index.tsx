@@ -30,11 +30,10 @@ interface EligibleOffer {
 }
 
 const GUEST_STORAGE_KEY = "checkout-upsell-guest-key";
-const DISMISS_STORAGE_KEY = "checkout-upsell-thankyou-dismissed";
 
 export default reactExtension(
-  "purchase.thank-you.block.render",
-  () => <ThankYouUpsellBlock />,
+  "purchase.checkout.block.render",
+  () => <CheckoutUpsellBlock />,
 );
 
 function numericIdFromGid(gid: string): string | null {
@@ -42,7 +41,7 @@ function numericIdFromGid(gid: string): string | null {
   return match ? match[1] : null;
 }
 
-function ThankYouUpsellBlock() {
+function CheckoutUpsellBlock() {
   const shop = useShop();
   const shopDomain = shop.myshopifyDomain;
   const settings = useSettings() as { api_base?: string };
@@ -52,7 +51,6 @@ function ThankYouUpsellBlock() {
   const [offers, setOffers] = useState<EligibleOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
 
   const getCustomerIdentity = useCallback(async (): Promise<{
     customerId: string | null;
@@ -113,14 +111,14 @@ function ThankYouUpsellBlock() {
             offerName: offer.offerName,
             productId: offer.productId,
             variantId: offer.variantId,
-            placement: "post_purchase",
+            placement: "checkout",
             customerId,
             guestKey,
             isGuest: !customerId,
           }),
         });
       } catch (err) {
-        console.error(`ThankYou upsell ${path} tracking error:`, err);
+        console.error(`Checkout upsell ${path} tracking error:`, err);
       }
     },
     [shopDomain, getCustomerIdentity, settings],
@@ -142,21 +140,6 @@ function ThankYouUpsellBlock() {
     },
     [processing, shopDomain, buildAcceptUrl, trackEvent],
   );
-
-  const handleDismiss = useCallback(() => {
-    setDismissed(true);
-    void storage.write(DISMISS_STORAGE_KEY, true);
-  }, [storage]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void storage.read(DISMISS_STORAGE_KEY).then((value) => {
-      if (!cancelled && value === true) setDismissed(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [storage]);
 
   const lineIds = useMemo(() => {
     const productIds = (lines ?? [])
@@ -186,8 +169,8 @@ function ThankYouUpsellBlock() {
         const { customerId, guestKey } = await getCustomerIdentity();
         const params = new URLSearchParams({
           shop: shopDomain,
-          placement: "post_purchase",
-          displayLocation: "thank_you_page",
+          placement: "checkout",
+          displayLocation: "checkout_page",
           productIds: lineIds.productIds.join(","),
           variantIds: lineIds.variantIds.join(","),
         });
@@ -208,7 +191,7 @@ function ThankYouUpsellBlock() {
           for (const offer of data.offers) void trackEvent("viewed", offer);
         }
       } catch (err) {
-        console.error("ThankYou upsell fetch error:", err);
+        console.error("Checkout upsell fetch error:", err);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -220,7 +203,6 @@ function ThankYouUpsellBlock() {
     };
   }, [shopDomain, lineIds, trackEvent, getCustomerIdentity, settings]);
 
-  if (dismissed) return null;
   if (loading || offers.length === 0) return null;
 
   return (
@@ -341,9 +323,9 @@ function AcceptButton({
       to={href}
       onPress={() => onAccept(offer)}
       disabled={processing || !href}
-      accessibilityLabel="Add this item to your order"
+      accessibilityLabel="Add this item to checkout"
     >
-      Order
+      Add
     </Button>
   );
 }

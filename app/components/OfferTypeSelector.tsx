@@ -362,6 +362,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   placementRow: { display: "flex", gap: 12, flexWrap: "wrap" },
   placementCard: {
+    position: "relative",
     display: "inline-flex",
     alignItems: "center",
     gap: 10,
