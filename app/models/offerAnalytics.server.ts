@@ -799,6 +799,23 @@ export async function getOfferRevenueByOffer(shop: string): Promise<Array<{ offe
   }));
 }
 
+function utcDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function utcDayStartDaysAgo(daysAgo: number): Date {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() - daysAgo);
+  return date;
+}
+
+function utcDayAtOffset(since: Date, offset: number): Date {
+  const date = new Date(since.getTime());
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date;
+}
+
 export async function getOfferTrendMetrics(shop: string, days = 12, filters?: AnalyticsDashboardFilters): Promise<{
   labels: string[];
   views: number[];
@@ -806,9 +823,7 @@ export async function getOfferTrendMetrics(shop: string, days = 12, filters?: An
   addedToCart: number[];
   purchases: number[];
 }> {
-  const since = new Date();
-  since.setHours(0, 0, 0, 0);
-  since.setDate(since.getDate() - (days - 1));
+  const since = utcDayStartDaysAgo(days - 1);
 
   const eventWhere: Prisma.OfferEventWhereInput = { shop, createdAt: { gte: since } };
   if (filters?.dateFrom || filters?.dateTo) {
@@ -832,16 +847,14 @@ export async function getOfferTrendMetrics(shop: string, days = 12, filters?: An
   const bucketMap = new Map<string, { views: number; clicks: number; addedToCart: number; purchases: number }>();
 
   for (let i = 0; i < days; i += 1) {
-    const date = new Date(since);
-    date.setDate(since.getDate() + i);
-    const key = date.toISOString().slice(0, 10);
+    const key = utcDateKey(utcDayAtOffset(since, i));
     bucketMap.set(key, { views: 0, clicks: 0, addedToCart: 0, purchases: 0 });
   }
 
   for (const row of rows) {
-    const key = row.createdAt.toISOString().slice(0, 10);
-    if (!bucketMap.has(key)) continue;
-    const bucket = bucketMap.get(key)!;
+    const key = utcDateKey(row.createdAt);
+    const bucket = bucketMap.get(key);
+    if (!bucket) continue;
 
     if (row.eventType === OfferEventType.viewed) bucket.views += 1;
     if (row.eventType === OfferEventType.clicked) bucket.clicks += 1;
@@ -856,11 +869,10 @@ export async function getOfferTrendMetrics(shop: string, days = 12, filters?: An
   const purchases: number[] = [];
 
   for (let i = 0; i < days; i += 1) {
-    const date = new Date(since);
-    date.setDate(since.getDate() + i);
-    const key = date.toISOString().slice(0, 10);
+    const date = utcDayAtOffset(since, i);
+    const key = utcDateKey(date);
     const bucket = bucketMap.get(key) ?? { views: 0, clicks: 0, addedToCart: 0, purchases: 0 };
-    labels.push(date.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+    labels.push(date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }));
     views.push(bucket.views);
     clicks.push(bucket.clicks);
     addedToCart.push(bucket.addedToCart);
