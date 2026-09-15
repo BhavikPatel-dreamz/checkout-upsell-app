@@ -4,6 +4,7 @@ import {
   useCartLines,
   useCustomer,
   useStorage,
+  useApplyCartLinesChange,
   Image,
   Text,
   View,
@@ -36,11 +37,6 @@ export default reactExtension(
   () => <CheckoutUpsellBlock />,
 );
 
-function numericIdFromGid(gid: string): string | null {
-  const match = gid.match(/(\d+)\s*$/);
-  return match ? match[1] : null;
-}
-
 function CheckoutUpsellBlock() {
   const shop = useShop();
   const shopDomain = shop.myshopifyDomain;
@@ -48,6 +44,7 @@ function CheckoutUpsellBlock() {
   const lines = useCartLines();
   const customer = useCustomer();
   const storage = useStorage();
+  const applyCartLinesChange = useApplyCartLinesChange();
   const [offers, setOffers] = useState<EligibleOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -74,29 +71,6 @@ function CheckoutUpsellBlock() {
       };
     }
   }, [customer, storage]);
-
-  const buildAcceptUrl = useCallback(
-    async (selectedOffer: EligibleOffer): Promise<string | null> => {
-      if (!shopDomain) return null;
-      const upsellVariantId = numericIdFromGid(selectedOffer.variantId);
-      if (!upsellVariantId) return null;
-
-      const { customerId, guestKey } = await getCustomerIdentity();
-      const params = new URLSearchParams({
-        id: upsellVariantId,
-        quantity: "1",
-        return_to: "/checkout",
-      });
-      params.set("properties[_upsell_offer_id]", selectedOffer.offerId);
-      params.set("properties[_upsell_product_id]", selectedOffer.productId);
-      params.set("properties[_upsell_variant_id]", selectedOffer.variantId);
-      if (customerId) params.set("properties[_upsell_customer_id]", customerId);
-      if (guestKey) params.set("properties[_upsell_guest_key]", guestKey);
-
-      return `https://${shopDomain}/cart/add?${params.toString()}`;
-    },
-    [shopDomain, getCustomerIdentity],
-  );
 
   const trackEvent = useCallback(
     async (path: "clicked" | "added-to-cart" | "viewed", offer: EligibleOffer) => {
@@ -126,19 +100,44 @@ function CheckoutUpsellBlock() {
 
   const handleAccept = useCallback(
     async (selectedOffer: EligibleOffer) => {
-      if (!selectedOffer || processing || !shopDomain) return;
+      if (!selectedOffer || processing) return;
       setProcessing(true);
       try {
-        const acceptUrl = await buildAcceptUrl(selectedOffer);
-        void trackEvent("clicked", selectedOffer);
-        if (acceptUrl) {
-          void trackEvent("added-to-cart", selectedOffer);
+        const { customerId, guestKey } = await getCustomerIdentity();
+        const attributes = [
+          { key: "_upsell_offer_id", value: selectedOffer.offerId },
+          { key: "upsell_offer_id", value: selectedOffer.offerId },
+          { key: "_upsell_product_id", value: selectedOffer.productId },
+          { key: "upsell_product_id", value: selectedOffer.productId },
+          { key: "_upsell_variant_id", value: selectedOffer.variantId },
+          { key: "upsell_variant_id", value: selectedOffer.variantId },
+        ];
+        if (customerId) {
+          attributes.push({ key: "_upsell_customer_id", value: customerId });
+          attributes.push({ key: "upsell_customer_id", value: customerId });
         }
+        if (guestKey) {
+          attributes.push({ key: "_upsell_guest_key", value: guestKey });
+          attributes.push({ key: "upsell_guest_key", value: guestKey });
+        }
+
+        void trackEvent("clicked", selectedOffer);
+        const result = await applyCartLinesChange({
+          type: "addCartLine",
+          merchandiseId: selectedOffer.variantId,
+          quantity: 1,
+          attributes,
+        });
+        if (result.type === "error") {
+          console.error("Checkout upsell add error:", result.message);
+          return;
+        }
+        void trackEvent("added-to-cart", selectedOffer);
       } finally {
         setProcessing(false);
       }
     },
-    [processing, shopDomain, buildAcceptUrl, trackEvent],
+    [processing, applyCartLinesChange, getCustomerIdentity, trackEvent],
   );
 
   const lineIds = useMemo(() => {
@@ -278,12 +277,14 @@ function CheckoutUpsellBlock() {
                 </View>
 
                 <View minBlockSize={84} maxBlockSize={84} overflow="hidden">
-                  <AcceptButton
-                    offer={o}
-                    processing={processing}
-                    buildAcceptUrl={buildAcceptUrl}
-                    onAccept={handleAccept}
-                  />
+                  <Button
+                    kind="primary"
+                    onPress={() => handleAccept(o)}
+                    disabled={processing}
+                    accessibilityLabel="Add this item to checkout"
+                  >
+                    Add
+                  </Button>
                 </View>
               </BlockStack>
             </View>
@@ -291,41 +292,5 @@ function CheckoutUpsellBlock() {
         </InlineLayout>
       </ScrollView>
     </BlockStack>
-  );
-}
-
-function AcceptButton({
-  offer,
-  processing,
-  buildAcceptUrl,
-  onAccept,
-}: {
-  offer: EligibleOffer;
-  processing: boolean;
-  buildAcceptUrl: (offer: EligibleOffer) => Promise<string | null>;
-  onAccept: (offer: EligibleOffer) => void;
-}) {
-  const [href, setHref] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    let cancelled = false;
-    void buildAcceptUrl(offer).then((url) => {
-      if (!cancelled) setHref(url ?? undefined);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [offer, buildAcceptUrl]);
-
-  return (
-    <Button
-      kind="primary"
-      to={href}
-      onPress={() => onAccept(offer)}
-      disabled={processing || !href}
-      accessibilityLabel="Add this item to checkout"
-    >
-      Add
-    </Button>
   );
 }
