@@ -140,6 +140,8 @@ export async function findEligibleCrossSellOffers(options: {
             pool,
             identity,
             max: placement === OfferPlacement.product_page ? pool.length : MAX_UPSELL_PRODUCTS,
+            anchorProductIds: cartProductIds.filter((id) => targets.includes(id)),
+            cartProductIds,
           })
         : pool;
 

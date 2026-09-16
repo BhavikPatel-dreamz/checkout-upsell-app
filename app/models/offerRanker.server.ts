@@ -6,7 +6,7 @@ import {
   type IdentityLookup,
 } from "./browseActivity.server";
 import { MAX_UPSELL_PRODUCTS, type EligibleOfferPayload } from "./eligibleOffer";
-import { pickPoolWithOptionalLlm } from "./offerLlmPicker.server";
+import { rankAiRecommendWithHybrid } from "../ai/recommend/rankAiRecommend.server";
 
 const RECENCY_HALF_LIFE_HOURS = 48;
 const CONVERSION_WEIGHT = 0.35;
@@ -172,23 +172,11 @@ export async function rankAiRecommendPool(options: {
   pool: EligibleOfferPayload[];
   identity: IdentityLookup;
   max?: number;
+  anchorProductIds?: string[];
+  cartProductIds?: string[];
+  catalogExpand?: boolean;
 }): Promise<EligibleOfferPayload[]> {
-  const { shop, offerId, pool, identity } = options;
-  const max = options.max ?? MAX_UPSELL_PRODUCTS;
-  if (pool.length === 0) return [];
-  if (pool.length === 1) return pool.slice(0, max);
-
-  const activity = await loadRecentActivity(shop, identity);
-  const conversionByProduct = await getProductConversionPriors(
-    shop,
-    pool.map((item) => item.productId),
-  );
-  const ranked = scorePoolAgainstActivity(pool, activity, conversionByProduct);
-  const withLlm =
-    activity.length > 0
-      ? await pickPoolWithOptionalLlm({ shop, offerId, identity, pool: ranked, activity })
-      : ranked;
-  return withLlm.slice(0, max);
+  return rankAiRecommendWithHybrid(options);
 }
 
 export async function rankEligibleOffers(options: {
