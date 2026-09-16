@@ -23,6 +23,12 @@ export async function loadHybridCandidates(input: {
   const anchors = [...new Set(input.productIds.map((id) => id.trim()).filter(Boolean))];
   if (anchors.length === 0) return [];
 
+  if (typeof db.productRelation?.findMany !== "function") {
+    throw new Error(
+      "Prisma client is missing productRelation. Run `pnpm exec prisma generate` and restart the app.",
+    );
+  }
+
   const relations = await db.productRelation.findMany({
     where: { shop: input.shop, productId: { in: anchors } },
   });
