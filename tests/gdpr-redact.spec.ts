@@ -12,6 +12,7 @@ describe("GDPR redact", () => {
     await db.browseActivity.deleteMany({ where: { shop: { in: [SHOP, OTHER] } } });
     await db.identityLink.deleteMany({ where: { shop: { in: [SHOP, OTHER] } } });
     await db.consentState.deleteMany({ where: { shop: { in: [SHOP, OTHER] } } });
+    await db.customerProductAffinity.deleteMany({ where: { shop: { in: [SHOP, OTHER] } } });
 
     await db.identityLink.create({
       data: {
@@ -56,17 +57,30 @@ describe("GDPR redact", () => {
         analytics: true,
       },
     });
+    await db.customerProductAffinity.create({
+      data: {
+        shop: SHOP,
+        subjectType: ConsentSubjectType.customer,
+        subjectId: "gid://shopify/Customer/55",
+        productId: "gid://shopify/Product/1",
+        viewCount: 2,
+        lastOccurredAt: new Date(),
+        score: 2,
+      },
+    });
 
     const result = await redactCustomerData({ shop: SHOP, customerId: 55 });
     expect(result.deleted.shopperEvents).toBe(1);
     expect(result.deleted.browseActivities).toBe(1);
     expect(result.deleted.identityLinks).toBe(1);
     expect(result.deleted.consentStates).toBe(1);
+    expect(result.deleted.customerProductAffinity).toBe(1);
     expect(await db.shopperEvent.count({ where: { shop: OTHER } })).toBe(1);
   }, 20_000);
 
   it("shop redact deletes all behavioral data for that shop", async () => {
     await db.shopperEvent.deleteMany({ where: { shop: SHOP } });
+    await db.productProductAffinity.deleteMany({ where: { shop: SHOP } });
     await db.shopperEvent.create({
       data: {
         shop: SHOP,
@@ -76,8 +90,19 @@ describe("GDPR redact", () => {
         occurredAt: new Date(),
       },
     });
+    await db.productProductAffinity.create({
+      data: {
+        shop: SHOP,
+        productId: "gid://shopify/Product/1",
+        relatedProductId: "gid://shopify/Product/2",
+        viewViewCount: 1,
+        lastOccurredAt: new Date(),
+        score: 1,
+      },
+    });
     const result = await redactShopData(SHOP);
     expect(result.deleted.shopperEvents).toBe(1);
+    expect(result.deleted.productProductAffinity).toBe(1);
     expect(await db.shopperEvent.count({ where: { shop: SHOP } })).toBe(0);
   }, 20_000);
 });

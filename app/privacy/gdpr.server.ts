@@ -55,6 +55,7 @@ export async function redactCustomerData(input: {
         identityLinks: 0,
         consentStates: 0,
         upsellHistory: 0,
+        customerProductAffinity: 0,
       },
     };
   }
@@ -96,17 +97,38 @@ export async function redactCustomerData(input: {
     subjectId: { in: [...keys, ...guestKeys] },
   };
 
-  const [shopperEvents, browseActivities, offerEvents, identityLinks, consentStates, upsellHistory] =
-    await Promise.all([
-      db.shopperEvent.deleteMany({ where: shopperWhere }),
-      db.browseActivity.deleteMany({ where: browseWhere }),
-      db.offerEvent.deleteMany({ where: offerWhere }),
-      db.identityLink.deleteMany({ where: identityWhere }),
-      db.consentState.deleteMany({ where: consentWhere }),
-      db.upsellHistory.deleteMany({
-        where: { shopdomain: shop, customerId: { in: keys } },
-      }),
-    ]);
+  const [
+    shopperEvents,
+    browseActivities,
+    offerEvents,
+    identityLinks,
+    consentStates,
+    upsellHistory,
+    customerProductAffinity,
+  ] = await Promise.all([
+    db.shopperEvent.deleteMany({ where: shopperWhere }),
+    db.browseActivity.deleteMany({ where: browseWhere }),
+    db.offerEvent.deleteMany({ where: offerWhere }),
+    db.identityLink.deleteMany({ where: identityWhere }),
+    db.consentState.deleteMany({ where: consentWhere }),
+    db.upsellHistory.deleteMany({
+      where: { shopdomain: shop, customerId: { in: keys } },
+    }),
+    db.customerProductAffinity.deleteMany({
+      where: {
+        shop,
+        OR: [
+          { subjectType: ConsentSubjectType.customer, subjectId: { in: keys } },
+          ...(sessions.length
+            ? [{ subjectType: ConsentSubjectType.session, subjectId: { in: sessions } }]
+            : []),
+          ...(anons.length
+            ? [{ subjectType: ConsentSubjectType.anon, subjectId: { in: anons } }]
+            : []),
+        ],
+      },
+    }),
+  ]);
 
   return {
     deleted: {
@@ -116,6 +138,7 @@ export async function redactCustomerData(input: {
       identityLinks: identityLinks.count,
       consentStates: consentStates.count,
       upsellHistory: upsellHistory.count,
+      customerProductAffinity: customerProductAffinity.count,
     },
   };
 }
@@ -131,19 +154,31 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
         identityLinks: 0,
         consentStates: 0,
         upsellHistory: 0,
+        customerProductAffinity: 0,
+        productProductAffinity: 0,
       },
     };
   }
 
-  const [shopperEvents, browseActivities, offerEvents, identityLinks, consentStates, upsellHistory] =
-    await Promise.all([
-      db.shopperEvent.deleteMany({ where: { shop } }),
-      db.browseActivity.deleteMany({ where: { shop } }),
-      db.offerEvent.deleteMany({ where: { shop } }),
-      db.identityLink.deleteMany({ where: { shop } }),
-      db.consentState.deleteMany({ where: { shop } }),
-      db.upsellHistory.deleteMany({ where: { shopdomain: shop } }),
-    ]);
+  const [
+    shopperEvents,
+    browseActivities,
+    offerEvents,
+    identityLinks,
+    consentStates,
+    upsellHistory,
+    customerProductAffinity,
+    productProductAffinity,
+  ] = await Promise.all([
+    db.shopperEvent.deleteMany({ where: { shop } }),
+    db.browseActivity.deleteMany({ where: { shop } }),
+    db.offerEvent.deleteMany({ where: { shop } }),
+    db.identityLink.deleteMany({ where: { shop } }),
+    db.consentState.deleteMany({ where: { shop } }),
+    db.upsellHistory.deleteMany({ where: { shopdomain: shop } }),
+    db.customerProductAffinity.deleteMany({ where: { shop } }),
+    db.productProductAffinity.deleteMany({ where: { shop } }),
+  ]);
 
   return {
     deleted: {
@@ -153,6 +188,8 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
       identityLinks: identityLinks.count,
       consentStates: consentStates.count,
       upsellHistory: upsellHistory.count,
+      customerProductAffinity: customerProductAffinity.count,
+      productProductAffinity: productProductAffinity.count,
     },
   };
 }

@@ -141,6 +141,42 @@ model IdentityLink {
   @@index([shop, toType, toId])
 }
 
+/// Shop-scoped customer (or anon/session) interest in a product. Rebuilt by the affinity job.
+model CustomerProductAffinity {
+  id             String             @id @default(cuid())
+  shop           String
+  subjectType    ConsentSubjectType
+  subjectId      String
+  productId      String
+  viewCount      Int                @default(0)
+  atcCount       Int                @default(0)
+  purchaseCount  Int                @default(0)
+  lastOccurredAt DateTime
+  score          Float
+  computedAt     DateTime           @default(now())
+
+  @@unique([shop, subjectType, subjectId, productId])
+  @@index([shop, subjectType, subjectId, score])
+  @@index([shop, productId])
+}
+
+/// Directed co-occurrence: given productId, relatedProductId was seen in the same identity basket.
+model ProductProductAffinity {
+  id                String   @id @default(cuid())
+  shop              String
+  productId         String
+  relatedProductId  String
+  viewViewCount     Int      @default(0)
+  atcAtcCount       Int      @default(0)
+  buyBuyCount       Int      @default(0)
+  lastOccurredAt    DateTime
+  score             Float
+  computedAt        DateTime @default(now())
+
+  @@unique([shop, productId, relatedProductId])
+  @@index([shop, productId, score])
+}
+
 model OfferEvent {
   id         String          @id @default(cuid())
   offerId    String

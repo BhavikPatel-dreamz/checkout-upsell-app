@@ -31,7 +31,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 
 | ID | Task | Status |
 | --- | --- | --- |
-| AI-2.1 | Aggregate jobs: product-product and customer-product affinity tables | NOT_STARTED |
+| AI-2.1 | Aggregate jobs: product-product and customer-product affinity tables | COMPLETE |
 | AI-2.2 | `ProductIntelligence` from synced `ProductVariant` + Admin product fields (no embeddings yet) | NOT_STARTED |
 | AI-2.3 | Relation builders: FBT, similar (co-view), complementary heuristic (category rules + FBT) | NOT_STARTED |
 | AI-2.4 | Scoring function + tests (weights documented; inventory + in-cart penalty) | NOT_STARTED |
