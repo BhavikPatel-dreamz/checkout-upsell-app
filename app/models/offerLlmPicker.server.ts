@@ -5,11 +5,18 @@ const CACHE_TTL_MS = 1000 * 60 * 5;
 const LLM_TIMEOUT_MS = 2500;
 const cache = new Map<string, { expiresAt: number; ids: string[] }>();
 
-function llmEnabled(): boolean {
-  if (process.env.AI_RECOMMEND_LLM === "0" || process.env.AI_RECOMMEND_LLM === "false") {
-    return false;
-  }
-  return Boolean(process.env.OPENAI_API_KEY);
+/** Max SKUs sent to the LLM. The model only reorders this head; it never adds products. */
+export const LLM_TOP_K = 8;
+
+export function llmPickerEnabled(): boolean {
+  const flag = process.env.AI_RECOMMEND_LLM?.trim().toLowerCase();
+  if (flag !== "1" && flag !== "true" && flag !== "on") return false;
+  return Boolean(process.env.OPENAI_API_KEY?.trim());
+}
+
+export function splitLlmTopK<T>(items: T[], k = LLM_TOP_K): { head: T[]; tail: T[] } {
+  const limit = Math.max(0, k);
+  return { head: items.slice(0, limit), tail: items.slice(limit) };
 }
 
 function identityKey(identity: IdentityLookup): string {
@@ -100,7 +107,7 @@ async function requestLlmOrder(options: {
           {
             role: "system",
             content:
-              "You rank upsell products for one Shopify shop. Choose only from the provided pool ids. Return a JSON array of variant ids in best-first order. Do not invent ids. Shop-scoped only.",
+              "You only reorder the provided upsell pool for one Shopify shop. Return a JSON array of variant ids from that pool, best first. Never invent ids, never add products, never use other shops.",
           },
           {
             role: "user",
@@ -131,7 +138,7 @@ export async function pickPoolWithOptionalLlm(options: {
   activity: BrowseActivityRow[];
 }): Promise<EligibleOfferPayload[]> {
   const { shop, offerId, identity, pool, activity } = options;
-  if (pool.length <= 1 || !llmEnabled()) return pool;
+  if (pool.length <= 1 || !llmPickerEnabled()) return pool;
 
   pruneCache();
   const key = cacheKey(shop, identity, offerId, pool);

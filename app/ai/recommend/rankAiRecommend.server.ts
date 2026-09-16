@@ -3,7 +3,7 @@ import db from "../../db.server";
 import { loadRecentActivity, type IdentityLookup } from "../../models/browseActivity.server";
 import { MAX_UPSELL_PRODUCTS, type EligibleOfferPayload } from "../../models/eligibleOffer";
 import { getMerchantRuleSet, toPipelineMerchantRules } from "../../models/merchantRuleSet.server";
-import { pickPoolWithOptionalLlm } from "../../models/offerLlmPicker.server";
+import { pickPoolWithOptionalLlm, splitLlmTopK } from "../../models/offerLlmPicker.server";
 import { loadHybridCandidates, runHybridRecommend } from "./hybridRecommend.server";
 import { runHybridPipeline, type HybridCandidate, type MerchantRules } from "./pipeline";
 
@@ -156,13 +156,15 @@ export async function rankAiRecommendWithHybrid(options: {
   let ranked = orderPoolByRankedProducts(pool, rankedIds);
 
   if (ranked.length > 1 && activity.length > 0) {
-    ranked = await pickPoolWithOptionalLlm({
+    const { head, tail } = splitLlmTopK(ranked);
+    const reorderedHead = await pickPoolWithOptionalLlm({
       shop,
       offerId,
       identity,
-      pool: ranked,
+      pool: head,
       activity,
     });
+    ranked = [...reorderedHead, ...tail];
   }
 
   ranked = ranked.slice(0, max);
