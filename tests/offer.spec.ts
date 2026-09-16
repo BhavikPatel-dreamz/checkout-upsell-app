@@ -17,6 +17,10 @@ import {
   normalizeOfferType,
   isOfferType,
 } from "../app/config/offerTypes";
+import {
+  OfferPlacement as OfferPlacementValues,
+  placementFromDisplayLocation,
+} from "../app/types/offer";
 
 const db = new PrismaClient();
 
@@ -53,6 +57,23 @@ describe("centralized offer type config", () => {
     expect(isOfferType("post")).toBe(false);
     expect(normalizeOfferType("nope")).toBe(OfferType.cross_sell);
     expect(normalizeOfferType("free_gift")).toBe(OfferType.free_gift);
+  });
+});
+
+describe("display location → storefront placement", () => {
+  it("maps each Display Upsell on value to the placement storefronts query", () => {
+    expect(
+      placementFromDisplayLocation("checkout_page", OfferPlacementValues.post_purchase),
+    ).toBe(OfferPlacementValues.checkout);
+    expect(
+      placementFromDisplayLocation("cart_drawer", OfferPlacementValues.checkout),
+    ).toBe(OfferPlacementValues.cart_drawer);
+    expect(
+      placementFromDisplayLocation("cart_drawer_upsell", OfferPlacementValues.checkout),
+    ).toBe(OfferPlacementValues.cart_drawer);
+    expect(
+      placementFromDisplayLocation("thank_you_page", OfferPlacementValues.checkout),
+    ).toBe(OfferPlacementValues.post_purchase);
   });
 });
 

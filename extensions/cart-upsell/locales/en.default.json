@@ -2,5 +2,10 @@
   "cart_upsell": {
     "title": "You may also like",
     "add_to_cart": "Add to cart"
+  },
+  "product_upsell": {
+    "title": "You may also like",
+    "add_to_cart": "Add to cart",
+    "view": "View product"
   }
 }

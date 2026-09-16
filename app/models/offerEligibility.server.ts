@@ -30,9 +30,20 @@ export async function findEligibleCrossSellOffers(options: {
   placement: OfferPlacement;
   productIds?: string[];
   variantIds?: string[];
+  excludeProductIds?: string[];
+  excludeVariantIds?: string[];
+  displayLocation?: string;
   identity?: IdentityLookup;
 }) {
-  const { shop, placement, productIds = [], variantIds = [] } = options;
+  const {
+    shop,
+    placement,
+    productIds = [],
+    variantIds = [],
+    excludeProductIds = [],
+    excludeVariantIds = [],
+    displayLocation,
+  } = options;
   const identity = options.identity ?? {};
 
   const offers = await db.offer.findMany({
@@ -58,6 +69,8 @@ export async function findEligibleCrossSellOffers(options: {
   const cartProductIds = Array.from(new Set([...(productIds || []), ...derivedProductIds]));
   const cartVariantIdSet = new Set(variantIds);
   const cartProductIdSet = new Set(cartProductIds);
+  const excludedVariantIdSet = new Set(excludeVariantIds);
+  const excludedProductIdSet = new Set(excludeProductIds);
 
   const results: EligibleOfferPayload[] = [];
   const seenVariantIds = new Set<string>();
@@ -68,6 +81,24 @@ export async function findEligibleCrossSellOffers(options: {
     if (!cartProductIds.some((id) => targets.includes(id))) continue;
 
     const triggerRules = (offer.triggerRules ?? {}) as Record<string, unknown>;
+    if (displayLocation) {
+      const savedLocation =
+        typeof triggerRules.displayLocation === "string" ? triggerRules.displayLocation : "";
+      if (displayLocation === "checkout_page") {
+        if (
+          savedLocation === "cart_drawer" ||
+          savedLocation === "cart_drawer_upsell" ||
+          savedLocation === "thank_you_page" ||
+          savedLocation === "product_page"
+        ) {
+          continue;
+        }
+      } else if (displayLocation === "thank_you_page") {
+        if (savedLocation && savedLocation !== "thank_you_page") continue;
+      } else if (savedLocation !== displayLocation) {
+        continue;
+      }
+    }
     const selections = manualSelectionsFromRules(triggerRules);
     if (selections.length === 0) continue;
 
@@ -75,14 +106,14 @@ export async function findEligibleCrossSellOffers(options: {
 
     for (const sel of selections) {
       if (!sel || typeof sel.variantId !== "string") continue;
-      if (cartVariantIdSet.has(sel.variantId)) continue;
+      if (cartVariantIdSet.has(sel.variantId) || excludedVariantIdSet.has(sel.variantId)) continue;
       if (seenVariantIds.has(sel.variantId)) continue;
 
       const pv = await db.productVariant.findFirst({
         where: { shop, variantId: sel.variantId, availableForSale: true },
       });
       if (!pv) continue;
-      if (cartProductIdSet.has(pv.productId)) continue;
+      if (cartProductIdSet.has(pv.productId) || excludedProductIdSet.has(pv.productId)) continue;
 
       pool.push({
         offerId: offer.id,
@@ -108,7 +139,7 @@ export async function findEligibleCrossSellOffers(options: {
             offerId: offer.id,
             pool,
             identity,
-            max: MAX_UPSELL_PRODUCTS,
+            max: placement === OfferPlacement.product_page ? pool.length : MAX_UPSELL_PRODUCTS,
           })
         : pool;
 

@@ -1,17 +1,16 @@
 /**
  * Centralized offer definitions.
  *
- * The canonical offer types and placements live in the Prisma schema
- * (OfferType / OfferPlacement enums). Offer-type configuration and helpers
- * live in `../config/offerTypes` — re-exported here so every route shares a
- * single source of truth for offer semantics, labels, and display logic.
+ * Offer-type configuration and client-safe enum values live in
+ * `../config/offerTypes` — re-exported here so every route shares a single
+ * source of truth for offer semantics, labels, and display logic.
  */
 
-import { OfferPlacement } from "@prisma/client";
+import { OfferPlacement } from "../config/offerTypes";
 
-export { OfferPlacement };
 export {
   OfferType,
+  OfferPlacement,
   OFFER_TYPE_CONFIG,
   COMMON_OFFER_FIELDS,
   DEAL_TYPE_OPTIONS,
@@ -41,9 +40,34 @@ export function placementFromUpsellType(upsellType?: string): OfferPlacement {
   return OfferPlacement.checkout;
 }
 
+/**
+ * Maps "Display Upsell on" to the placement storefronts actually query.
+ * Cart page uses `checkout`; cart drawer uses `cart_drawer`; thank-you uses `post_purchase`.
+ */
+export function placementFromDisplayLocation(
+  displayLocation: string | undefined,
+  fallback: OfferPlacement,
+): OfferPlacement {
+  switch (displayLocation) {
+    case "thank_you_page":
+      return OfferPlacement.post_purchase;
+    case "product_page":
+      return OfferPlacement.product_page;
+    case "cart_drawer":
+    case "cart_drawer_upsell":
+      return OfferPlacement.cart_drawer;
+    case "checkout_page":
+      return OfferPlacement.checkout;
+    default:
+      return fallback;
+  }
+}
+
 /** Short label used in the UI header when creating / editing an offer. */
 export function placementHeaderLabel(placement: OfferPlacement): string {
   if (placement === OfferPlacement.post_purchase) return "Post-Purchase";
+  if (placement === OfferPlacement.cart_drawer) return "Cart Drawer";
+  if (placement === OfferPlacement.product_page) return "Product Page";
   return "Pre-Purchase";
 }
 
@@ -60,9 +84,11 @@ export function displayLocationOptions(
 ): DisplayLocationOption[] {
   switch (placement) {
     case OfferPlacement.checkout:
+    case OfferPlacement.cart_drawer:
       return [
         { value: "checkout_page", label: "On Checkout Page" },
         { value: "cart_drawer", label: "On Cart Page" },
+        { value: "cart_drawer_upsell", label: "On Cart Drawer" },
       ];
     case OfferPlacement.post_purchase:
       return [{ value: "thank_you_page", label: "On Thank You Page" }];

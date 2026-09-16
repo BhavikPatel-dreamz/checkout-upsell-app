@@ -18,20 +18,42 @@ function getString(value: unknown): string | null {
  * - Cart AJAX / some integrations: flat object map
  */
 function getLineItemProperties(lineItem: any): Record<string, string> {
-  const raw = lineItem?.properties ?? lineItem?.customAttributes ?? [];
   const props: Record<string, string> = {};
-  if (Array.isArray(raw)) {
-    for (const entry of raw) {
-      const key = getString(entry?.name ?? entry?.key);
-      if (!key) continue;
-      props[key] = getString(entry?.value) ?? "";
-    }
-  } else if (raw && typeof raw === "object") {
-    for (const [key, value] of Object.entries(raw)) {
-      props[key] = getString(value) ?? "";
+  const sources = [
+    lineItem?.properties,
+    lineItem?.customAttributes,
+    lineItem?.custom_attributes,
+    lineItem?.attributes,
+    lineItem?.line_item_properties,
+  ];
+
+  for (const raw of sources) {
+    if (Array.isArray(raw)) {
+      for (const entry of raw) {
+        const key = getString(entry?.name ?? entry?.key);
+        if (!key) continue;
+        props[key.trim().toLowerCase()] = getString(entry?.value) ?? "";
+      }
+    } else if (raw && typeof raw === "object") {
+      for (const [key, value] of Object.entries(raw)) {
+        props[key.trim().toLowerCase()] = getString(value) ?? "";
+      }
     }
   }
   return props;
+}
+
+function toShopifyGid(type: "Product" | "ProductVariant", value: string | null): string | null {
+  if (!value) return null;
+  if (value.startsWith("gid://")) return value;
+  return `gid://shopify/${type}/${value}`;
+}
+
+function idCandidates(type: "Product" | "ProductVariant", value: string | null): string[] {
+  if (!value) return [];
+  const gid = toShopifyGid(type, value);
+  const numeric = value.match(/(\d+)\s*$/)?.[1] ?? null;
+  return Array.from(new Set([value, gid, numeric].filter((item): item is string => Boolean(item))));
 }
 
 function getUpsellProperties(lineItem: any): {
@@ -43,11 +65,11 @@ function getUpsellProperties(lineItem: any): {
 } {
   const props = getLineItemProperties(lineItem);
   return {
-    offerId: getString(props["_upsell_offer_id"]),
-    productId: getString(props["_upsell_product_id"]),
-    variantId: getString(props["_upsell_variant_id"]),
-    customerId: getString(props["_upsell_customer_id"]),
-    guestKey: getString(props["_upsell_guest_key"]),
+    offerId: getString(props["_upsell_offer_id"] ?? props["upsell_offer_id"]),
+    productId: getString(props["_upsell_product_id"] ?? props["upsell_product_id"]),
+    variantId: getString(props["_upsell_variant_id"] ?? props["upsell_variant_id"]),
+    customerId: getString(props["_upsell_customer_id"] ?? props["upsell_customer_id"]),
+    guestKey: getString(props["_upsell_guest_key"] ?? props["upsell_guest_key"]),
   };
 }
 
@@ -108,10 +130,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     `isCancelled=${isCancelled}`,
   );
 
-  if (financialStatus !== "paid" || isCancelled) {
+  const unpaid =
+    Boolean(financialStatus) &&
+    financialStatus !== "paid" &&
+    financialStatus !== "partially_paid";
+  if (unpaid || isCancelled) {
     console.log(
       `[orders/paid] order=${orderId} SKIPPED — reason: ` +
-      `${financialStatus !== "paid" ? `financial_status is "${financialStatus}", expected "paid"` : ""}` +
+      `${unpaid ? `financial_status is "${financialStatus}", expected "paid" or "partially_paid"` : ""}` +
       `${isCancelled ? " order is cancelled" : ""}`,
     );
     return new Response(null, { status: 200 });
@@ -146,7 +172,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const lineProductId = getString(lineItem?.product_id);
     const lineVariantId = getString(lineItem?.variant_id);
     const lineProps = getLineItemProperties(lineItem);
-    const { offerId, productId, variantId, customerId: upsellCustomerId, guestKey } =
+    let { offerId, productId, variantId, customerId: upsellCustomerId, guestKey } =
       getUpsellProperties(lineItem);
 
     console.log(
@@ -160,12 +186,57 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
 
     if (!offerId || !productId || !variantId) {
+      const variantIds = idCandidates("ProductVariant", lineVariantId);
+      const productIds = idCandidates("Product", lineProductId);
+      if (variantIds.length > 0 || productIds.length > 0) {
+        const since = new Date(Date.now() - 1000 * 60 * 60 * 48);
+        const recentAdd =
+          (variantIds.length
+            ? await db.offerEvent.findFirst({
+                where: {
+                  shop,
+                  eventType: OfferEventType.added_to_cart,
+                  createdAt: { gte: since },
+                  variantId: { in: variantIds },
+                },
+                orderBy: { createdAt: "desc" },
+                select: { offerId: true, productId: true, variantId: true, customerId: true, guestKey: true },
+              })
+            : null) ??
+          (productIds.length
+            ? await db.offerEvent.findFirst({
+                where: {
+                  shop,
+                  eventType: OfferEventType.added_to_cart,
+                  createdAt: { gte: since },
+                  productId: { in: productIds },
+                },
+                orderBy: { createdAt: "desc" },
+                select: { offerId: true, productId: true, variantId: true, customerId: true, guestKey: true },
+              })
+            : null);
+        if (recentAdd) {
+          console.log(
+            `[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} recovered attribution from recent added_to_cart event offer=${recentAdd.offerId}`,
+          );
+          offerId = offerId ?? recentAdd.offerId;
+          productId = productId ?? recentAdd.productId;
+          variantId = variantId ?? recentAdd.variantId;
+          upsellCustomerId = upsellCustomerId ?? recentAdd.customerId;
+          guestKey = guestKey ?? recentAdd.guestKey;
+        }
+      }
+    }
+
+    if (!offerId || !productId || !variantId) {
       console.log(
         `[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} SKIPPED — missing required upsell properties ` +
-        `(this line item was not added via the thank-you upsell flow, or properties were dropped somewhere before checkout).`,
+        `and no matching added-to-cart event for this line.`,
       );
       continue;
     }
+    productId = toShopifyGid("Product", productId) ?? productId;
+    variantId = toShopifyGid("ProductVariant", variantId) ?? variantId;
     console.log(`[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} identified as upsell line, looking up offer...`);
 
     let offer: { id: string; name: string; placement: OfferPlacement } | null = null;
@@ -196,8 +267,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       `customerId=${purchaseIdentityCustomerId ?? "none"} guestKey=${purchaseGuestKey ?? "none"}`,
     );
     if (!purchaseIdentityCustomerId && !purchaseGuestKey) {
-      console.log(`[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} SKIPPED — no customer/guest identity available to attribute this purchase to.`);
-      continue;
+      console.log(
+        `[orders/paid] order=${orderId} lineItem=${lineItemId ?? "n/a"} no customer/guest identity supplied; ` +
+        `recording ${offer.placement} purchase from line-item / add-to-cart attribution.`,
+      );
     }
 
     const lineItemRevenue = getLineItemRevenue(lineItem);
@@ -213,9 +286,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           eventType: OfferEventType.purchased,
           orderId,
           ...(lineItemId ? { lineItemId } : {}),
-          ...(purchaseIdentityCustomerId
-            ? { customerId: purchaseIdentityCustomerId }
-            : { guestKey: purchaseGuestKey }),
         },
         select: { id: true },
       });

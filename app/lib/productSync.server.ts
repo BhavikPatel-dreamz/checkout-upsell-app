@@ -3,6 +3,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import {
   deleteStaleVariants,
+  invalidateProductSummaryCache,
   syncProductsChunk,
 } from "../models/productVariant.server";
 import {
@@ -32,6 +33,7 @@ export async function productSyncAction({ request }: ActionFunctionArgs) {
       const { upserted, removed } = await import("../models/productVariant.server").then((m) =>
         m.syncProductById(admin, shop, productId, new Date()),
       );
+      invalidateProductSummaryCache(shop);
 
       return {
         ok: true as const,
@@ -158,6 +160,7 @@ export async function productSyncAction({ request }: ActionFunctionArgs) {
     if (chunk.done) {
       const removed = await deleteStaleVariants(shop, startedAt);
       await finishSyncRun(runId, { removed });
+      invalidateProductSummaryCache(shop);
       console.info("[ProductSync] Completed", {
         shop,
         runId,

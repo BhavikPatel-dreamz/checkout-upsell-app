@@ -1,16 +1,36 @@
 /**
  * Centralized offer type configuration.
  *
- * The canonical offer types come from the Prisma schema (`OfferType` enum).
  * This module is the single source of truth for how each offer type is
  * labelled, described, and which fields its form renders. Adding a new offer
  * type later means adding one entry to `OFFER_TYPE_CONFIG` — no new route,
  * no new complete form, no duplicated action.
  */
 
-import { OfferType, OfferPlacement } from "@prisma/client";
+// This module is imported by browser components, so it must not import Prisma.
+// Keep these values aligned with the Prisma enums in `schema.prisma`.
+export const OfferType = {
+  cross_sell: "cross_sell",
+  bundle: "bundle",
+  volume: "volume",
+  free_gift: "free_gift",
+  subscription: "subscription",
+  ai_recommend: "ai_recommend",
+} as const;
 
-export { OfferType, OfferPlacement };
+export type OfferType = (typeof OfferType)[keyof typeof OfferType];
+
+export const OfferPlacement = {
+  product_page: "product_page",
+  cart_drawer: "cart_drawer",
+  checkout: "checkout",
+  post_purchase: "post_purchase",
+  order_status: "order_status",
+} as const;
+
+export type OfferPlacement =
+  (typeof OfferPlacement)[keyof typeof OfferPlacement];
+
 
 /** Field ids the unified offer form can render. */
 export type OfferFieldId =

@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
-import { Link } from "react-router";
+import { useMemo, useState, useEffect, type MouseEvent } from "react";
+import { useNavigate } from "react-router";
 
 type ProductMetaMap = {
   titles: Record<string, string>;
@@ -112,11 +112,29 @@ function OfferListRow({
   percentOfMax: number;
   url?: string;
 }) {
+  const navigate = useNavigate();
+
+  function handleClick(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    if (url) navigate(url);
+  }
+
   return (
-    <Link
-      to={url ?? "#"}
+    <button
+      type="button"
+      onClick={handleClick}
       className="analytics-offer-row"
-      style={{ textDecoration: "none", color: "inherit", cursor: url ? "pointer" : undefined }}
+      style={{
+        textDecoration: "none",
+        color: "inherit",
+        cursor: url ? "pointer" : "default",
+        background: "none",
+        border: "none",
+        padding: 0,
+        fontFamily: "inherit",
+        textAlign: "left",
+        width: "100%",
+      }}
     >
       <div className="analytics-offer-main">
         <div className="analytics-rank-badge">{RANK_MEDALS[rank - 1] ?? rank}</div>
@@ -133,7 +151,7 @@ function OfferListRow({
           {formatMetric(value)} <span className="analytics-offer-value-label">{valueLabel}</span>
         </div>
       </div>
-    </Link>
+    </button>
   );
 }
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { Link, useLoaderData } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 
 import { authenticate } from "../shopify.server";
 import { getOfferAnalyticsForOffer, getOfferTrendMetrics } from "../models/offerAnalytics.server";
@@ -189,8 +189,8 @@ function PerformanceChart({
 
   const width = 460;
   const height = 220;
-  const paddingLeft = 36;
-  const paddingRight = 30;
+  const paddingLeft = 42;
+  const paddingRight = 16;
   const paddingBottom = 22;
   const paddingTop = 10;
 
@@ -200,8 +200,9 @@ function PerformanceChart({
     values: trendMetrics?.[s.dataKey] ?? [],
   }));
 
-  const allValues = seriesData.flatMap((s) => s.values);
-  const maxValue = allValues.length > 0 ? Math.max(...allValues) : 1;
+  const visibleSeries = seriesData.filter((s) => visible[s.key]);
+  const allValues = visibleSeries.flatMap((s) => s.values);
+  const maxValue = Math.max(1, allValues.length > 0 ? Math.max(...allValues) : 1);
   const points = seriesData[0]?.values.length ?? 0;
 
   // Determine which label indices to show to avoid crowding
@@ -253,38 +254,46 @@ function PerformanceChart({
     );
   }
 
+  function getX(index: number) {
+    if (points <= 1) return chartLeft + chartWidth / 2;
+    return chartLeft + (index / (points - 1)) * chartWidth;
+  }
+
+  function getY(value: number) {
+    const t = Math.log1p(Math.max(0, value)) / Math.log1p(maxValue);
+    return chartTop + (1 - t) * chartHeight;
+  }
+
   function toPath(values: number[]) {
     return values
       .map((value, index) => {
-        const x = chartLeft + (index / (points - 1)) * chartWidth;
-        const y = chartTop + (1 - value / maxValue) * chartHeight;
+        const x = getX(index);
+        const y = getY(value);
         return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(" ");
   }
 
-  function getX(index: number) {
-    return chartLeft + (index / (points - 1)) * chartWidth;
-  }
-
-  function getY(value: number) {
-    return chartTop + (1 - value / maxValue) * chartHeight;
-  }
+  const yTickValues = [0, Math.expm1(Math.log1p(maxValue) * 0.5), maxValue];
 
   // Build tooltip data
   const tooltipIdx = hoverIndex;
-  const tooltipX = tooltipIdx !== null ? getX(tooltipIdx) : 0;
   const tooltipDate = tooltipIdx !== null ? labels[tooltipIdx] ?? "" : "";
-  const tooltipSeries = seriesData.map((s) => ({
-    label: s.label,
-    color: s.color,
-    value: tooltipIdx !== null ? s.values[tooltipIdx] ?? 0 : 0,
-  }));
+  const tooltipSeries = seriesData
+    .filter((s) => visible[s.key])
+    .map((s) => ({
+      label: s.label,
+      color: s.color,
+      value: tooltipIdx !== null ? s.values[tooltipIdx] ?? 0 : 0,
+    }));
 
-  // Tooltip positioning: flip to left side if near right edge
-  const tooltipWidth = 150;
-  const tooltipFitsRight = tooltipX + tooltipWidth + 12 < chartRight;
-  const tooltipLeft = tooltipFitsRight ? tooltipX + 12 : tooltipX - tooltipWidth - 12;
+  const plotLeftPct = (chartLeft / width) * 100;
+  const plotWidthPct = (chartWidth / width) * 100;
+  const hoverPct =
+    tooltipIdx !== null && points > 1
+      ? plotLeftPct + (tooltipIdx / (points - 1)) * plotWidthPct
+      : plotLeftPct + plotWidthPct / 2;
+  const tooltipFitsRight = hoverPct < 62;
 
   return (
     <div
@@ -338,19 +347,30 @@ function PerformanceChart({
 
       <div style={{ position: "relative" }}>
         <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "auto" }}>
-          {/* Horizontal grid lines */}
-          {[0, 0.5, 1].map((fraction) => {
-            const y = chartTop + fraction * chartHeight;
+          {/* Horizontal grid lines + y-axis labels */}
+          {yTickValues.map((tick) => {
+            const y = getY(tick);
             return (
-              <line
-                key={fraction}
-                x1={chartLeft}
-                x2={chartRight}
-                y1={y}
-                y2={y}
-                stroke="#EEF0F1"
-                strokeWidth={1}
-              />
+              <g key={`ytick-${tick}`}>
+                <line
+                  x1={chartLeft}
+                  x2={chartRight}
+                  y1={y}
+                  y2={y}
+                  stroke="#EEF0F1"
+                  strokeWidth={1}
+                />
+                <text
+                  x={chartLeft - 6}
+                  y={y + 3}
+                  textAnchor="end"
+                  fontSize="9"
+                  fill={colors.subdued}
+                  fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                >
+                  {Math.round(tick).toLocaleString()}
+                </text>
+              </g>
             );
           })}
 
@@ -419,29 +439,38 @@ function PerformanceChart({
             );
           })}
 
-          {/* Hover hit areas — one rect per point for easier mouse targeting */}
+        </svg>
+
+        {/* Hover hit areas — HTML overlay so targeting matches the scaled SVG */}
+        <div
+          style={{
+            position: "absolute",
+            left: `${(chartLeft / width) * 100}%`,
+            top: `${(chartTop / height) * 100}%`,
+            width: `${(chartWidth / width) * 100}%`,
+            height: `${(chartHeight / height) * 100}%`,
+            display: "flex",
+            cursor: "crosshair",
+          }}
+          onMouseLeave={() => setHoverIndex(null)}
+        >
           {Array.from({ length: points }, (_, i) => (
-            <rect
+            <div
               key={`hit-${i}`}
-              x={getX(i) - chartWidth / points / 2}
-              y={chartTop}
-              width={chartWidth / points}
-              height={chartHeight}
-              fill="transparent"
+              style={{ flex: 1, height: "100%" }}
               onMouseEnter={() => setHoverIndex(i)}
-              onMouseLeave={() => setHoverIndex(null)}
-              style={{ cursor: "crosshair" }}
             />
           ))}
-        </svg>
+        </div>
 
         {/* Tooltip */}
         {tooltipIdx !== null && (
           <div
             style={{
               position: "absolute",
-              top: chartTop * 2,
-              left: tooltipLeft,
+              top: "12%",
+              left: tooltipFitsRight ? `calc(${hoverPct}% + 8px)` : undefined,
+              right: tooltipFitsRight ? undefined : `calc(${100 - hoverPct}% + 8px)`,
               background: "#fff",
               border: `1px solid ${colors.border}`,
               borderRadius: "8px",
@@ -638,6 +667,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export default function OfferAnalyticsDetailsPage() {
   const { analytics, trendMetrics, productNames } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
 
   if (!analytics) {
     return (
@@ -665,8 +695,9 @@ export default function OfferAnalyticsDetailsPage() {
           <p style={{ margin: "0 0 1rem", color: colors.subdued, lineHeight: 1.5 }}>
             This offer could not be loaded or no longer exists.
           </p>
-          <Link
-            to="/app/analytics"
+          <button
+            type="button"
+            onClick={() => navigate("/app/analytics")}
             style={{
               background: colors.accent,
               color: "#fff",
@@ -681,7 +712,7 @@ export default function OfferAnalyticsDetailsPage() {
             }}
           >
             Back to Analytics
-          </Link>
+          </button>
         </div>
       </div>
     );
@@ -706,8 +737,9 @@ export default function OfferAnalyticsDetailsPage() {
       }}
     >
       {/* Back link */}
-      <Link
-        to="/app/analytics"
+      <button
+        type="button"
+        onClick={() => navigate("/app/analytics")}
         style={{
           background: "none",
           border: "none",
@@ -721,7 +753,7 @@ export default function OfferAnalyticsDetailsPage() {
         }}
       >
         ← All Upsells
-      </Link>
+      </button>
 
       {/* Header */}
       <div

@@ -38,6 +38,7 @@ import {
   normalizeOfferType,
 } from "../config/offerTypes";
 import { validateOfferFields } from "../validation/offerSchemas";
+import { placementFromDisplayLocation } from "../types/offer";
 import "../styles/app._index.css";
 
 // ── Loader ─────────────────────────────────────────────────────────────
@@ -122,7 +123,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
           conditions: Array.isArray(rawRules.conditions)
             ? rawRules.conditions
             : [{ field: "", operator: "", value: "" }],
-          displayLocation: rawRules.displayLocation ?? "checkout_page",
+          displayLocation:
+            offer.placement === "cart_drawer"
+              ? "cart_drawer_upsell"
+              : rawRules.displayLocation ?? "checkout_page",
           upsellProduct: rawRules.upsellProduct ?? "manual",
           triggerProductIds: Array.isArray(offer.targetProductIds)
             ? offer.targetProductIds
@@ -212,11 +216,11 @@ export async function action({ request }: ActionFunctionArgs) {
   // ── Build payload ────────────────────────────────────────────────
   const built = buildOfferPayload(payload);
 
-  // Respect the placement sent from the form (pre-purchase vs post-purchase).
   const placementRaw = String(formData.get("placement") || "");
-  if (placementRaw === "post_purchase" || placementRaw === "checkout") {
-    built.placement = placementRaw as OfferPlacement;
-  }
+  const fallbackPlacement = isOfferPlacement(placementRaw)
+    ? (placementRaw as OfferPlacement)
+    : built.placement;
+  built.placement = placementFromDisplayLocation(displayLocation, fallbackPlacement);
 
   if (offerId) {
     await updateOffer(session.shop, offerId, {

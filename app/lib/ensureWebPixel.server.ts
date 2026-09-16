@@ -18,6 +18,23 @@ function isAccessDenied(error: unknown): boolean {
   return /access denied|access scope/i.test(message);
 }
 
+function isAuthHandshake(error: unknown): boolean {
+  if (error instanceof Response) {
+    const location = error.headers.get("Location") ?? "";
+    return error.status === 302 || /session-token|\/auth\//i.test(location);
+  }
+  return false;
+}
+
+function isRedirectResponse(response: Response): boolean {
+  const location = response.headers.get("Location") ?? "";
+  return (
+    response.status === 302 ||
+    response.status === 401 ||
+    /session-token|\/auth\//i.test(location)
+  );
+}
+
 function isAlreadyExists(errors: Array<{ message?: string; code?: string }>): boolean {
   return errors.some((error) =>
     /already|taken|exists/i.test(`${error.code ?? ""} ${error.message ?? ""}`),
@@ -63,15 +80,27 @@ const WEB_PIXEL_UPDATE = `#graphql
   }
 `;
 
+async function graphqlJson<T>(
+  admin: AdminGraphql,
+  query: string,
+  options?: { variables?: Record<string, unknown> },
+): Promise<T | null> {
+  const response = await admin.graphql(query, options);
+  if (isRedirectResponse(response)) return null;
+  if (!response.ok) {
+    throw new Error(`Web pixel GraphQL failed (${response.status})`);
+  }
+  return (await response.json()) as T;
+}
+
 async function readWebPixelId(admin: AdminGraphql): Promise<string | null> {
   try {
-    const existingResponse = await admin.graphql(WEB_PIXEL_QUERY);
-    const existingJson = (await existingResponse.json()) as {
+    const existingJson = await graphqlJson<{
       data?: { webPixel?: { id?: string } | null };
-    };
-    return existingJson.data?.webPixel?.id ?? null;
+    }>(admin, WEB_PIXEL_QUERY);
+    return existingJson?.data?.webPixel?.id ?? null;
   } catch (error) {
-    if (isAccessDenied(error)) return null;
+    if (isAccessDenied(error) || isAuthHandshake(error)) return null;
     throw error;
   }
 }
@@ -81,12 +110,18 @@ export async function ensureWebPixel(admin: AdminGraphql, shop?: string | null):
 
   try {
     const settings = pixelSettings();
-    const createResponse = await admin.graphql(WEB_PIXEL_CREATE, {
+    const createJson = await graphqlJson<{
+      data?: {
+        webPixelCreate?: {
+          userErrors?: Array<{ message?: string; code?: string }>;
+          webPixel?: { id?: string };
+        };
+      };
+    }>(admin, WEB_PIXEL_CREATE, {
       variables: { webPixel: { settings } },
     });
-    const createJson = (await createResponse.json()) as {
-      data?: { webPixelCreate?: { userErrors?: Array<{ message?: string; code?: string }>; webPixel?: { id?: string } } };
-    };
+    if (!createJson) return;
+
     const createErrors = createJson.data?.webPixelCreate?.userErrors ?? [];
 
     if (createJson.data?.webPixelCreate?.webPixel?.id && createErrors.length === 0) {
@@ -105,23 +140,26 @@ export async function ensureWebPixel(admin: AdminGraphql, shop?: string | null):
       return;
     }
 
-    const updateResponse = await admin.graphql(WEB_PIXEL_UPDATE, {
+    const updateJson = await graphqlJson<{
+      data?: { webPixelUpdate?: { userErrors?: Array<{ message?: string }> } };
+    }>(admin, WEB_PIXEL_UPDATE, {
       variables: { id: existingId, webPixel: { settings } },
     });
-    const updateJson = (await updateResponse.json()) as {
-      data?: { webPixelUpdate?: { userErrors?: Array<{ message?: string }> } };
-    };
+    if (!updateJson) return;
+
     const updateErrors = updateJson.data?.webPixelUpdate?.userErrors ?? [];
     if (updateErrors.length > 0) console.warn("webPixelUpdate errors:", updateErrors);
 
     if (shop) ensuredShops.add(shop);
   } catch (error) {
+    if (isAuthHandshake(error)) return;
     if (isAccessDenied(error)) {
       console.warn(
         "ensureWebPixel skipped: grant write_pixels, read_pixels, and read_customer_events, then re-auth the app.",
       );
       return;
     }
-    console.warn("ensureWebPixel failed:", error);
+    const message = error instanceof Error ? error.message : "unknown error";
+    console.warn("ensureWebPixel failed:", message);
   }
 }

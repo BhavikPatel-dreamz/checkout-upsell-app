@@ -1,0 +1,31 @@
+<div id="product-upsell-root" class="product-upsell-block" style="display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin: 16px 0;">
+  <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">{{ "product_upsell.title" | t }}</h3>
+  <div id="product-upsell-items" style="display: flex; flex-direction: row; gap: 12px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity;"></div>
+  <div id="product-upsell-error" style="display: none; color: #d32f2f; font-size: 12px; margin-top: 8px;"></div>
+</div>
+
+<script>
+  window.PRODUCT_UPSELL_CONFIG = {
+    eligibilityUrl: "/apps/checkout-upsell/api/offers/eligible",
+    viewedUrl: "/apps/checkout-upsell/api/offers/viewed",
+    clickedUrl: "/apps/checkout-upsell/api/offers/clicked",
+    addedToCartUrl: "/apps/checkout-upsell/api/offers/added-to-cart",
+    customerId: {% if customer %}"gid://shopify/Customer/{{ customer.id }}"{% else %}null{% endif %},
+    shop: {{ shop.permanent_domain | json }},
+    productId: {% if product %}"gid://shopify/Product/{{ product.id }}"{% else %}null{% endif %},
+    variantId: {% if product.selected_or_first_available_variant %}"gid://shopify/ProductVariant/{{ product.selected_or_first_available_variant.id }}"{% else %}null{% endif %},
+    addToCartLabel: {{ "product_upsell.add_to_cart" | t | json }},
+    viewLabel: {{ "product_upsell.view" | t | json }}
+  };
+</script>
+
+{% schema %}
+{
+  "name": "Product Page Upsell",
+  "target": "section",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "javascript": "product-upsell.js"
+}
+{% endschema %}

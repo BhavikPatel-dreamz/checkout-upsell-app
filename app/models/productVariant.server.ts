@@ -78,6 +78,27 @@ const SHOPIFY_PRODUCTS_QUERY = `#graphql
   }
 `;
 
+// Lightweight version of SHOPIFY_PRODUCTS_QUERY for the sync dashboard —
+// only the fields the product-sync page actually renders. Cuts payload
+// size drastically vs. fetching full variant price/inventory/options data.
+const PRODUCT_SUMMARY_QUERY = `#graphql
+  query ProductSummaries($first: Int!, $after: String) {
+    products(first: $first, after: $after) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        id
+        title
+        handle
+        status
+        featuredMedia { preview { image { url } } }
+        variants(first: 250) {
+          nodes { id }
+        }
+      }
+    }
+  }
+`;
+
 const SHOPIFY_PRODUCT_BY_ID_QUERY = `#graphql
   query ProductById($id: ID!) {
     product(id: $id) {
@@ -167,6 +188,15 @@ export interface CatalogProductNode {
   metafields: { nodes: { namespace: string; key: string; value: string }[] };
   featuredMedia: ImagePreview | null;
   variants: { nodes: CatalogVariantNode[] };
+}
+
+export interface ProductSummaryNode {
+  id: string;
+  title: string;
+  handle: string | null;
+  status: string | null;
+  featuredMedia: ImagePreview | null;
+  variants: { nodes: { id: string }[] };
 }
 
 interface ProductVariantsPage {
@@ -331,6 +361,65 @@ export async function getShopifyProductCatalog(admin: AdminGraphqlClient, shop: 
   }
 
   return products;
+}
+
+// Short-lived in-process cache for the product-sync dashboard's catalog
+// summary. The full catalog walk (sequential cursor pages) is the actual
+// bottleneck on page load, not payload size — this avoids repeating it on
+// every navigation. Note: on serverless (e.g. Vercel), this only helps
+// within a warm instance; cold starts still pay the full fetch.
+const SUMMARY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const summaryCache = new Map<string, { data: ProductSummaryNode[]; fetchedAt: number }>();
+
+/** Slim catalog fetch for the product-sync dashboard — id/title/handle/status/image + variant ids only. */
+export async function getShopifyProductSummaries(
+  admin: AdminGraphqlClient,
+  shop: string,
+  { force = false }: { force?: boolean } = {},
+) {
+  const cached = summaryCache.get(shop);
+  if (!force && cached && Date.now() - cached.fetchedAt < SUMMARY_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const products: ProductSummaryNode[] = [];
+  let after: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const response = await admin.graphql(PRODUCT_SUMMARY_QUERY, {
+      variables: { first: CATALOG_PAGE_SIZE, after },
+    });
+
+    const body = (await response.json()) as {
+      data?: {
+        products?: {
+          pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+          nodes?: ProductSummaryNode[];
+        };
+      };
+      errors?: unknown;
+    };
+
+    if (body.errors || !body.data?.products) {
+      const message = JSON.stringify(body.errors ?? "no Shopify product summaries returned");
+      console.error("[ProductSync] Failed to load product summaries", { shop, message });
+      throw new Error(`Shopify product summary query failed: ${message}`);
+    }
+
+    const nodes = body.data.products.nodes ?? [];
+    products.push(...nodes);
+    hasNextPage = Boolean(body.data.products.pageInfo?.hasNextPage);
+    after = body.data.products.pageInfo?.endCursor ?? null;
+  }
+
+  summaryCache.set(shop, { data: products, fetchedAt: Date.now() });
+  return products;
+}
+
+/** Drop the cached catalog summary for a shop — call after a sync completes so the next load is fresh. */
+export function invalidateProductSummaryCache(shop: string) {
+  summaryCache.delete(shop);
 }
 
 export async function getShopifyProductById(admin: AdminGraphqlClient, productId: string) {

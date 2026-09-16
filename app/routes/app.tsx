@@ -10,8 +10,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   await ensureWebPixel(admin, session.shop);
 
-  // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  return {
+    // eslint-disable-next-line no-undef
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+  };
 };
 
 export default function App() {
@@ -19,10 +21,12 @@ export default function App() {
 
   return (
     <AppProvider embedded apiKey={apiKey}>
-<s-app-nav>
+      <s-app-nav>
         <s-link href="/app">
           Dashboard
         </s-link>
+        <s-link href="/app/offers/new">Create Upsell</s-link>
+        <s-link href="/app/upsells">All Upsells</s-link>
         <s-link href="/app/product-sync">Product Sync</s-link>
         <s-link href="/app/analytics">Analytics</s-link>
         <s-link href="/app/settings">Settings</s-link>
