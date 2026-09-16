@@ -3,6 +3,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { OfferPlacement, OfferEventType, Prisma } from "@prisma/client";
+import { emitPurchaseShopperEvents } from "../models/orderPurchase.server";
 
 function getString(value: unknown): string | null {
   if (typeof value === "string" && value.trim()) return value.trim();
@@ -111,8 +112,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   console.log(`[orders/paid] authenticated OK: topic=${topic} shop=${shop}`);
-  console.log(`[orders/paid] raw payload keys: ${Object.keys(payload as object).join(", ")}`);
-  console.log(`[orders/paid] FULL PAYLOAD:\n${JSON.stringify(payload, null, 2)}`);
+
+  try {
+    await emitPurchaseShopperEvents({ shop, payload });
+  } catch (error) {
+    console.error("[orders/paid] purchase ShopperEvent emit failed", error);
+    return new Response(null, { status: 500 });
+  }
 
   const order = payload as Record<string, any>;
   const financialStatus = getString(order?.financial_status ?? order?.processed_financial_status);
