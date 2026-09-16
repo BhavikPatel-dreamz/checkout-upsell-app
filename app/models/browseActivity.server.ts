@@ -1,6 +1,7 @@
 import { BrowseActivityType, OfferEventType, Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { browseActivityToShopperCreateData } from "../ai/events/fromBrowseActivity";
+import { recordIdentitySighting } from "../ai/events/identity.server";
 import {
   allowsAnalyticsPersistence,
   isShopperEventName,
@@ -176,6 +177,8 @@ export async function recordBrowseActivity(
     query,
   });
 
+  await rememberIdentity({ shop, customerId, guestKey, clientId });
+
   return { recorded: true, id: created.id };
 }
 
@@ -286,7 +289,27 @@ async function recordShopperOnlyActivity(
     create: data,
     update: {},
   });
+  await rememberIdentity({ shop, customerId, guestKey, clientId });
   return { recorded: true, id: created.id };
+}
+
+async function rememberIdentity(input: {
+  shop: string;
+  customerId: string | null;
+  guestKey: string | null;
+  clientId: string | null;
+}): Promise<void> {
+  try {
+    await recordIdentitySighting({
+      shop: input.shop,
+      sessionId: input.guestKey,
+      anonId: input.clientId ?? input.guestKey,
+      customerId: input.customerId,
+      source: "activity",
+    });
+  } catch (error) {
+    console.error("[browseActivity] identity link failed", error);
+  }
 }
 
 async function dualWriteShopperEvent(input: {

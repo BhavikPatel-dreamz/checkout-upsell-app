@@ -13,9 +13,11 @@
     customerId: {% if customer %}"gid://shopify/Customer/{{ customer.id }}"{% else %}null{% endif %},
     shop: {{ shop.permanent_domain | json }},
     addToCartLabel: {{ "cart_upsell.add_to_cart" | t | json }},
-    viewLabel: {{ "product_upsell.view" | t | json }}
+    viewLabel: {{ "product_upsell.view" | t | json }},
+    eventsUrl: "/apps/checkout-upsell/api/ai/events"
   };
 </script>
+<script src="{{ 'ai-events.js' | asset_url }}" defer></script>
 
 {% schema %}
 {

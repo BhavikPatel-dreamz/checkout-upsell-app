@@ -15,9 +15,11 @@
     productId: {% if product %}"gid://shopify/Product/{{ product.id }}"{% else %}null{% endif %},
     variantId: {% if product.selected_or_first_available_variant %}"gid://shopify/ProductVariant/{{ product.selected_or_first_available_variant.id }}"{% else %}null{% endif %},
     addToCartLabel: {{ "product_upsell.add_to_cart" | t | json }},
-    viewLabel: {{ "product_upsell.view" | t | json }}
+    viewLabel: {{ "product_upsell.view" | t | json }},
+    eventsUrl: "/apps/checkout-upsell/api/ai/events"
   };
 </script>
+<script src="{{ 'ai-events.js' | asset_url }}" defer></script>
 
 {% schema %}
 {

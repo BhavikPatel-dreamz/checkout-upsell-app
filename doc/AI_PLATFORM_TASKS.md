@@ -15,8 +15,8 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 | AI-1.2 | Versioned event envelope types + Zod in `app/ai/events/` | COMPLETE |
 | AI-1.3 | Dual-write: map existing `BrowseActivity` ingest (`api.activity`) into `ShopperEvent` without breaking ranker | COMPLETE |
 | AI-1.4 | Expand pixel event names to P1 set (product_view, search, collection, ATC) with Customer Privacy check | COMPLETE |
-| AI-1.5 | Theme/checkout emitters: batch POST `/api/ai/events` for recommendation_* and cart mutations (consent-gated) | NOT_STARTED |
-| AI-1.6 | Identity: sessionId + anonId + customerId merge-on-login within shop (`IdentityLink`) | NOT_STARTED |
+| AI-1.5 | Theme/checkout emitters: batch POST `/api/ai/events` for recommendation_* and cart mutations (consent-gated) | COMPLETE |
+| AI-1.6 | Identity: sessionId + anonId + customerId merge-on-login within shop (`IdentityLink`) | COMPLETE |
 | AI-1.7 | Replace stub `webhooks.orders.create` / paid with HMAC-verified handlers that emit `purchase` + line items | NOT_STARTED |
 | AI-1.8 | Attribution: link purchase lines to last `recommendationId` / offer within window; dual-write `OfferEvent.purchased` | NOT_STARTED |
 | AI-1.9 | Consent + retention settings on shop; scheduled delete job for expired events | NOT_STARTED |

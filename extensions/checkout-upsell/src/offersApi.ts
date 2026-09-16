@@ -13,3 +13,21 @@ export function offersApiUrl(
 ): string {
   return `${offersApiOrigin(settings)}/api/offers/${path}`;
 }
+
+export function aiEventsUrl(settings?: { api_base?: string }): string {
+  return `${offersApiOrigin(settings)}/api/ai/events`;
+}
+
+export async function emitAiEvents(
+  shop: string,
+  settings: { api_base?: string } | undefined,
+  events: Array<Record<string, unknown>>,
+  consented: boolean,
+): Promise<void> {
+  if (!consented || events.length === 0 || !shop) return;
+  await fetch(aiEventsUrl(settings), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ shop, consented: true, events }),
+  });
+}

@@ -7,9 +7,11 @@
     variantId: {% if product.selected_or_first_available_variant %}"gid://shopify/ProductVariant/{{ product.selected_or_first_available_variant.id }}"{% else %}null{% endif %},
     collectionId: {% if collection %}"gid://shopify/Collection/{{ collection.id }}"{% else %}null{% endif %},
     query: {% if search.terms %}{{ search.terms | json }}{% else %}null{% endif %},
-    activityUrl: "/apps/checkout-upsell/api/activity"
+    activityUrl: "/apps/checkout-upsell/api/activity",
+    eventsUrl: "/apps/checkout-upsell/api/ai/events"
   };
 </script>
+<script src="{{ 'ai-events.js' | asset_url }}" defer></script>
 {% comment %}
   Optional theme markup (after this embed is enabled):
   <a class="cu-track" data-cu-event="product_click" data-cu-product-id="{{ product.id }}">…</a>

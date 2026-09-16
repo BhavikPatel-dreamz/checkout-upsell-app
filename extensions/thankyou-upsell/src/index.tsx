@@ -14,7 +14,7 @@ import {
   useSettings,
 } from "@shopify/ui-extensions-react/checkout";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { offersApiUrl } from "./offersApi";
+import { offersApiUrl, emitAiEvents } from "./offersApi";
 
 interface EligibleOffer {
   offerId: string;
@@ -103,6 +103,12 @@ function ThankYouUpsellBlock() {
   const trackEvent = useCallback(
     async (path: "clicked" | "added-to-cart" | "viewed", offer: EligibleOffer) => {
       const { customerId, guestKey } = await getCustomerIdentity();
+      const name =
+        path === "viewed"
+          ? "recommendation_view"
+          : path === "clicked"
+            ? "recommendation_click"
+            : "recommendation_add";
       try {
         await fetch(offersApiUrl(path, settings), {
           method: "POST",
@@ -119,6 +125,23 @@ function ThankYouUpsellBlock() {
             isGuest: !customerId,
           }),
         });
+        await emitAiEvents(
+          shopDomain,
+          settings,
+          [
+            {
+              name,
+              customerId,
+              sessionId: guestKey,
+              anonId: guestKey,
+              surface: "checkout_ui",
+              source: "thankyou_upsell",
+              entities: { productId: offer.productId, variantId: offer.variantId },
+              attribution: { recommendationId: offer.offerId, campaignId: offer.offerId },
+            },
+          ],
+          true,
+        );
       } catch (err) {
         console.error(`ThankYou upsell ${path} tracking error:`, err);
       }

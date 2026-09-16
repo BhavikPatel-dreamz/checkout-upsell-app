@@ -15,7 +15,7 @@ import {
   useSettings,
 } from "@shopify/ui-extensions-react/checkout";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { offersApiUrl } from "./offersApi";
+import { offersApiUrl, emitAiEvents } from "./offersApi";
 
 interface EligibleOffer {
   offerId: string;
@@ -75,6 +75,12 @@ function CheckoutUpsellBlock() {
   const trackEvent = useCallback(
     async (path: "clicked" | "added-to-cart" | "viewed", offer: EligibleOffer) => {
       const { customerId, guestKey } = await getCustomerIdentity();
+      const name =
+        path === "viewed"
+          ? "recommendation_view"
+          : path === "clicked"
+            ? "recommendation_click"
+            : "recommendation_add";
       try {
         await fetch(offersApiUrl(path, settings), {
           method: "POST",
@@ -91,6 +97,36 @@ function CheckoutUpsellBlock() {
             isGuest: !customerId,
           }),
         });
+        await emitAiEvents(
+          shopDomain,
+          settings,
+          [
+            {
+              name,
+              customerId,
+              sessionId: guestKey,
+              anonId: guestKey,
+              surface: "checkout_ui",
+              source: "checkout_upsell",
+              entities: { productId: offer.productId, variantId: offer.variantId },
+              attribution: { recommendationId: offer.offerId, campaignId: offer.offerId },
+            },
+            ...(path === "added-to-cart"
+              ? [
+                  {
+                    name: "add_to_cart",
+                    customerId,
+                    sessionId: guestKey,
+                    anonId: guestKey,
+                    surface: "checkout_ui",
+                    source: "checkout_upsell",
+                    entities: { productId: offer.productId, variantId: offer.variantId },
+                  },
+                ]
+              : []),
+          ],
+          true,
+        );
       } catch (err) {
         console.error(`Checkout upsell ${path} tracking error:`, err);
       }

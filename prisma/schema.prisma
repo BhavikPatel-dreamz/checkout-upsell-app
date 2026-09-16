@@ -123,6 +123,22 @@ model ConsentState {
   @@index([shop, updatedAt])
 }
 
+/// Shop-scoped alias graph. Merge session/anon onto a customer on login. Never join shops.
+model IdentityLink {
+  id        String               @id @default(cuid())
+  shop      String
+  fromType  ConsentSubjectType
+  fromId    String
+  toType    ConsentSubjectType
+  toId      String
+  source    String               @default("ingest")
+  createdAt DateTime             @default(now())
+
+  @@unique([shop, fromType, fromId, toType, toId])
+  @@index([shop, fromType, fromId])
+  @@index([shop, toType, toId])
+}
+
 model OfferEvent {
   id         String          @id @default(cuid())
   offerId    String
