@@ -156,6 +156,7 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
         upsellHistory: 0,
         customerProductAffinity: 0,
         productProductAffinity: 0,
+        productRelations: 0,
       },
     };
   }
@@ -169,6 +170,7 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
     upsellHistory,
     customerProductAffinity,
     productProductAffinity,
+    productRelations,
   ] = await Promise.all([
     db.shopperEvent.deleteMany({ where: { shop } }),
     db.browseActivity.deleteMany({ where: { shop } }),
@@ -178,6 +180,7 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
     db.upsellHistory.deleteMany({ where: { shopdomain: shop } }),
     db.customerProductAffinity.deleteMany({ where: { shop } }),
     db.productProductAffinity.deleteMany({ where: { shop } }),
+    db.productRelation.deleteMany({ where: { shop } }),
   ]);
 
   return {
@@ -190,6 +193,7 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
       upsellHistory: upsellHistory.count,
       customerProductAffinity: customerProductAffinity.count,
       productProductAffinity: productProductAffinity.count,
+      productRelations: productRelations.count,
     },
   };
 }

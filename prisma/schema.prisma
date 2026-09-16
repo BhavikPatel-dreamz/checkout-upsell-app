@@ -177,6 +177,34 @@ model ProductProductAffinity {
   @@index([shop, productId, score])
 }
 
+enum ProductRelationKind {
+  fbt
+  similar
+  complementary
+}
+
+enum ProductRelationSource {
+  stat
+  embed
+  merchant
+}
+
+/// Offline candidate edges (AI-2.3). Serving/ranking is later phases.
+model ProductRelation {
+  id                String                 @id @default(cuid())
+  shop              String
+  productId         String
+  relatedProductId  String
+  kind              ProductRelationKind
+  source            ProductRelationSource  @default(stat)
+  score             Float
+  evidence          Json?
+  computedAt        DateTime               @default(now())
+
+  @@unique([shop, productId, relatedProductId, kind])
+  @@index([shop, productId, kind, score])
+}
+
 model OfferEvent {
   id         String          @id @default(cuid())
   offerId    String

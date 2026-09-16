@@ -33,7 +33,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 | --- | --- | --- |
 | AI-2.1 | Aggregate jobs: product-product and customer-product affinity tables | COMPLETE |
 | AI-2.2 | `ProductIntelligence` from synced `ProductVariant` + Admin product fields (no embeddings yet) | COMPLETE |
-| AI-2.3 | Relation builders: FBT, similar (co-view), complementary heuristic (category rules + FBT) | NOT_STARTED |
+| AI-2.3 | Relation builders: FBT, similar (co-view), complementary heuristic (category rules + FBT) | COMPLETE |
 | AI-2.4 | Scoring function + tests (weights documented; inventory + in-cart penalty) | NOT_STARTED |
 | AI-2.5 | Hybrid pipeline: business rules → candidates → score → merchant include/exclude/max N | NOT_STARTED |
 | AI-2.6 | `MerchantRuleSet` admin UI (never / always / min margin if cost present / price band) | NOT_STARTED |

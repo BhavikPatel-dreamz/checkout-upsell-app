@@ -1,4 +1,5 @@
 import { ConsentSubjectType } from "@prisma/client";
+import { rebuildShopRelations } from "./relations.server";
 import db from "../db.server";
 import { getShopPrivacySettings } from "../models/shopPrivacy.server";
 
@@ -106,6 +107,7 @@ export interface AffinityJobResult {
   shops: number;
   customerProductRows: number;
   productProductRows: number;
+  relationRows: number;
 }
 
 export async function rebuildAffinityTables(shopFilter?: string): Promise<AffinityJobResult> {
@@ -115,14 +117,16 @@ export async function rebuildAffinityTables(shopFilter?: string): Promise<Affini
   const shops = await shopsWithEvents(listingCutoff, shopFilter);
   let customerProductRows = 0;
   let productProductRows = 0;
+  let relationRows = 0;
 
   for (const shop of shops) {
     const counts = await rebuildShopAffinity(shop, now);
     customerProductRows += counts.customerProductRows;
     productProductRows += counts.productProductRows;
+    relationRows += await rebuildShopRelations(shop);
   }
 
-  return { shops: shops.length, customerProductRows, productProductRows };
+  return { shops: shops.length, customerProductRows, productProductRows, relationRows };
 }
 
 async function rebuildShopAffinity(
