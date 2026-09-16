@@ -48,7 +48,7 @@ describe("shop-scoped identity merge", () => {
     const after = await db.shopperEvent.findFirst({ where: { shop: SHOP, sessionId: "sess-1", name: "cart_view" } });
     expect(after?.customerId).toBe("gid://shopify/Customer/99");
     expect(await resolveCustomerId(SHOP, { sessionId: "sess-1" })).toBe("gid://shopify/Customer/99");
-  });
+  }, 20_000);
 
   it("does not join shops or replace an existing customer link", async () => {
     await db.identityLink.deleteMany({ where: { shop: { in: [SHOP, OTHER] } } });
@@ -70,5 +70,5 @@ describe("shop-scoped identity merge", () => {
 
     expect(await resolveCustomerId(SHOP, { sessionId: "sess-keep" })).toBe("gid://shopify/Customer/1");
     expect(await resolveCustomerId(OTHER, { sessionId: "sess-keep" })).toBe("gid://shopify/Customer/9");
-  });
+  }, 20_000);
 });

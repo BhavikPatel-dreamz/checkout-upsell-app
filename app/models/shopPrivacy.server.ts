@@ -1,7 +1,10 @@
+import {
+  DEFAULT_RETENTION_DAYS,
+  RETENTION_DAY_OPTIONS,
+} from "../config/privacy";
 import db from "../db.server";
 
-export const RETENTION_DAY_OPTIONS = [30, 90, 365] as const;
-export const DEFAULT_RETENTION_DAYS = 90;
+export { DEFAULT_RETENTION_DAYS, RETENTION_DAY_OPTIONS };
 
 export interface ShopPrivacySettings {
   shop: string;

@@ -1,9 +1,9 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { Form, useActionData, useLoaderData } from "react-router";
+import { RETENTION_DAY_OPTIONS } from "../config/privacy";
 import { authenticate } from "../shopify.server";
 import {
   getShopPrivacySettings,
-  RETENTION_DAY_OPTIONS,
   upsertShopPrivacySettings,
 } from "../models/shopPrivacy.server";
 
