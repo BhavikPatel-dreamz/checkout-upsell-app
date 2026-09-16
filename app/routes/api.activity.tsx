@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { badRequest, methodNotAllowed, readJsonBody } from "../lib/http.server";
-import { recordBrowseActivity } from "../models/browseActivity.server";
+import { recordStorefrontActivity } from "../models/browseActivity.server";
 
 function isValidShopDomain(value: unknown): value is string {
   return typeof value === "string" && /^[a-z0-9-]+\.myshopify\.com$/.test(value);
@@ -42,7 +42,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return withCors(Response.json({ recorded: false, skipped: "consent" }));
   }
 
-  const result = await recordBrowseActivity({
+  const result = await recordStorefrontActivity({
     shop,
     eventType: typeof body.eventType === "string" ? body.eventType : "",
     customerId: typeof body.customerId === "string" ? body.customerId : null,
@@ -55,6 +55,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     occurredAt:
       typeof body.occurredAt === "string" || typeof body.occurredAt === "number" ? body.occurredAt : null,
     consented: body.consented !== false,
+    customName: typeof body.customName === "string" ? body.customName : null,
+    eventId: typeof body.eventId === "string" ? body.eventId : null,
+    surface: typeof body.surface === "string" ? body.surface : null,
+    source: typeof body.source === "string" ? body.source : null,
   });
 
   if (!result.recorded && result.skipped === "invalid") {

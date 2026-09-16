@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { BrowseActivityType, OfferPlacement, OfferType, PrismaClient } from "@prisma/client";
 import { createOffer } from "../app/models/offer.server";
-import { recordBrowseActivity, loadRecentActivity } from "../app/models/browseActivity.server";
+import { recordBrowseActivity, recordStorefrontActivity, loadRecentActivity } from "../app/models/browseActivity.server";
 import { rankEligibleOffers } from "../app/models/offerRanker.server";
 import type { EligibleOfferPayload } from "../app/models/eligibleOffer";
 
@@ -27,6 +27,7 @@ function offerPayload(id: string, productId: string): EligibleOfferPayload {
 
 describe("browse activity and ranker", () => {
   beforeEach(async () => {
+    await db.shopperEvent.deleteMany({ where: { shop: SHOP } });
     await db.browseActivity.deleteMany({ where: { shop: SHOP } });
     await db.offerEvent.deleteMany({ where: { shop: SHOP } });
     await db.offer.deleteMany({ where: { shop: SHOP } });
@@ -140,6 +141,53 @@ describe("browse activity and ranker", () => {
     });
     expect(variant.recorded).toBe(true);
     expect(dwell.recorded).toBe(true);
+    const shopperRows = await db.shopperEvent.findMany({ where: { shop: SHOP }, orderBy: { name: "asc" } });
+    expect(shopperRows.map((row) => row.name)).toEqual(["variant_select"]);
+  });
+
+  it("dual-writes mapped browse activity into ShopperEvent", async () => {
+    const result = await recordBrowseActivity({
+      shop: SHOP,
+      eventType: BrowseActivityType.product_viewed,
+      clientId: "client-dual",
+      productId: "gid://shopify/Product/99",
+      consented: true,
+    });
+    expect(result.recorded).toBe(true);
+    const row = await db.shopperEvent.findUnique({
+      where: { shop_eventId: { shop: SHOP, eventId: result.id! } },
+    });
+    expect(row?.name).toBe("product_view");
+    expect(row?.anonId).toBe("client-dual");
+    expect(row?.surface).toBe("pixel");
+    expect(row?.productId).toBe("gid://shopify/Product/99");
+  });
+
+  it("records class/custom events on ShopperEvent only (ranker browse store unchanged)", async () => {
+    const click = await recordStorefrontActivity({
+      shop: SHOP,
+      eventType: "product_click",
+      clientId: "client-class",
+      productId: "gid://shopify/Product/3",
+      consented: true,
+    });
+    const custom = await recordStorefrontActivity({
+      shop: SHOP,
+      eventType: "size_guide_open",
+      clientId: "client-class",
+      productId: "gid://shopify/Product/3",
+      consented: true,
+    });
+    expect(click.recorded).toBe(true);
+    expect(custom.recorded).toBe(true);
+    const browse = await loadRecentActivity(SHOP, { clientId: "client-class" });
+    expect(browse).toHaveLength(0);
+    const shopper = await db.shopperEvent.findMany({
+      where: { shop: SHOP, anonId: "client-class" },
+      orderBy: { name: "asc" },
+    });
+    expect(shopper.map((row) => row.name)).toEqual(["custom", "product_click"]);
+    expect(shopper.find((row) => row.name === "custom")?.query).toBe("size_guide_open");
   });
 
   it("ranks an AI Recommend pool by activity and keeps pool order without activity", async () => {

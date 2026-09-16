@@ -66,13 +66,15 @@
     return { customerId: null, guestKey: getGuestKey(), clientId: clientId };
   }
 
-  function post(eventType, extra) {
+  function post(eventType, extra, once) {
     if (!trackingAllowed()) return;
     var cfg = config();
     if (!cfg.activityUrl || !cfg.shop) return;
-    var key = eventType + ":" + JSON.stringify(extra || {});
-    if (fired[key]) return;
-    fired[key] = true;
+    if (once !== false) {
+      var key = eventType + ":" + JSON.stringify(extra || {});
+      if (fired[key]) return;
+      fired[key] = true;
+    }
     var id = identity();
     fetch(cfg.activityUrl, {
       method: "POST",
@@ -90,11 +92,72 @@
         variantId: extra && extra.variantId,
         collectionId: extra && extra.collectionId,
         query: extra && extra.query,
+        customName: extra && extra.customName,
+        eventId: extra && extra.eventId,
+        surface: (extra && extra.surface) || "theme_block",
+        source: (extra && extra.source) || "activity_beacon",
         occurredAt: new Date().toISOString(),
       }),
     }).catch(function (err) {
       console.error("Upsell activity beacon error:", err);
     });
+  }
+
+  function track(eventType, extra, options) {
+    var opts = options || {};
+    var payload = extra || {};
+    if (opts.unique === false) {
+      var debounceKey = eventType + ":" + JSON.stringify(payload);
+      var now = Date.now();
+      if (fired[debounceKey] && now - fired[debounceKey] < 2000) return;
+      fired[debounceKey] = now;
+      post(eventType, payload, false);
+      return;
+    }
+    post(eventType, payload, true);
+  }
+
+  function attr(el, name) {
+    if (!el || !el.getAttribute) return null;
+    var value = el.getAttribute(name);
+    return value && String(value).trim() ? String(value).trim() : null;
+  }
+
+  function eventFromClass(el) {
+    var className = el && el.className ? String(el.className) : "";
+    var match = className.match(/(?:^|\s)cu-track--([a-zA-Z][a-zA-Z0-9_]{0,63})(?:\s|$)/);
+    return match ? match[1] : null;
+  }
+
+  function extraFromElement(el) {
+    return {
+      productId: attr(el, "data-cu-product-id") || attr(el, "data-product-id"),
+      variantId: attr(el, "data-cu-variant-id") || attr(el, "data-variant-id"),
+      collectionId: attr(el, "data-cu-collection-id") || attr(el, "data-collection-id"),
+      query: attr(el, "data-cu-query") || attr(el, "data-query"),
+      customName: attr(el, "data-cu-name") || attr(el, "data-cu-custom-name"),
+      source: "class_tracker",
+      surface: "theme_block",
+    };
+  }
+
+  function bindClassTracker() {
+    document.addEventListener(
+      "click",
+      function (event) {
+        var el = event.target;
+        if (!el || !el.closest) return;
+        var target = el.closest("[data-cu-event], [data-cu-track], .cu-track");
+        if (!target) return;
+        var eventType =
+          attr(target, "data-cu-event") ||
+          attr(target, "data-cu-track") ||
+          eventFromClass(target);
+        if (!eventType) return;
+        track(eventType, extraFromElement(target), { unique: false });
+      },
+      true,
+    );
   }
 
   function firePageView() {
@@ -188,6 +251,11 @@
     }
     firePageView();
     hookCartAdd();
+    bindClassTracker();
+    window.CheckoutUpsellActivity = window.CheckoutUpsellActivity || {};
+    window.CheckoutUpsellActivity.track = function (eventType, extra) {
+      track(eventType, extra || {}, { unique: false });
+    };
     setInterval(function () {
       maybeVariantChanged();
       tickTimeOnPage();

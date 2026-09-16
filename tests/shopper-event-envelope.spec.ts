@@ -28,7 +28,7 @@ describe("shopper event envelope v1", () => {
   it("lists every Phase 1 event name", () => {
     expect(SHOPPER_EVENT_NAMES).toContain("product_view");
     expect(SHOPPER_EVENT_NAMES).toContain("recommendation_purchase");
-    expect(SHOPPER_EVENT_NAMES).toHaveLength(25);
+    expect(SHOPPER_EVENT_NAMES).toHaveLength(26);
   });
 
   it("parses a valid v1 envelope and maps Prisma columns", () => {
@@ -70,5 +70,16 @@ describe("shopper event envelope v1", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(allowsAnalyticsPersistence(result.data)).toBe(false);
+  });
+
+  it("accepts a custom slug on name=custom", () => {
+    const result = parseShopperEventEnvelope({
+      ...valid,
+      name: "custom",
+      entities: { customName: "size_guide_open", productId: "gid://shopify/Product/1" },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(toShopperEventCreateData(result.data).query).toBe("size_guide_open");
   });
 });

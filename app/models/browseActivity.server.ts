@@ -1,4 +1,14 @@
 import { BrowseActivityType, OfferEventType, Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
+import { browseActivityToShopperCreateData } from "../ai/events/fromBrowseActivity";
+import {
+  allowsAnalyticsPersistence,
+  isShopperEventName,
+  parseShopperEventEnvelope,
+  toShopperEventCreateData,
+  type ShopperEventName,
+  type ShopperEventSurface,
+} from "../ai/events/envelope";
 import db from "../db.server";
 
 export const ACTIVITY_TTL_DAYS = 30;
@@ -18,6 +28,10 @@ export interface RecordBrowseActivityInput {
   query?: string | null;
   occurredAt?: Date | string | number | null;
   consented?: boolean;
+  customName?: string | null;
+  eventId?: string | null;
+  surface?: string | null;
+  source?: string | null;
 }
 
 export interface BrowseActivityRow {
@@ -132,6 +146,7 @@ export async function recordBrowseActivity(
     return { recorded: false, skipped: "duplicate", id: duplicate.id };
   }
 
+  const occurredAt = parseOccurredAt(input.occurredAt);
   const created = await db.browseActivity.create({
     data: {
       shop,
@@ -143,11 +158,161 @@ export async function recordBrowseActivity(
       variantId,
       collectionId,
       query,
-      occurredAt: parseOccurredAt(input.occurredAt),
+      occurredAt,
     },
   });
 
+  await dualWriteShopperEvent({
+    shop,
+    eventId: created.id,
+    eventType: created.eventType,
+    occurredAt,
+    customerId,
+    guestKey,
+    clientId,
+    productId,
+    variantId,
+    collectionId,
+    query,
+  });
+
   return { recorded: true, id: created.id };
+}
+
+const CUSTOM_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/;
+
+function resolveShopperName(eventType: string, customName: string | null): {
+  name: ShopperEventName;
+  customName: string | null;
+} | null {
+  if (isShopperEventName(eventType) && eventType !== "custom") {
+    return { name: eventType, customName: null };
+  }
+  const slug = customName || (eventType === "custom" ? null : eventType);
+  if (slug && CUSTOM_NAME_RE.test(slug)) {
+    return { name: "custom", customName: slug };
+  }
+  return null;
+}
+
+function asSurface(value: string | null): ShopperEventSurface {
+  if (
+    value === "theme_block" ||
+    value === "pixel" ||
+    value === "checkout_ui" ||
+    value === "post_purchase" ||
+    value === "admin"
+  ) {
+    return value;
+  }
+  return "theme_block";
+}
+
+/** Browse types stay on BrowseActivity (ranker). Other / custom events go to ShopperEvent only. */
+export async function recordStorefrontActivity(
+  input: RecordBrowseActivityInput,
+): Promise<{ recorded: boolean; skipped?: string; id?: string }> {
+  const eventType = trimOrNull(input.eventType);
+  if (eventType && EVENT_TYPES.has(eventType)) {
+    return recordBrowseActivity(input);
+  }
+  return recordShopperOnlyActivity(input);
+}
+
+async function recordShopperOnlyActivity(
+  input: RecordBrowseActivityInput,
+): Promise<{ recorded: boolean; skipped?: string; id?: string }> {
+  if (input.consented === false) {
+    return { recorded: false, skipped: "consent" };
+  }
+
+  const shop = trimOrNull(input.shop);
+  const eventType = trimOrNull(input.eventType);
+  const customName = trimOrNull(input.customName);
+  if (!shop || !eventType) {
+    return { recorded: false, skipped: "invalid" };
+  }
+
+  const resolved = resolveShopperName(eventType, customName);
+  if (!resolved) {
+    return { recorded: false, skipped: "invalid" };
+  }
+
+  const customerId = toShopifyGid("Customer", trimOrNull(input.customerId));
+  const guestKey = trimOrNull(input.guestKey);
+  const clientId = trimOrNull(input.clientId);
+  if (!customerId && !guestKey && !clientId) {
+    return { recorded: false, skipped: "identity" };
+  }
+
+  const productId = toShopifyGid("Product", trimOrNull(input.productId));
+  const variantId = toShopifyGid("ProductVariant", trimOrNull(input.variantId));
+  const collectionId = toShopifyGid("Collection", trimOrNull(input.collectionId));
+  const query = trimOrNull(input.query)?.slice(0, 200) ?? null;
+  const eventId = trimOrNull(input.eventId) ?? randomUUID();
+  const occurredAt = parseOccurredAt(input.occurredAt);
+
+  const parsed = parseShopperEventEnvelope({
+    schemaVersion: 1,
+    shop,
+    eventId,
+    occurredAt,
+    sessionId: guestKey,
+    customerId,
+    anonId: clientId ?? guestKey,
+    consent: { analytics: true, marketing: false },
+    name: resolved.name,
+    source: trimOrNull(input.source) ?? "class_tracker",
+    surface: asSurface(trimOrNull(input.surface)),
+    entities: {
+      ...(productId ? { productId } : {}),
+      ...(variantId ? { variantId } : {}),
+      ...(collectionId ? { collectionId } : {}),
+      ...(query ? { query } : {}),
+      ...(resolved.customName ? { customName: resolved.customName } : {}),
+    },
+  });
+
+  if (!parsed.ok) {
+    return { recorded: false, skipped: "invalid" };
+  }
+  if (!allowsAnalyticsPersistence(parsed.data)) {
+    return { recorded: false, skipped: "consent" };
+  }
+
+  const data = toShopperEventCreateData(parsed.data);
+  const created = await db.shopperEvent.upsert({
+    where: { shop_eventId: { shop: data.shop, eventId: data.eventId } },
+    create: data,
+    update: {},
+  });
+  return { recorded: true, id: created.id };
+}
+
+async function dualWriteShopperEvent(input: {
+  shop: string;
+  eventId: string;
+  eventType: BrowseActivityType;
+  occurredAt: Date;
+  customerId: string | null;
+  guestKey: string | null;
+  clientId: string | null;
+  productId: string | null;
+  variantId: string | null;
+  collectionId: string | null;
+  query: string | null;
+}): Promise<void> {
+  const data = browseActivityToShopperCreateData(input);
+  if (!data) return;
+  try {
+    await db.shopperEvent.upsert({
+      where: { shop_eventId: { shop: data.shop, eventId: data.eventId } },
+      create: data,
+      update: {},
+    });
+  } catch (error) {
+    console.error("[browseActivity] ShopperEvent dual-write failed", error);
+  }
 }
 
 export async function loadRecentActivity(

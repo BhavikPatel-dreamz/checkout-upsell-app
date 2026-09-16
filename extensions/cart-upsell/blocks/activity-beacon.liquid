@@ -10,6 +10,12 @@
     activityUrl: "/apps/checkout-upsell/api/activity"
   };
 </script>
+{% comment %}
+  Optional theme markup (after this embed is enabled):
+  <a class="cu-track" data-cu-event="product_click" data-cu-product-id="{{ product.id }}">…</a>
+  <button class="cu-track cu-track--size_guide_open">Size guide</button>
+  CheckoutUpsellActivity.track("wishlist_add", { productId: product.id })
+{% endcomment %}
 
 {% schema %}
 {

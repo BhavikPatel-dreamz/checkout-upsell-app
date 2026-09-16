@@ -33,9 +33,16 @@ export const SHOPPER_EVENT_NAMES = [
   "offer_accept",
   "offer_reject",
   "wishlist_add",
+  "custom",
 ] as const;
 
 export type ShopperEventName = (typeof SHOPPER_EVENT_NAMES)[number];
+
+const SHOPPER_EVENT_NAME_SET = new Set<string>(SHOPPER_EVENT_NAMES);
+
+export function isShopperEventName(value: string): value is ShopperEventName {
+  return SHOPPER_EVENT_NAME_SET.has(value);
+}
 
 export const SHOPPER_EVENT_SURFACES = [
   "theme_block",
@@ -62,6 +69,11 @@ const entitiesSchema = z
     variantId: opaqueId.optional(),
     collectionId: opaqueId.optional(),
     query: z.string().trim().max(500).optional(),
+    customName: z
+      .string()
+      .trim()
+      .regex(/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/, "customName must be a short slug")
+      .optional(),
   })
   .strict();
 
@@ -108,6 +120,13 @@ export const shopperEventEnvelopeSchema = z
         code: z.ZodIssueCode.custom,
         message: "At least one of sessionId, customerId, or anonId is required",
         path: ["sessionId"],
+      });
+    }
+    if (value.name === "custom" && !value.entities?.customName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "customName is required when name is custom",
+        path: ["entities", "customName"],
       });
     }
   });
@@ -194,7 +213,7 @@ export function toShopperEventCreateData(envelope: ShopperEventEnvelope) {
     productId: entities?.productId ?? null,
     variantId: entities?.variantId ?? null,
     collectionId: entities?.collectionId ?? null,
-    query: entities?.query ?? null,
+    query: entities?.query ?? entities?.customName ?? null,
     recommendationId: emptyToNull(attribution?.recommendationId ?? undefined),
     campaignId: emptyToNull(attribution?.campaignId ?? undefined),
     experienceId: emptyToNull(attribution?.experienceId ?? undefined),

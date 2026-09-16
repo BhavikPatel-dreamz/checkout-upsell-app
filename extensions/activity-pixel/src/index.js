@@ -1,12 +1,17 @@
 import { register } from "@shopify/web-pixels-extension";
 
-const EVENT_TYPES = new Set([
+const POSTABLE_TYPES = new Set([
   "product_viewed",
   "collection_viewed",
   "search_submitted",
   "product_added_to_cart",
   "variant_changed",
   "time_on_page",
+  "page_view",
+  "cart_view",
+  "remove_from_cart",
+  "checkout_started",
+  "checkout_completed",
 ]);
 
 const GUEST_COOKIE = "checkout-upsell-guest-key";
@@ -27,10 +32,35 @@ function myshopifyDomain(init) {
   return "";
 }
 
-register(({ analytics, browser, init, settings }) => {
+function pathnameFromEvent(event) {
+  try {
+    const href = event?.context?.document?.location?.href;
+    if (typeof href !== "string" || !href) return null;
+    return new URL(href).pathname.slice(0, 200);
+  } catch {
+    return null;
+  }
+}
+
+register(({ analytics, browser, init, settings, customerPrivacy }) => {
   const shop = myshopifyDomain(init);
   const apiBase = String(settings?.apiBase || "").replace(/\/$/, "");
   let lastProductView = { productId: null, variantId: null };
+  let analyticsAllowed = init?.customerPrivacy?.analyticsProcessingAllowed !== false;
+
+  function setConsentFromPayload(payload) {
+    const privacy = payload?.customerPrivacy;
+    if (!privacy || typeof privacy.analyticsProcessingAllowed !== "boolean") return;
+    analyticsAllowed = privacy.analyticsProcessingAllowed;
+  }
+
+  customerPrivacy.subscribe("visitorConsentCollected", setConsentFromPayload);
+  customerPrivacy.subscribe("analyticsConsentAccepted", () => {
+    analyticsAllowed = true;
+  });
+  customerPrivacy.subscribe("analyticsConsentDeclined", () => {
+    analyticsAllowed = false;
+  });
 
   function endpoints() {
     const urls = [];
@@ -64,7 +94,8 @@ register(({ analytics, browser, init, settings }) => {
   }
 
   async function postActivity(payload) {
-    if (!EVENT_TYPES.has(payload.eventType)) return;
+    if (!analyticsAllowed) return;
+    if (!POSTABLE_TYPES.has(payload.eventType)) return;
     if (!payload.clientId && !payload.customerId && !payload.guestKey) return;
     const urls = endpoints();
     if (urls.length === 0) return;
@@ -72,6 +103,8 @@ register(({ analytics, browser, init, settings }) => {
     const body = JSON.stringify({
       shop,
       consented: true,
+      surface: "pixel",
+      source: "web_pixel",
       ...payload,
     });
 
@@ -97,6 +130,16 @@ register(({ analytics, browser, init, settings }) => {
       guestKey: customerGid() ? null : await guestKeyFromCookie(),
     };
   }
+
+  analytics.subscribe("page_viewed", async (event) => {
+    const id = await identityFromEvent(event);
+    await postActivity({
+      eventType: "page_view",
+      ...id,
+      query: pathnameFromEvent(event),
+      occurredAt: event.timestamp,
+    });
+  });
 
   analytics.subscribe("product_viewed", async (event) => {
     const variant = event.data?.productVariant;
@@ -149,6 +192,15 @@ register(({ analytics, browser, init, settings }) => {
     });
   });
 
+  analytics.subscribe("cart_viewed", async (event) => {
+    const id = await identityFromEvent(event);
+    await postActivity({
+      eventType: "cart_view",
+      ...id,
+      occurredAt: event.timestamp,
+    });
+  });
+
   analytics.subscribe("product_added_to_cart", async (event) => {
     const merchandise = event.data?.cartLine?.merchandise;
     const id = await identityFromEvent(event);
@@ -157,6 +209,36 @@ register(({ analytics, browser, init, settings }) => {
       ...id,
       productId: toGid("Product", merchandise?.product?.id),
       variantId: toGid("ProductVariant", merchandise?.id),
+      occurredAt: event.timestamp,
+    });
+  });
+
+  analytics.subscribe("product_removed_from_cart", async (event) => {
+    const merchandise = event.data?.cartLine?.merchandise;
+    const id = await identityFromEvent(event);
+    await postActivity({
+      eventType: "remove_from_cart",
+      ...id,
+      productId: toGid("Product", merchandise?.product?.id),
+      variantId: toGid("ProductVariant", merchandise?.id),
+      occurredAt: event.timestamp,
+    });
+  });
+
+  analytics.subscribe("checkout_started", async (event) => {
+    const id = await identityFromEvent(event);
+    await postActivity({
+      eventType: "checkout_started",
+      ...id,
+      occurredAt: event.timestamp,
+    });
+  });
+
+  analytics.subscribe("checkout_completed", async (event) => {
+    const id = await identityFromEvent(event);
+    await postActivity({
+      eventType: "checkout_completed",
+      ...id,
       occurredAt: event.timestamp,
     });
   });

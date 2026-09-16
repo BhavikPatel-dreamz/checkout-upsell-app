@@ -316,11 +316,16 @@ export default function OnboardingPage() {
                 />
                 <GuideStep
                   number={4}
+                  title="Optional: track clicks with a CSS class"
+                  description='With Upsell activity enabled, add class="cu-track" and data-cu-event on any theme element. Clicks POST to the same activity API (consent-gated). Use a known event like product_click, or a custom slug such as size_guide_open. You can also call CheckoutUpsellActivity.track("wishlist_add", { productId: "gid://shopify/Product/1" }) from your own JS. These custom events are stored for AI later; they do not change smart ranking yet.'
+                />
+                <GuideStep
+                  number={5}
                   title="Position the blocks"
                   description="On cart, place the block near the cart items or checkout button. On thank-you, keep it near the order confirmation so it is easy to see."
                 />
                 <GuideStep
-                  number={5}
+                  number={6}
                   title="Save and preview"
                   description="Save both editors. Add a trigger product to the cart to test cart upsells, then complete a test order to see thank-you offers."
                 />
@@ -361,7 +366,18 @@ export default function OnboardingPage() {
               </div>
 
               <div style={styles.guideNote}>
-                <strong>Tip:</strong> Test your offers by adding a trigger product to your cart and proceeding to checkout. You should see the upsell block appear based on your offer configuration.
+                <strong>Custom activity (theme):</strong> Enable the Upsell activity embed, then mark elements:
+                <pre style={{ marginTop: 8, whiteSpace: "pre-wrap", fontSize: 12 }}>
+{`<a class="cu-track" data-cu-event="product_click" data-cu-product-id="{{ product.id }}" href="{{ product.url }}">
+  {{ product.title }}
+</a>
+
+<button class="cu-track cu-track--size_guide_open" type="button">Size guide</button>
+
+<script>
+  CheckoutUpsellActivity.track("wishlist_add", { productId: "gid://shopify/Product/123" });
+</script>`}
+                </pre>
               </div>
             </div>
           </div>
