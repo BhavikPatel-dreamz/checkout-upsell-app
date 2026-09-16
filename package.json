@@ -34,7 +34,6 @@
     "@react-router/fs-routes": "^7.18.0",
     "@react-router/node": "^7.18.0",
     "@react-router/serve": "^7.18.0",
-    "react-router": "^7.18.0",
     "@shopify/app-bridge-react": "^4.2.4",
     "@shopify/shopify-app-react-router": "^1.2.1",
     "@shopify/shopify-app-session-storage-prisma": "^9.0.0",
@@ -42,7 +41,9 @@
     "prisma": "^6.16.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "vite-tsconfig-paths": "^5.1.4"
+    "react-router": "^7.18.0",
+    "vite-tsconfig-paths": "^5.1.4",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@shopify/api-codegen-preset": "^1.2.0",
