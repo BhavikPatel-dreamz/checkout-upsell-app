@@ -13,13 +13,19 @@ export type DropReason =
   | "out_of_stock"
   | "excluded"
   | "not_included"
+  | "price_band"
+  | "min_margin"
   | "max_n";
 
-/** In-memory merchant constraints. Persist + admin UI is AI-2.6. */
+/** Merchant constraints. Admin persistence is MerchantRuleSet (AI-2.6). */
 export interface MerchantRules {
   includeProductIds?: string[];
   excludeProductIds?: string[];
+  alwaysProductIds?: string[];
   maxN?: number;
+  minMarginPercent?: number;
+  priceMin?: number;
+  priceMax?: number;
 }
 
 export interface HybridCandidate {
@@ -35,6 +41,8 @@ export interface HybridCandidate {
   priceFit?: number;
   businessValue?: number;
   repetition?: number;
+  price?: number | null;
+  marginPercent?: number | null;
 }
 
 export interface ScoredHybridCandidate extends HybridCandidate {
@@ -142,9 +150,10 @@ export function applyMerchantRules(
 ): { kept: ScoredHybridCandidate[]; dropped: DroppedCandidate[] } {
   const exclude = idSet(merchant?.excludeProductIds);
   const include = idSet(merchant?.includeProductIds);
+  const always = idSet(merchant?.alwaysProductIds);
   const maxN = merchant?.maxN ?? MAX_UPSELL_PRODUCTS;
   const dropped: DroppedCandidate[] = [];
-  const afterExclude: ScoredHybridCandidate[] = [];
+  const eligible: ScoredHybridCandidate[] = [];
 
   for (const row of ranked) {
     if (exclude.has(row.productId)) {
@@ -155,11 +164,38 @@ export function applyMerchantRules(
       dropped.push({ productId: row.productId, reason: "not_included" });
       continue;
     }
-    afterExclude.push(row);
+    if (
+      merchant?.priceMin != null &&
+      row.price != null &&
+      row.price < merchant.priceMin
+    ) {
+      dropped.push({ productId: row.productId, reason: "price_band" });
+      continue;
+    }
+    if (
+      merchant?.priceMax != null &&
+      row.price != null &&
+      row.price > merchant.priceMax
+    ) {
+      dropped.push({ productId: row.productId, reason: "price_band" });
+      continue;
+    }
+    if (
+      merchant?.minMarginPercent != null &&
+      row.marginPercent != null &&
+      row.marginPercent < merchant.minMarginPercent
+    ) {
+      dropped.push({ productId: row.productId, reason: "min_margin" });
+      continue;
+    }
+    eligible.push(row);
   }
 
-  const kept = afterExclude.slice(0, Math.max(0, maxN));
-  for (const row of afterExclude.slice(kept.length)) {
+  const pinned = eligible.filter((row) => always.has(row.productId));
+  const rest = eligible.filter((row) => !always.has(row.productId));
+  const ordered = [...pinned, ...rest];
+  const kept = ordered.slice(0, Math.max(0, maxN));
+  for (const row of ordered.slice(kept.length)) {
     dropped.push({ productId: row.productId, reason: "max_n" });
   }
   return { kept, dropped };

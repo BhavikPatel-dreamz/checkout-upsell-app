@@ -36,7 +36,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 | AI-2.3 | Relation builders: FBT, similar (co-view), complementary heuristic (category rules + FBT) | COMPLETE |
 | AI-2.4 | Scoring function + tests (weights documented; inventory + in-cart penalty) | COMPLETE |
 | AI-2.5 | Hybrid pipeline: business rules → candidates → score → merchant include/exclude/max N | COMPLETE |
-| AI-2.6 | `MerchantRuleSet` admin UI (never / always / min margin if cost present / price band) | NOT_STARTED |
+| AI-2.6 | `MerchantRuleSet` admin UI (never / always / min margin if cost present / price band) | COMPLETE |
 | AI-2.7 | Wire `ai_recommend` + eligibility to scored candidates **inside merchant pool first**, then optional catalog expand behind flag | NOT_STARTED |
 | AI-2.8 | Keep LLM picker optional and **top-K only**; never candidate gen | NOT_STARTED |
 | AI-2.9 | Embeddings + `pgvector` (or skip if BLOCKED on ops) — similar/complementary | NOT_STARTED |

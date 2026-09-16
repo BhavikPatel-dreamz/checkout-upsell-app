@@ -1,7 +1,13 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { Form, useActionData, useLoaderData } from "react-router";
+import { formatProductIdList } from "../config/merchantRules";
 import { RETENTION_DAY_OPTIONS } from "../config/privacy";
 import { authenticate } from "../shopify.server";
+import {
+  getMerchantRuleSet,
+  merchantRuleSetFromForm,
+  upsertMerchantRuleSet,
+} from "../models/merchantRuleSet.server";
 import {
   getShopPrivacySettings,
   upsertShopPrivacySettings,
@@ -9,23 +15,39 @@ import {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
-  return getShopPrivacySettings(session.shop);
+  const [privacy, merchant] = await Promise.all([
+    getShopPrivacySettings(session.shop),
+    getMerchantRuleSet(session.shop),
+  ]);
+  return { privacy, merchant };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   const { session } = await authenticate.admin(request);
   const form = await request.formData();
-  const settings = await upsertShopPrivacySettings(session.shop, {
+  const intent = String(form.get("intent") ?? "privacy");
+
+  if (intent === "rules") {
+    const merchant = await upsertMerchantRuleSet(session.shop, merchantRuleSetFromForm(form));
+    return { ok: true as const, intent: "rules" as const, merchant };
+  }
+
+  const privacy = await upsertShopPrivacySettings(session.shop, {
     trackingEnabled: form.get("trackingEnabled") === "true",
     privacyRetentionDays: Number(form.get("privacyRetentionDays")),
   });
-  return { ok: true as const, settings };
+  return { ok: true as const, intent: "privacy" as const, privacy };
 }
 
 export default function SettingsPage() {
   const loaded = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const settings = actionData?.settings ?? loaded;
+  const privacy =
+    actionData && "privacy" in actionData && actionData.privacy ? actionData.privacy : loaded.privacy;
+  const merchant =
+    actionData && "merchant" in actionData && actionData.merchant
+      ? actionData.merchant
+      : loaded.merchant;
 
   return (
     <s-page heading="Settings">
@@ -36,13 +58,14 @@ export default function SettingsPage() {
           tracking still requires the shopper’s Shopify analytics consent.
         </s-paragraph>
         <Form method="post">
+          <input type="hidden" name="intent" value="privacy" />
           <s-stack direction="block" gap="base">
             <label>
               <input
                 type="checkbox"
                 name="trackingEnabled"
                 value="true"
-                defaultChecked={settings.trackingEnabled}
+                defaultChecked={privacy.trackingEnabled}
               />{" "}
               Enable storefront activity tracking
             </label>
@@ -50,7 +73,7 @@ export default function SettingsPage() {
               Keep events for{" "}
               <select
                 name="privacyRetentionDays"
-                defaultValue={String(settings.privacyRetentionDays)}
+                defaultValue={String(privacy.privacyRetentionDays)}
               >
                 {RETENTION_DAY_OPTIONS.map((days) => (
                   <option key={days} value={days}>
@@ -62,7 +85,85 @@ export default function SettingsPage() {
             <s-button type="submit" variant="primary">
               Save
             </s-button>
-            {actionData?.ok ? <s-paragraph>Saved.</s-paragraph> : null}
+            {actionData?.ok && actionData.intent === "privacy" ? (
+              <s-paragraph>Saved.</s-paragraph>
+            ) : null}
+          </s-stack>
+        </Form>
+      </s-section>
+
+      <s-section heading="Recommendation rules">
+        <s-paragraph>
+          Never-recommend and always-include wrap the hybrid scorer. Min
+          margin applies only when a product has cost/margin data. Price band
+          uses catalog prices from product sync. Standard shops always review
+          these lists; nothing auto-publishes.
+        </s-paragraph>
+        <Form method="post">
+          <input type="hidden" name="intent" value="rules" />
+          <s-stack direction="block" gap="base">
+            <label>
+              Never recommend (one product ID or GID per line)
+              <textarea
+                name="neverProductIds"
+                rows={4}
+                defaultValue={formatProductIdList(merchant.neverProductIds)}
+                style={{ width: "100%" }}
+              />
+            </label>
+            <label>
+              Always include when eligible (pinned first, still respects never
+              and stock)
+              <textarea
+                name="alwaysProductIds"
+                rows={4}
+                defaultValue={formatProductIdList(merchant.alwaysProductIds)}
+                style={{ width: "100%" }}
+              />
+            </label>
+            <label>
+              Max products shown{" "}
+              <input
+                type="number"
+                name="maxN"
+                min={1}
+                max={20}
+                defaultValue={merchant.maxN}
+              />
+            </label>
+            <label>
+              Min margin % (ignored when cost is unknown){" "}
+              <input
+                type="number"
+                name="minMarginPercent"
+                step="0.1"
+                defaultValue={merchant.minMarginPercent ?? ""}
+              />
+            </label>
+            <label>
+              Price min{" "}
+              <input
+                type="number"
+                name="priceMin"
+                step="0.01"
+                defaultValue={merchant.priceMin ?? ""}
+              />
+            </label>
+            <label>
+              Price max{" "}
+              <input
+                type="number"
+                name="priceMax"
+                step="0.01"
+                defaultValue={merchant.priceMax ?? ""}
+              />
+            </label>
+            <s-button type="submit" variant="primary">
+              Save rules
+            </s-button>
+            {actionData?.ok && actionData.intent === "rules" ? (
+              <s-paragraph>Saved.</s-paragraph>
+            ) : null}
           </s-stack>
         </Form>
       </s-section>

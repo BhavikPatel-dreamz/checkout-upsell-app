@@ -1,5 +1,6 @@
 import { ConsentSubjectType, ProductRelationKind } from "@prisma/client";
 import db from "../../db.server";
+import { getMerchantRuleSet, toPipelineMerchantRules } from "../../models/merchantRuleSet.server";
 import {
   runHybridPipeline,
   type HybridCandidate,
@@ -75,6 +76,7 @@ export async function loadHybridCandidates(input: {
       relationScore: relation.score,
       availableForSale: catalog?.availableForSale ?? true,
       inventoryQuantity: catalog?.inventoryQuantity ?? null,
+      price: catalog?.priceMin != null ? Number(catalog.priceMin) : null,
       affinity: affinityByPair.get(`${relation.productId}|${relation.relatedProductId}`) ?? 0,
       interest: interestByProduct.get(relation.relatedProductId) ?? 0,
       complementarity: strategy === "complementary" ? relation.score : 0,
@@ -95,10 +97,12 @@ export async function runHybridRecommend(input: {
     productIds: input.productIds,
     customerId: input.customerId,
   });
+  const merchant =
+    input.merchant ?? toPipelineMerchantRules(await getMerchantRuleSet(input.shop));
   return runHybridPipeline({
     candidates,
     anchorProductIds: input.productIds,
     cartProductIds: input.cartProductIds ?? [],
-    merchant: input.merchant,
+    merchant,
   });
 }

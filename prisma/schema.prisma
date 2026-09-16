@@ -37,6 +37,20 @@ model Shop {
   updatedAt            DateTime @updatedAt
 }
 
+/// Shop-level never/always lists, price band, optional min margin (AI-2.6).
+model MerchantRuleSet {
+  id               String   @id @default(cuid())
+  shop             String   @unique
+  neverProductIds  String[] @default([])
+  alwaysProductIds String[] @default([])
+  maxN             Int      @default(5)
+  minMarginPercent Float?
+  priceMin         Decimal? @db.Decimal(12, 2)
+  priceMax         Decimal? @db.Decimal(12, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model Offer {
   id               String         @id @default(cuid())
   shop             String

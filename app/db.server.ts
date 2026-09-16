@@ -9,9 +9,15 @@ function createPrisma(): PrismaClient {
   return new PrismaClient();
 }
 
-function hasProductRelation(client: PrismaClient): boolean {
-  return typeof (client as PrismaClient & { productRelation?: { findMany?: unknown } }).productRelation
-    ?.findMany === "function";
+function hasRequiredDelegates(client: PrismaClient): boolean {
+  const asAny = client as PrismaClient & {
+    productRelation?: { findMany?: unknown };
+    merchantRuleSet?: { findUnique?: unknown };
+  };
+  return (
+    typeof asAny.productRelation?.findMany === "function" &&
+    typeof asAny.merchantRuleSet?.findUnique === "function"
+  );
 }
 
 /**
@@ -20,7 +26,7 @@ function hasProductRelation(client: PrismaClient): boolean {
  */
 function getPrisma(): PrismaClient {
   const cached = global.prismaGlobal;
-  if (cached && hasProductRelation(cached)) return cached;
+  if (cached && hasRequiredDelegates(cached)) return cached;
 
   const client = createPrisma();
   if (process.env.NODE_ENV !== "production") {
