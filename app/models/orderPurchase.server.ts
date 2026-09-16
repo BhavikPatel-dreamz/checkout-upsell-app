@@ -1,3 +1,4 @@
+import { OfferEventType, Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import db from "../db.server";
 import {
@@ -5,7 +6,16 @@ import {
   parseShopperEventEnvelope,
   toShopperEventCreateData,
 } from "../ai/events/envelope";
-import { recordIdentitySighting } from "../ai/events/identity.server";
+import { recordIdentitySighting, resolveCustomerId } from "../ai/events/identity.server";
+
+export const PURCHASE_ATTRIBUTION_WINDOW_MS = 1000 * 60 * 60 * 24 * 7;
+
+const ATTRIBUTION_EVENT_NAMES = [
+  "recommendation_add",
+  "recommendation_click",
+  "recommendation_view",
+  "recommendation_purchase",
+];
 
 function getString(value: unknown): string | null {
   if (typeof value === "string" && value.trim()) return value.trim();
@@ -52,6 +62,145 @@ export function orderIdFromPayload(order: Record<string, unknown>): string {
   );
 }
 
+function idCandidates(type: "Product" | "ProductVariant", value: string | null): string[] {
+  if (!value) return [];
+  const gid = toGid(type, value);
+  const numeric = value.match(/(\d+)\s*$/)?.[1] ?? null;
+  return Array.from(new Set([value, gid, numeric].filter((item): item is string => Boolean(item))));
+}
+
+function lineRevenue(lineItem: Record<string, unknown>): Prisma.Decimal | null {
+  const priceRaw = getString(lineItem.price ?? lineItem.total_price);
+  if (!priceRaw) return null;
+  const price = Number.parseFloat(priceRaw);
+  if (!Number.isFinite(price)) return null;
+  const quantity = Number.parseInt(getString(lineItem.quantity) ?? "1", 10);
+  const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+  const amount = price * safeQuantity;
+  if (amount < 0) return null;
+  return new Prisma.Decimal(amount.toFixed(2));
+}
+
+async function lastRecommendation(input: {
+  shop: string;
+  at: Date;
+  customerId: string | null;
+  sessionId: string | null;
+  anonId: string | null;
+  productId: string | null;
+  variantId: string | null;
+}): Promise<{ offerId: string; productId: string | null; variantId: string | null } | null> {
+  const since = new Date(input.at.getTime() - PURCHASE_ATTRIBUTION_WINDOW_MS);
+  const identityOr = [
+    ...(input.customerId ? [{ customerId: input.customerId }] : []),
+    ...(input.sessionId ? [{ sessionId: input.sessionId }, { anonId: input.sessionId }] : []),
+    ...(input.anonId ? [{ anonId: input.anonId }, { sessionId: input.anonId }] : []),
+  ];
+  if (identityOr.length === 0) return null;
+
+  const productIds = idCandidates("Product", input.productId);
+  const variantIds = idCandidates("ProductVariant", input.variantId);
+  const productOr = [
+    ...(productIds.length ? [{ productId: { in: productIds } }] : []),
+    ...(variantIds.length ? [{ variantId: { in: variantIds } }] : []),
+  ];
+  if (productOr.length === 0) return null;
+
+  const rec = await db.shopperEvent.findFirst({
+    where: {
+      shop: input.shop,
+      name: { in: ATTRIBUTION_EVENT_NAMES },
+      recommendationId: { not: null },
+      occurredAt: { gte: since, lte: input.at },
+      AND: [{ OR: identityOr }, { OR: productOr }],
+    },
+    orderBy: { occurredAt: "desc" },
+    select: { recommendationId: true, productId: true, variantId: true },
+  });
+  if (rec?.recommendationId) {
+    return {
+      offerId: rec.recommendationId,
+      productId: rec.productId,
+      variantId: rec.variantId,
+    };
+  }
+
+  const add = await db.offerEvent.findFirst({
+    where: {
+      shop: input.shop,
+      eventType: OfferEventType.added_to_cart,
+      createdAt: { gte: since, lte: input.at },
+      AND: [
+        {
+          OR: [
+            ...(input.customerId ? [{ customerId: input.customerId }] : []),
+            ...(input.sessionId ? [{ guestKey: input.sessionId }] : []),
+            ...(input.anonId ? [{ guestKey: input.anonId }] : []),
+          ],
+        },
+        {
+          OR: [
+            ...(productIds.length ? [{ productId: { in: productIds } }] : []),
+            ...(variantIds.length ? [{ variantId: { in: variantIds } }] : []),
+          ],
+        },
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    select: { offerId: true, productId: true, variantId: true },
+  });
+  if (!add) return null;
+  return { offerId: add.offerId, productId: add.productId, variantId: add.variantId };
+}
+
+async function dualWriteOfferPurchased(input: {
+  shop: string;
+  offerId: string;
+  orderId: string;
+  lineItemId: string | null;
+  productId: string;
+  variantId: string;
+  customerId: string | null;
+  guestKey: string | null;
+  revenue: Prisma.Decimal | null;
+}): Promise<void> {
+  const offer = await db.offer.findFirst({
+    where: { shop: input.shop, id: input.offerId },
+    select: { id: true, placement: true },
+  });
+  if (!offer) return;
+
+  const existing = await db.offerEvent.findFirst({
+    where: {
+      shop: input.shop,
+      offerId: input.offerId,
+      productId: input.productId,
+      variantId: input.variantId,
+      eventType: OfferEventType.purchased,
+      orderId: input.orderId,
+      ...(input.lineItemId ? { lineItemId: input.lineItemId } : {}),
+    },
+    select: { id: true },
+  });
+  if (existing) return;
+
+  await db.offerEvent.create({
+    data: {
+      shop: input.shop,
+      offerId: input.offerId,
+      eventType: OfferEventType.purchased,
+      orderId: input.orderId,
+      lineItemId: input.lineItemId,
+      customerId: input.customerId,
+      guestKey: input.customerId ? null : input.guestKey,
+      productId: input.productId,
+      variantId: input.variantId,
+      placement: offer.placement,
+      ...(input.revenue ? { revenue: input.revenue } : {}),
+    },
+  });
+}
+
 export async function emitPurchaseShopperEvents(input: {
   shop: string;
   payload: unknown;
@@ -83,16 +232,21 @@ export async function emitPurchaseShopperEvents(input: {
 
   const sessionId = guestFromLines;
   const anonId = cartToken ?? (customerId || sessionId ? null : `order:${orderId}`);
+  const resolvedCustomerId =
+    customerId ??
+    (await resolveCustomerId(input.shop, { sessionId, anonId, customerId }));
 
   await recordIdentitySighting({
     shop: input.shop,
     sessionId,
     anonId,
-    customerId,
+    customerId: resolvedCustomerId,
     source: "orders_webhook",
   });
 
   const rows: ReturnType<typeof toShopperEventCreateData>[] = [];
+  let created = 0;
+  let skipped = 0;
   const totalPrice = getString(order.total_price);
   const currency = getString(order.currency ?? order.presentment_currency);
 
@@ -102,7 +256,7 @@ export async function emitPurchaseShopperEvents(input: {
     eventId: `checkout_completed:${orderId}`,
     occurredAt: getString(order.created_at ?? order.processed_at) ?? new Date().toISOString(),
     sessionId,
-    customerId,
+    customerId: resolvedCustomerId,
     anonId: anonId ?? sessionId,
     consent: { analytics: true, marketing: false },
     name: "checkout_completed",
@@ -118,12 +272,24 @@ export async function emitPurchaseShopperEvents(input: {
   if (completed.ok && allowsAnalyticsPersistence(completed.data)) {
     rows.push(toShopperEventCreateData(completed.data));
   }
+  if (rows.length > 0) {
+    const completedInsert = await db.shopperEvent.createMany({ data: rows, skipDuplicates: true });
+    created += completedInsert.count;
+    skipped += rows.length - completedInsert.count;
+  }
+
+  const occurredAtIso = getString(order.created_at ?? order.processed_at) ?? new Date().toISOString();
+  const occurredAt = new Date(occurredAtIso);
 
   for (const rawLine of lineItems) {
     if (!rawLine || typeof rawLine !== "object") continue;
     const lineItem = rawLine as Record<string, unknown>;
     const lineItemId = getString(lineItem.admin_graphql_api_id ?? lineItem.id) ?? randomUUID();
     const props = lineProperties(lineItem);
+    const lineSession = getString(props["_upsell_guest_key"] ?? props["upsell_guest_key"]) ?? sessionId;
+    const lineCustomer =
+      toGid("Customer", getString(props["_upsell_customer_id"] ?? props["upsell_customer_id"])) ??
+      resolvedCustomerId;
     const productId = toGid(
       "Product",
       getString(props["_upsell_product_id"] ?? props["upsell_product_id"] ?? lineItem.product_id),
@@ -132,18 +298,28 @@ export async function emitPurchaseShopperEvents(input: {
       "ProductVariant",
       getString(props["_upsell_variant_id"] ?? props["upsell_variant_id"] ?? lineItem.variant_id),
     );
-    const offerId = getString(props["_upsell_offer_id"] ?? props["upsell_offer_id"]);
+    let offerId = getString(props["_upsell_offer_id"] ?? props["upsell_offer_id"]);
+    if (!offerId) {
+      const attributed = await lastRecommendation({
+        shop: input.shop,
+        at: occurredAt,
+        customerId: lineCustomer,
+        sessionId: lineSession,
+        anonId,
+        productId,
+        variantId,
+      });
+      offerId = attributed?.offerId ?? null;
+    }
     const quantity = getString(lineItem.quantity);
     const parsed = parseShopperEventEnvelope({
       schemaVersion: 1,
       shop: input.shop,
       eventId: `purchase:${orderId}:${lineItemId}`,
-      occurredAt: getString(order.created_at ?? order.processed_at) ?? new Date().toISOString(),
-      sessionId: getString(props["_upsell_guest_key"] ?? props["upsell_guest_key"]) ?? sessionId,
-      customerId:
-        toGid("Customer", getString(props["_upsell_customer_id"] ?? props["upsell_customer_id"])) ??
-        customerId,
-      anonId: anonId ?? sessionId,
+      occurredAt: occurredAtIso,
+      sessionId: lineSession,
+      customerId: lineCustomer,
+      anonId: anonId ?? lineSession,
       consent: { analytics: true, marketing: false },
       name: "purchase",
       source: "orders_webhook",
@@ -158,10 +334,40 @@ export async function emitPurchaseShopperEvents(input: {
       },
     });
     if (!parsed.ok || !allowsAnalyticsPersistence(parsed.data)) continue;
-    rows.push(toShopperEventCreateData(parsed.data));
+    const data = toShopperEventCreateData(parsed.data);
+    const existing = await db.shopperEvent.findUnique({
+      where: { shop_eventId: { shop: data.shop, eventId: data.eventId } },
+    });
+    if (!existing) {
+      await db.shopperEvent.create({ data });
+      created += 1;
+    } else if (!existing.recommendationId && data.recommendationId) {
+      await db.shopperEvent.update({
+        where: { id: existing.id },
+        data: {
+          recommendationId: data.recommendationId,
+          campaignId: data.campaignId,
+          attribution: data.attribution,
+        },
+      });
+    } else {
+      skipped += 1;
+    }
+
+    if (offerId && productId && variantId) {
+      await dualWriteOfferPurchased({
+        shop: input.shop,
+        offerId,
+        orderId,
+        lineItemId,
+        productId,
+        variantId,
+        customerId: lineCustomer,
+        guestKey: lineSession,
+        revenue: lineRevenue(lineItem),
+      });
+    }
   }
 
-  if (rows.length === 0) return { accepted: 0, skipped: 0 };
-  const result = await db.shopperEvent.createMany({ data: rows, skipDuplicates: true });
-  return { accepted: result.count, skipped: rows.length - result.count };
+  return { accepted: created, skipped };
 }

@@ -18,7 +18,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 | AI-1.5 | Theme/checkout emitters: batch POST `/api/ai/events` for recommendation_* and cart mutations (consent-gated) | COMPLETE |
 | AI-1.6 | Identity: sessionId + anonId + customerId merge-on-login within shop (`IdentityLink`) | COMPLETE |
 | AI-1.7 | Replace stub `webhooks.orders.create` / paid with HMAC-verified handlers that emit `purchase` + line items | COMPLETE |
-| AI-1.8 | Attribution: link purchase lines to last `recommendationId` / offer within window; dual-write `OfferEvent.purchased` | NOT_STARTED |
+| AI-1.8 | Attribution: link purchase lines to last `recommendationId` / offer within window; dual-write `OfferEvent.purchased` | COMPLETE |
 | AI-1.9 | Consent + retention settings on shop; scheduled delete job for expired events | NOT_STARTED |
 | AI-1.10 | GDPR redact path deletes events, activity, future profiles (shop + customer) | NOT_STARTED |
 | AI-1.11 | Vitest: ingest, consent drop, identity merge, attribution window | NOT_STARTED |

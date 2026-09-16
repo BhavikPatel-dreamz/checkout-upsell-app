@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { ingestShopperEventBatch } from "../app/ai/events/ingest.server";
 import { emitPurchaseShopperEvents } from "../app/models/orderPurchase.server";
 
 const db = new PrismaClient();
@@ -32,6 +33,7 @@ const orderPayload = {
 
 describe("order purchase ShopperEvents", () => {
   it("emits checkout_completed plus one purchase per line and is idempotent", async () => {
+    await db.offerEvent.deleteMany({ where: { shop: SHOP } });
     await db.shopperEvent.deleteMany({ where: { shop: SHOP } });
     const first = await emitPurchaseShopperEvents({ shop: SHOP, payload: orderPayload });
     const second = await emitPurchaseShopperEvents({ shop: SHOP, payload: orderPayload });
@@ -45,5 +47,67 @@ describe("order purchase ShopperEvents", () => {
     ]);
     expect(rows.some((row) => row.recommendationId === "offer-abc")).toBe(true);
     expect(rows[0].customerId).toBe("gid://shopify/Customer/77");
-  });
+  }, 20_000);
+
+  it("attributes a line to the last in-window recommendation and dual-writes OfferEvent.purchased", async () => {
+    const { createOffer } = await import("../app/models/offer.server");
+    const { OfferPlacement, OfferType } = await import("@prisma/client");
+    await db.offerEvent.deleteMany({ where: { shop: SHOP } });
+    await db.shopperEvent.deleteMany({ where: { shop: SHOP } });
+    await db.offer.deleteMany({ where: { shop: SHOP } });
+
+    const offer = await createOffer(SHOP, {
+      name: "Attr",
+      type: OfferType.cross_sell,
+      placement: OfferPlacement.checkout,
+      targetProductIds: ["trigger"],
+      isActive: true,
+    });
+
+    await ingestShopperEventBatch({
+      shop: SHOP,
+      consented: true,
+      events: [
+        {
+          name: "recommendation_click",
+          customerId: "gid://shopify/Customer/77",
+          anonId: "cart-token-1",
+          occurredAt: "2026-09-16T09:00:00.000Z",
+          entities: {
+            productId: "gid://shopify/Product/3",
+            variantId: "gid://shopify/ProductVariant/4",
+          },
+          attribution: { recommendationId: offer.id },
+        },
+      ],
+    });
+
+    await emitPurchaseShopperEvents({
+      shop: SHOP,
+      payload: {
+        ...orderPayload,
+        id: 1002,
+        admin_graphql_api_id: "gid://shopify/Order/1002",
+        line_items: [
+          {
+            id: 22,
+            product_id: 3,
+            variant_id: 4,
+            quantity: 1,
+            price: "10.00",
+          },
+        ],
+      },
+    });
+
+    const purchase = await db.shopperEvent.findFirst({
+      where: { shop: SHOP, name: "purchase", eventId: "purchase:gid://shopify/Order/1002:22" },
+    });
+    expect(purchase?.recommendationId).toBe(offer.id);
+    const offerPurchase = await db.offerEvent.findFirst({
+      where: { shop: SHOP, offerId: offer.id, eventType: "purchased" },
+    });
+    expect(offerPurchase?.productId).toBe("gid://shopify/Product/3");
+    expect(offerPurchase?.orderId).toBe("gid://shopify/Order/1002");
+  }, 20_000);
 });
