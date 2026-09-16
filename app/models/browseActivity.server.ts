@@ -10,6 +10,7 @@ import {
   type ShopperEventName,
   type ShopperEventSurface,
 } from "../ai/events/envelope";
+import { getShopPrivacySettings } from "./shopPrivacy.server";
 import db from "../db.server";
 
 export const ACTIVITY_TTL_DAYS = 30;
@@ -113,6 +114,11 @@ export async function recordBrowseActivity(
     return { recorded: false, skipped: "invalid" };
   }
 
+  const privacy = await getShopPrivacySettings(shop);
+  if (!privacy.trackingEnabled) {
+    return { recorded: false, skipped: "consent" };
+  }
+
   const customerId = toShopifyGid("Customer", trimOrNull(input.customerId));
   const guestKey = trimOrNull(input.guestKey);
   const clientId = trimOrNull(input.clientId);
@@ -121,7 +127,7 @@ export async function recordBrowseActivity(
     return { recorded: false, skipped: "identity" };
   }
 
-  const cutoff = new Date(Date.now() - ACTIVITY_TTL_DAYS * 24 * 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() - privacy.privacyRetentionDays * 24 * 60 * 60 * 1000);
   await db.browseActivity.deleteMany({
     where: { shop, occurredAt: { lt: cutoff } },
   });
@@ -234,6 +240,11 @@ async function recordShopperOnlyActivity(
   const customName = trimOrNull(input.customName);
   if (!shop || !eventType) {
     return { recorded: false, skipped: "invalid" };
+  }
+
+  const privacy = await getShopPrivacySettings(shop);
+  if (!privacy.trackingEnabled) {
+    return { recorded: false, skipped: "consent" };
   }
 
   const resolved = resolveShopperName(eventType, customName);

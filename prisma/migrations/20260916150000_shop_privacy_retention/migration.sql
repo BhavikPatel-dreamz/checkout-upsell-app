@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Shop" ADD COLUMN "trackingEnabled" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Shop" ADD COLUMN "privacyRetentionDays" INTEGER NOT NULL DEFAULT 90;

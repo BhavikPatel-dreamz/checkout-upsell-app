@@ -7,6 +7,7 @@ import {
   type ShopperEventName,
 } from "./envelope";
 import { recordIdentitySighting } from "./identity.server";
+import { getShopPrivacySettings } from "../../models/shopPrivacy.server";
 
 export const AI_EVENTS_BATCH_MAX = 25;
 
@@ -55,9 +56,15 @@ export async function ingestShopperEventBatch(input: {
     name: 0,
   };
 
+  const eventCount = Array.isArray(input.events) ? Math.min(input.events.length, AI_EVENTS_BATCH_MAX) : 0;
   if (input.consented === false) {
-    const count = Array.isArray(input.events) ? Math.min(input.events.length, AI_EVENTS_BATCH_MAX) : 0;
-    skipped.consent = count;
+    skipped.consent = eventCount;
+    return { accepted: 0, skipped };
+  }
+
+  const privacy = await getShopPrivacySettings(input.shop);
+  if (!privacy.trackingEnabled) {
+    skipped.consent = eventCount;
     return { accepted: 0, skipped };
   }
 
