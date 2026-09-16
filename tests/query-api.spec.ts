@@ -21,6 +21,11 @@ const SYNC_VARIANTS_QUERY = `#graphql
           title
           handle
           status
+          vendor
+          productType
+          publishedAt
+          tags
+          collections(first: 5) { nodes { title } }
           featuredMedia { preview { image { url } } }
         }
       }

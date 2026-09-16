@@ -4,6 +4,11 @@
 
 import { Prisma } from "@prisma/client";
 import db from "../db.server";
+import {
+  deleteOrphanProductIntelligence,
+  upsertProductIntelligence,
+  upsertProductIntelligenceForChunk,
+} from "./productIntelligence.server";
 
 // Minimal structural type for the Admin GraphQL client returned by
 // `authenticate.admin(request)` — avoids coupling to the SDK's exported name.
@@ -41,6 +46,11 @@ const SYNC_VARIANTS_QUERY = `#graphql
           title
           handle
           status
+          vendor
+          productType
+          publishedAt
+          tags
+          collections(first: 5) { nodes { title } }
           featuredMedia { preview { image { url } } }
         }
       }
@@ -59,6 +69,11 @@ const SHOPIFY_PRODUCTS_QUERY = `#graphql
         status
         description
         updatedAt
+        vendor
+        productType
+        publishedAt
+        tags
+        collections(first: 5) { nodes { title } }
         featuredMedia { preview { image { url } } }
         variants(first: 250) {
           nodes {
@@ -167,6 +182,11 @@ interface VariantNode {
     title: string;
     handle: string | null;
     status: string | null;
+    vendor: string | null;
+    productType: string | null;
+    publishedAt: string | null;
+    tags: string[];
+    collections: { nodes: { title: string }[] };
     featuredMedia: ImagePreview | null;
   };
 }
@@ -295,6 +315,7 @@ export async function syncProductsChunk(
       });
     }),
   );
+  await upsertProductIntelligenceForChunk(shop, nodes, syncedAt);
 
   const nextCursor = pageInfo.hasNextPage ? pageInfo.endCursor : null;
   console.info("[ProductSync] Variants saved", {
@@ -324,6 +345,7 @@ export async function deleteStaleVariants(
   const deleted = await db.productVariant.deleteMany({
     where: { shop, syncedAt: { lt: before } },
   });
+  await deleteOrphanProductIntelligence(shop);
   console.info("[ProductSync] Removed stale variants", { shop, removed: deleted.count, before });
   return deleted.count;
 }
@@ -474,6 +496,11 @@ export async function syncProductById(
             title: product.title,
             handle: product.handle,
             status: product.status,
+            vendor: product.vendor ?? null,
+            productType: product.productType ?? null,
+            publishedAt: product.publishedAt ?? null,
+            tags: product.tags ?? [],
+            collections: product.collections ?? { nodes: [] },
             featuredMedia: product.featuredMedia ?? null,
           },
         },
@@ -491,10 +518,12 @@ export async function syncProductById(
   let removed = 0;
   if (variantNodes.length === 0) {
     removed = (await db.productVariant.deleteMany({ where: { shop, productId } })).count;
+    await db.productIntelligence.deleteMany({ where: { shop, productId } });
   } else {
     removed = (await db.productVariant.deleteMany({
       where: { shop, productId, variantId: { notIn: Array.from(observedIds) } },
     })).count;
+    await upsertProductIntelligence(shop, product, variantNodes, syncedAt);
   }
 
   return { upserted: variantNodes.length, removed };
