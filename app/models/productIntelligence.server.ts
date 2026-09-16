@@ -128,6 +128,16 @@ export async function upsertProductIntelligence(
     create: row,
     update: row,
   });
+  const { writeProductEmbedding } = await import("../jobs/embeddings.server");
+  await writeProductEmbedding({
+    shop,
+    productId: product.id,
+    title: row.title,
+    brand: row.brand,
+    category: row.category,
+    tags: row.tags,
+    collections: row.collections,
+  });
 }
 
 export async function upsertProductIntelligenceForChunk(

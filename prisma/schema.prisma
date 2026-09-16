@@ -269,7 +269,7 @@ model ProductVariant {
   @@index([shop, productId])
 }
 
-/// Catalog features for ranking (AI-2.2). No embedding vector yet (AI-2.9).
+/// Catalog features for ranking. Embedding stored as pgvector column (AI-2.9), not a Prisma field.
 model ProductIntelligence {
   id                 String    @id @default(cuid())
   shop               String
