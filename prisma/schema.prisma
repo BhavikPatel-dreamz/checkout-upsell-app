@@ -72,6 +72,57 @@ model BrowseActivity {
   @@index([shop, clientId, occurredAt])
 }
 
+/// Append-only shopper event stream (AI platform Phase 1). Opaque ids only — no email, name, or IP.
+model ShopperEvent {
+  id             String   @id @default(cuid())
+  shop           String
+  eventId        String
+  schemaVersion  Int      @default(1)
+  name           String
+  source         String?
+  surface        String?
+  sessionId      String?
+  customerId     String?
+  anonId         String?
+  consentAnalytics Boolean @default(false)
+  consentMarketing Boolean @default(false)
+  productId      String?
+  variantId      String?
+  collectionId   String?
+  query          String?
+  recommendationId String?
+  campaignId     String?
+  experienceId   String?
+  entities       Json?
+  context        Json?
+  attribution    Json?
+  occurredAt     DateTime
+  createdAt      DateTime @default(now())
+
+  @@unique([shop, eventId])
+  @@index([shop, occurredAt])
+  @@index([shop, name, occurredAt])
+  @@index([shop, customerId, occurredAt])
+  @@index([shop, anonId, occurredAt])
+  @@index([shop, sessionId, occurredAt])
+  @@index([shop, recommendationId])
+}
+
+/// Latest analytics/marketing consent per opaque identity within a shop.
+model ConsentState {
+  id          String               @id @default(cuid())
+  shop        String
+  subjectType ConsentSubjectType
+  subjectId   String
+  analytics   Boolean              @default(false)
+  marketing   Boolean              @default(false)
+  recordedAt  DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@unique([shop, subjectType, subjectId])
+  @@index([shop, updatedAt])
+}
+
 model OfferEvent {
   id         String          @id @default(cuid())
   offerId    String
@@ -355,4 +406,10 @@ enum BrowseActivityType {
   product_added_to_cart
   variant_changed
   time_on_page
+}
+
+enum ConsentSubjectType {
+  customer
+  anon
+  session
 }

@@ -22,6 +22,15 @@ Checkout upsell app on React Router (ex-Remix template) — TypeScript, Prisma, 
 - Features are delivered as discrete tasks, one at a time. Implement only the task at hand — do not build ahead of the current request.
 - For every feature, keep the Standard vs Enterprise boundary explicit.
 
+### AI conversion platform
+
+The long-range product is **AI Conversion & Revenue Optimization** (shopper intelligence → recommend/offer/experience/timing → measure incrementality). Do not implement it as a single “AI recommendations” feature.
+
+- `doc/AI_PLATFORM_BLUEPRINT.md` — product/technical blueprint (modules, events, tables, APIs, Shopify surfaces, phases).
+- `doc/AI_PLATFORM_TASKS.md` — discrete tasks (`AI-x.y`). Implement **one task at a time**; update status after each task.
+- North star: **incremental revenue/profit vs holdout**, not impressions.
+- LLM is not the realtime recommender. Merchant rules wrap ML. Standard never silent-publishes.
+
 ### Reference documentation
 
 Read the relevant docs before working on the offer system, and keep them up to date when the code changes:

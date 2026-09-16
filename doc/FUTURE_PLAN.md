@@ -1,5 +1,7 @@
 # Future plan (deferred)
 
+The AI platform track lives in `doc/AI_PLATFORM_BLUEPRINT.md` and `doc/AI_PLATFORM_TASKS.md`. Use those instead of inventing parallel AI work.
+
 This file is the parking lot for work we **will add later**. Do not implement these as part of activity-ranked Standard upsells.
 
 Keep the Standard vs Enterprise boundary: Standard stays generic and config-driven; Enterprise is per-client and isolated from the Standard core.
