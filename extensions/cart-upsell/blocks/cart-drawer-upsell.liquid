@@ -7,6 +7,7 @@
 <script>
   window.CART_DRAWER_UPSELL_CONFIG = {
     eligibilityUrl: "/apps/checkout-upsell/api/offers/eligible",
+    decideUrl: "/apps/checkout-upsell/api/ai/decide",
     viewedUrl: "/apps/checkout-upsell/api/offers/viewed",
     clickedUrl: "/apps/checkout-upsell/api/offers/clicked",
     addedToCartUrl: "/apps/checkout-upsell/api/offers/added-to-cart",
@@ -17,6 +18,7 @@
     eventsUrl: "/apps/checkout-upsell/api/ai/events"
   };
 </script>
+<script src="{{ 'decide-client.js' | asset_url }}" defer></script>
 <script src="{{ 'ai-events.js' | asset_url }}" defer></script>
 
 {% schema %}
