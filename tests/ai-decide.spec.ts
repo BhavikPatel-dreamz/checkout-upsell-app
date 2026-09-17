@@ -43,6 +43,13 @@ describe("POST /api/ai/decide contract and holdout", () => {
       recommendationId: "rec-1",
       intent: { state: "EXPLORING", purchaseIntent: 0 },
       holdout: false,
+      timing: {
+        delayMs: 0,
+        trigger: "immediate",
+        expectedValue: 1,
+        interruptionCost: 0,
+        reason: "passthrough",
+      },
     });
   });
 

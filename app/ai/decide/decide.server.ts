@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import db from "../../db.server";
 import { refreshShopperProfile } from "../intent/profile.server";
 import { runHybridRecommend } from "../recommend/hybridRecommend.server";
+import { evaluateTiming, type TimingDecision } from "../timing/timing";
 import {
   identityKey,
   type DecideProduct,
@@ -43,16 +44,27 @@ async function productsFromHybrid(input: DecideRequest & { shop: string }): Prom
   return products;
 }
 
+const PASSTHROUGH_TIMING: TimingDecision = {
+  show: true,
+  delayMs: 0,
+  trigger: "immediate",
+  expectedValue: 1,
+  interruptionCost: 0,
+  reason: "passthrough",
+};
+
 export function buildDecideResponse(input: {
   surface: DecideSurface;
   holdout: boolean;
   products?: DecideProduct[];
   recommendationId?: string;
   intent?: { state: string; purchaseIntent: number };
+  timing?: TimingDecision;
 }): DecideResponse {
   const holdout = input.holdout;
   const products = holdout ? [] : (input.products ?? []);
-  const show = !holdout && products.length > 0;
+  const timing = input.timing ?? PASSTHROUGH_TIMING;
+  const show = !holdout && products.length > 0 && timing.show;
   return {
     show,
     experience: { channel: channelForSurface(input.surface), templateId: "default" },
@@ -62,6 +74,13 @@ export function buildDecideResponse(input: {
     recommendationId: input.recommendationId ?? randomUUID(),
     intent: input.intent ?? { state: "EXPLORING", purchaseIntent: 0 },
     holdout,
+    timing: {
+      delayMs: timing.delayMs,
+      trigger: timing.trigger,
+      expectedValue: timing.expectedValue,
+      interruptionCost: timing.interruptionCost,
+      reason: timing.reason,
+    },
   };
 }
 
@@ -86,15 +105,37 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
       products: [],
       recommendationId,
       intent,
+      timing: evaluateTiming({
+        surface: input.surface,
+        dwellMs: input.dwellMs,
+        scrollDepth: input.scrollDepth,
+        exitIntent: input.exitIntent,
+        cartValue: input.cartValue,
+        purchaseIntent: intent.purchaseIntent,
+        maxScore: 0,
+        productCount: 0,
+      }),
     });
   }
 
   const products = await productsFromHybrid(input);
+  const maxScore = products.reduce((max, row) => Math.max(max, row.score), 0);
+  const timing = evaluateTiming({
+    surface: input.surface,
+    dwellMs: input.dwellMs,
+    scrollDepth: input.scrollDepth,
+    exitIntent: input.exitIntent,
+    cartValue: input.cartValue,
+    purchaseIntent: intent.purchaseIntent,
+    maxScore,
+    productCount: products.length,
+  });
   return buildDecideResponse({
     surface: input.surface,
     holdout: false,
     products,
     recommendationId,
     intent,
+    timing,
   });
 }

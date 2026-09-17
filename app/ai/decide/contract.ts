@@ -24,6 +24,10 @@ export const decideRequestSchema = z
     anonId: z.string().trim().min(1).optional().nullable(),
     sessionId: z.string().trim().min(1).optional().nullable(),
     consented: z.boolean().optional(),
+    dwellMs: z.number().nonnegative().optional(),
+    scrollDepth: z.number().min(0).max(1).optional(),
+    exitIntent: z.boolean().optional(),
+    cartValue: z.number().nonnegative().optional(),
   })
   .strict();
 
@@ -45,6 +49,13 @@ export interface DecideResponse {
   recommendationId: string;
   intent: { state: string; purchaseIntent: number };
   holdout: boolean;
+  timing: {
+    delayMs: number;
+    trigger: string;
+    expectedValue: number;
+    interruptionCost: number;
+    reason: string;
+  };
 }
 
 export function identityKey(input: {
