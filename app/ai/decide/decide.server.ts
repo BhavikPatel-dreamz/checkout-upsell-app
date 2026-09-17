@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import db from "../../db.server";
-import { fallbackExperience, selectExperience, type ExperienceSelection } from "../experience/select";
+import { EXPERIENCE_TEMPLATES, fallbackExperience, selectExperience, type ExperienceSelection } from "../experience/select";
 import { refreshShopperProfile } from "../intent/profile.server";
+import { findExperienceForChannel } from "../../models/campaign.server";
 import { runHybridRecommend } from "../recommend/hybridRecommend.server";
 import { evaluateTiming, type TimingDecision } from "../timing/timing";
 import {
@@ -64,6 +65,28 @@ function resolveExperienceAndTiming(input: {
   return { experience, timing };
 }
 
+async function withPersistedExperience(
+  shop: string,
+  experience: ExperienceSelection,
+): Promise<{ experience: ExperienceSelection; campaignId: string | null; experienceId: string | null }> {
+  const row = await findExperienceForChannel(shop, experience.channel);
+  if (!row) return { experience, campaignId: null, experienceId: null };
+  const variant = row.variants[0];
+  const templateId = EXPERIENCE_TEMPLATES.includes(row.templateId as (typeof EXPERIENCE_TEMPLATES)[number])
+    ? (row.templateId as ExperienceSelection["templateId"])
+    : experience.templateId;
+  return {
+    experience: {
+      ...experience,
+      templateId,
+      headline: variant?.headline || experience.headline,
+      cta: variant?.cta || experience.cta,
+    },
+    campaignId: row.campaignId,
+    experienceId: row.id,
+  };
+}
+
 async function productsFromHybrid(input: DecideRequest & { shop: string }): Promise<DecideProduct[]> {
   const anchors = [...new Set([...(input.productIds ?? []), ...(input.cartProductIds ?? [])])];
   if (anchors.length === 0) return [];
@@ -109,6 +132,8 @@ export function buildDecideResponse(input: {
   intent?: { state: string; purchaseIntent: number };
   timing?: TimingDecision;
   experience?: ExperienceSelection;
+  campaignId?: string | null;
+  experienceId?: string | null;
 }): DecideResponse {
   const holdout = input.holdout;
   const products = holdout ? [] : (input.products ?? []);
@@ -139,6 +164,8 @@ export function buildDecideResponse(input: {
       interruptionCost: timing.interruptionCost,
       reason: timing.reason,
     },
+    campaignId: input.campaignId ?? null,
+    experienceId: input.experienceId ?? null,
   };
 }
 
@@ -164,6 +191,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
       maxScore: 0,
       productCount: 0,
     });
+    const persisted = await withPersistedExperience(input.shop, experience);
     return buildDecideResponse({
       surface: input.surface,
       holdout,
@@ -171,7 +199,9 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
       recommendationId,
       intent,
       timing,
-      experience,
+      experience: persisted.experience,
+      campaignId: persisted.campaignId,
+      experienceId: persisted.experienceId,
     });
   }
 
@@ -184,6 +214,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     maxScore,
     productCount: products.length,
   });
+  const persisted = await withPersistedExperience(input.shop, experience);
   return buildDecideResponse({
     surface: input.surface,
     holdout: false,
@@ -191,6 +222,8 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     recommendationId,
     intent,
     timing,
-    experience,
+    experience: persisted.experience,
+    campaignId: persisted.campaignId,
+    experienceId: persisted.experienceId,
   });
 }

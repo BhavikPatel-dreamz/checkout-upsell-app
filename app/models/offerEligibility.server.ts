@@ -89,7 +89,9 @@ export async function findEligibleCrossSellOffers(options: {
           savedLocation === "cart_drawer" ||
           savedLocation === "cart_drawer_upsell" ||
           savedLocation === "thank_you_page" ||
-          savedLocation === "product_page"
+          savedLocation === "product_page" ||
+          savedLocation === "popup" ||
+          savedLocation === "sidebar"
         ) {
           continue;
         }
@@ -139,7 +141,12 @@ export async function findEligibleCrossSellOffers(options: {
             offerId: offer.id,
             pool,
             identity,
-            max: placement === OfferPlacement.product_page ? pool.length : MAX_UPSELL_PRODUCTS,
+            max:
+              placement === OfferPlacement.product_page ||
+              placement === OfferPlacement.popup ||
+              placement === OfferPlacement.sidebar
+                ? pool.length
+                : MAX_UPSELL_PRODUCTS,
             anchorProductIds: cartProductIds.filter((id) => targets.includes(id)),
             cartProductIds,
           })

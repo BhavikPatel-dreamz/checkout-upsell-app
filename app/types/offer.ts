@@ -17,6 +17,7 @@ export {
   getOfferTypeConfig,
   isOfferType,
   isOfferPlacement,
+  parseOfferPlacement,
   normalizeOfferType,
   offerTypeOptions,
   offerRequiresTriggerProducts,
@@ -25,6 +26,8 @@ export {
 /** Human-readable labels for each offer placement. */
 export const PLACEMENT_LABELS: Record<OfferPlacement, string> = {
   [OfferPlacement.product_page]: "Product Page",
+  [OfferPlacement.popup]: "Popup",
+  [OfferPlacement.sidebar]: "Sidebar",
   [OfferPlacement.cart_drawer]: "Cart Drawer",
   [OfferPlacement.checkout]: "Pre-Purchase (Checkout)",
   [OfferPlacement.post_purchase]: "Post-Purchase (Thank You Page)",
@@ -53,6 +56,10 @@ export function placementFromDisplayLocation(
       return OfferPlacement.post_purchase;
     case "product_page":
       return OfferPlacement.product_page;
+    case "popup":
+      return OfferPlacement.popup;
+    case "sidebar":
+      return OfferPlacement.sidebar;
     case "cart_drawer":
     case "cart_drawer_upsell":
       return OfferPlacement.cart_drawer;
@@ -68,6 +75,8 @@ export function placementHeaderLabel(placement: OfferPlacement): string {
   if (placement === OfferPlacement.post_purchase) return "Post-Purchase";
   if (placement === OfferPlacement.cart_drawer) return "Cart Drawer";
   if (placement === OfferPlacement.product_page) return "Product Page";
+  if (placement === OfferPlacement.popup) return "Popup";
+  if (placement === OfferPlacement.sidebar) return "Sidebar";
   return "Pre-Purchase";
 }
 
@@ -93,7 +102,11 @@ export function displayLocationOptions(
     case OfferPlacement.post_purchase:
       return [{ value: "thank_you_page", label: "On Thank You Page" }];
     case OfferPlacement.product_page:
-      return [{ value: "product_page", label: "On Product Page" }];
+      return [{ value: "product_page", label: "On Product Page (inline)" }];
+    case OfferPlacement.popup:
+      return [{ value: "popup", label: "Popup" }];
+    case OfferPlacement.sidebar:
+      return [{ value: "sidebar", label: "Sidebar" }];
     default:
       return [{ value: "checkout_page", label: "On Checkout Page" }];
   }

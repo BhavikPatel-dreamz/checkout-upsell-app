@@ -72,6 +72,15 @@ describe("display location → storefront placement", () => {
       placementFromDisplayLocation("cart_drawer_upsell", OfferPlacementValues.checkout),
     ).toBe(OfferPlacementValues.cart_drawer);
     expect(
+      placementFromDisplayLocation("product_page", OfferPlacementValues.checkout),
+    ).toBe(OfferPlacementValues.product_page);
+    expect(placementFromDisplayLocation("popup", OfferPlacementValues.checkout)).toBe(
+      OfferPlacementValues.popup,
+    );
+    expect(placementFromDisplayLocation("sidebar", OfferPlacementValues.checkout)).toBe(
+      OfferPlacementValues.sidebar,
+    );
+    expect(
       placementFromDisplayLocation("thank_you_page", OfferPlacementValues.checkout),
     ).toBe(OfferPlacementValues.post_purchase);
   });

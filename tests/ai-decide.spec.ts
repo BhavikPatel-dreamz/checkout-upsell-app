@@ -50,6 +50,8 @@ describe("POST /api/ai/decide contract and holdout", () => {
         interruptionCost: 0,
         reason: "passthrough",
       },
+      campaignId: null,
+      experienceId: null,
     });
   });
 

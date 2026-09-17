@@ -172,6 +172,7 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
         merchantRuleSets: 0,
         shopperProfiles: 0,
         shopperIntentSnapshots: 0,
+        campaigns: 0,
       },
     };
   }
@@ -189,6 +190,7 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
     merchantRuleSets,
     shopperProfiles,
     shopperIntentSnapshots,
+    campaigns,
   ] = await Promise.all([
     db.shopperEvent.deleteMany({ where: { shop } }),
     db.browseActivity.deleteMany({ where: { shop } }),
@@ -202,6 +204,7 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
     db.merchantRuleSet.deleteMany({ where: { shop } }),
     db.shopperProfile.deleteMany({ where: { shop } }),
     db.shopperIntentSnapshot.deleteMany({ where: { shop } }),
+    db.campaign.deleteMany({ where: { shop } }),
   ]);
 
   return {
@@ -218,6 +221,7 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
       merchantRuleSets: merchantRuleSets.count,
       shopperProfiles: shopperProfiles.count,
       shopperIntentSnapshots: shopperIntentSnapshots.count,
+      campaigns: campaigns.count,
     },
   };
 }

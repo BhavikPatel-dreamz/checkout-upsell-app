@@ -1,6 +1,7 @@
 import { corsPreflight, jsonWithCors } from "../lib/cors.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { OfferPlacement } from "@prisma/client";
+import { parseOfferPlacement } from "../config/offerTypes";
 import { authenticate } from "../shopify.server";
 import { findEligibleCrossSellOffers } from "../models/offerEligibility.server";
 import { rankEligibleOffers } from "../models/offerRanker.server";
@@ -53,24 +54,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const placementParam = url.searchParams.get("placement");
   if (!placementParam) {
     return jsonWithCors(
-      { errors: { placement: "placement is required (checkout | cart_drawer | product_page | post_purchase)." } },
+      { errors: { placement: "placement is required (checkout | cart_drawer | product_page | popup | sidebar | post_purchase)." } },
       { status: 400 },
     );
   }
 
-  const placement =
-    placementParam === "post_purchase"
-      ? OfferPlacement.post_purchase
-      : placementParam === "product_page"
-        ? OfferPlacement.product_page
-        : placementParam === "cart_drawer"
-          ? OfferPlacement.cart_drawer
-          : placementParam === "checkout"
-            ? OfferPlacement.checkout
-            : null;
+  const placement = parseOfferPlacement(placementParam) as OfferPlacement | null;
   if (!placement) {
     return jsonWithCors(
-      { errors: { placement: "placement must be one of: checkout, cart_drawer, product_page, post_purchase" } },
+      {
+        errors: {
+          placement:
+            "placement must be one of: checkout, cart_drawer, product_page, popup, sidebar, post_purchase",
+        },
+      },
       { status: 400 },
     );
   }
@@ -109,7 +106,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     shop,
     offers: eligible,
     identity: { customerId, guestKey, clientId },
-    max: placement === OfferPlacement.product_page ? eligible.length : undefined,
+    max:
+      placement === OfferPlacement.product_page ||
+      placement === OfferPlacement.popup ||
+      placement === OfferPlacement.sidebar
+        ? eligible.length
+        : undefined,
   });
 
   return jsonWithCors({ offers });

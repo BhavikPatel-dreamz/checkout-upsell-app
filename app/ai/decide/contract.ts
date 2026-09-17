@@ -56,6 +56,8 @@ export interface DecideResponse {
     interruptionCost: number;
     reason: string;
   };
+  campaignId: string | null;
+  experienceId: string | null;
 }
 
 export function identityKey(input: {

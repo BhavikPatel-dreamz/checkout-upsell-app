@@ -3,6 +3,7 @@
 
 import { Prisma, OfferType, OfferPlacement } from "@prisma/client";
 import db from "../db.server";
+import { wrapOfferAsCampaign } from "./campaign.server";
 import { getOfferTypeConfig, offerRequiresTriggerProducts } from "../config/offerTypes";
 import { validateOfferFields } from "../validation/offerSchemas";
 
@@ -353,12 +354,12 @@ export function getOffer(shop: string, id: string) {
   return db.offer.findFirst({ where: { id, shop } });
 }
 
-export function createOffer(shop: string, input: OfferCreateInput | OfferFormPayload) {
+export async function createOffer(shop: string, input: OfferCreateInput | OfferFormPayload) {
   const normalized = buildOfferPayload(
     (input as OfferFormPayload) ?? {},
   );
 
-  return db.offer.create({
+  const offer = await db.offer.create({
     data: {
       shop,
       name: normalized.name,
@@ -371,6 +372,14 @@ export function createOffer(shop: string, input: OfferCreateInput | OfferFormPay
         : {}),
     },
   });
+  await wrapOfferAsCampaign({
+    shop,
+    offerId: offer.id,
+    name: offer.name,
+    placement: offer.placement,
+    isActive: offer.isActive,
+  });
+  return offer;
 }
 
 /** Updates only if the offer belongs to `shop`. Returns the row, or null if not found. */
@@ -381,7 +390,17 @@ export async function updateOffer(
 ) {
   const result = await db.offer.updateMany({ where: { id, shop }, data });
   if (result.count === 0) return null;
-  return db.offer.findFirst({ where: { id, shop } });
+  const offer = await db.offer.findFirst({ where: { id, shop } });
+  if (offer) {
+    await wrapOfferAsCampaign({
+      shop,
+      offerId: offer.id,
+      name: offer.name,
+      placement: offer.placement,
+      isActive: offer.isActive,
+    });
+  }
+  return offer;
 }
 
 /** Deletes only if the offer belongs to `shop`. Returns true if a row was removed. */

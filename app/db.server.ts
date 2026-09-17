@@ -14,11 +14,13 @@ function hasRequiredDelegates(client: PrismaClient): boolean {
     productRelation?: { findMany?: unknown };
     merchantRuleSet?: { findUnique?: unknown };
     shopperProfile?: { upsert?: unknown };
+    campaign?: { upsert?: unknown };
   };
   return (
     typeof asAny.productRelation?.findMany === "function" &&
     typeof asAny.merchantRuleSet?.findUnique === "function" &&
-    typeof asAny.shopperProfile?.upsert === "function"
+    typeof asAny.shopperProfile?.upsert === "function" &&
+    typeof asAny.campaign?.upsert === "function"
   );
 }
 

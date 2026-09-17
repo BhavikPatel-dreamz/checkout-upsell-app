@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { parseOfferPlacement } from "../config/offerTypes";
 import { OfferPlacement } from "@prisma/client";
 import { badRequest, methodNotAllowed, readJsonBody } from "../lib/http.server";
 import { trackOfferAddedToCart } from "../models/offerAnalytics.server";
@@ -8,11 +9,7 @@ function isValidShopDomain(value: unknown): value is string {
 }
 
 function parsePlacement(value: unknown): OfferPlacement | null {
-  if (value === "checkout") return OfferPlacement.checkout;
-  if (value === "cart_drawer") return OfferPlacement.cart_drawer;
-  if (value === "product_page") return OfferPlacement.product_page;
-  if (value === "post_purchase") return OfferPlacement.post_purchase;
-  return null;
+  return parseOfferPlacement(value) as OfferPlacement | null;
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {

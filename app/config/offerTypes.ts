@@ -22,6 +22,8 @@ export type OfferType = (typeof OfferType)[keyof typeof OfferType];
 
 export const OfferPlacement = {
   product_page: "product_page",
+  popup: "popup",
+  sidebar: "sidebar",
   cart_drawer: "cart_drawer",
   checkout: "checkout",
   post_purchase: "post_purchase",
@@ -126,6 +128,10 @@ export function isOfferPlacement(value: unknown): value is OfferPlacement {
     typeof value === "string" &&
     Object.values(OfferPlacement).includes(value as OfferPlacement)
   );
+}
+
+export function parseOfferPlacement(value: unknown): OfferPlacement | null {
+  return isOfferPlacement(value) ? value : null;
 }
 
 /** Normalize a raw value into a canonical offer type, defaulting to cross-sell. */

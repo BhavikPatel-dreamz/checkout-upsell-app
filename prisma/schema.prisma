@@ -63,9 +63,79 @@ model Offer {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   events           OfferEvent[]
+  campaigns        Campaign[]
+  experiences      Experience[]
 
   @@index([shop])
   @@index([shop, placement, isActive])
+}
+
+/// Wraps an existing Offer — no second offer form (AI-3.5).
+model Campaign {
+  id           String          @id @default(cuid())
+  shop         String
+  name         String
+  goal         String          @default("revenue")
+  status       String          @default("draft")
+  offerId      String?
+  offer        Offer?          @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  rules        CampaignRule[]
+  experiences  Experience[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([shop, offerId])
+  @@index([shop, status])
+}
+
+model CampaignRule {
+  id                   String   @id @default(cuid())
+  shop                 String
+  campaignId           String
+  campaign             Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  neverProductIds      String[] @default([])
+  alwaysProductIds     String[] @default([])
+  minMarginPercent     Float?
+  maxProducts          Int      @default(5)
+  priceMin             Decimal? @db.Decimal(12, 2)
+  priceMax             Decimal? @db.Decimal(12, 2)
+  frequencyPerSession  Int      @default(1)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([shop, campaignId])
+}
+
+model Experience {
+  id         String               @id @default(cuid())
+  shop       String
+  campaignId String
+  campaign   Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  offerId    String?
+  offer      Offer?               @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  channel    String
+  templateId String               @default("default")
+  variants   ExperienceVariant[]
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  @@unique([shop, offerId, channel])
+  @@index([shop, channel])
+}
+
+model ExperienceVariant {
+  id           String     @id @default(cuid())
+  shop         String
+  experienceId String
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  headline     String     @default("")
+  cta          String     @default("")
+  layout       String     @default("default")
+  offerPolicy  Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([shop, experienceId])
 }
 
 model BrowseActivity {
@@ -557,6 +627,8 @@ enum OfferType {
 
 enum OfferPlacement {
   product_page
+  popup
+  sidebar
   cart_drawer
   checkout
   post_purchase

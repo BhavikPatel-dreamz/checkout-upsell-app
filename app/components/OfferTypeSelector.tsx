@@ -15,7 +15,13 @@ import { offerTypeOptions, OFFER_TYPE_CONFIG } from "../config/offerTypes";
 import { PLACEMENT_LABELS } from "../types/offer";
 import { AdminAppLink } from "./AdminAppLink";
 
-const CREATE_PLACEMENTS: OfferPlacement[] = ["checkout", "product_page", "post_purchase"];
+const CREATE_PLACEMENTS: OfferPlacement[] = [
+  "checkout",
+  "product_page",
+  "popup",
+  "sidebar",
+  "post_purchase",
+];
 
 // Small per-type glyphs — purely decorative, keyed by offer type value so an
 // unrecognised/future type still falls back gracefully to the generic icon.
