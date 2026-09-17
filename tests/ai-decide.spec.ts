@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { decideRequestSchema, identityKey } from "../app/ai/decide/contract";
 import { buildDecideResponse } from "../app/ai/decide/decide.server";
-import { assignHoldout, DEFAULT_HOLDOUT_RATE } from "../app/ai/decide/holdout";
+import { assignHoldout, DEFAULT_HOLDOUT_RATE, normalizeHoldoutPercent } from "../app/ai/decide/holdout";
 
 describe("POST /api/ai/decide contract and holdout", () => {
   it("parses the request and returns the stable response shape", () => {
@@ -57,6 +57,9 @@ describe("POST /api/ai/decide contract and holdout", () => {
 
   it("assigns sticky holdout and suppresses products when held out", () => {
     expect(DEFAULT_HOLDOUT_RATE).toBe(0.1);
+    expect(normalizeHoldoutPercent(0)).toBe(5);
+    expect(normalizeHoldoutPercent(10)).toBe(10);
+    expect(normalizeHoldoutPercent(99)).toBe(50);
     const shop = "holdout.myshopify.com";
     const id = identityKey({ anonId: "sticky-anon" });
     const first = assignHoldout(shop, id, 0.5);

@@ -152,6 +152,17 @@ export default function SettingsPage() {
               />
             </label>
             <label>
+              Always-on holdout % (decide never runs without a holdout; default 10, min 5)
+              <input
+                type="number"
+                name="holdoutPercent"
+                min={5}
+                max={50}
+                step="1"
+                defaultValue={merchant.holdoutPercent}
+              />
+            </label>
+            <label>
               Price min{" "}
               <input
                 type="number"

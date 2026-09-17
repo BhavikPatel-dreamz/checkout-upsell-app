@@ -12,7 +12,7 @@ import {
   type DecideResponse,
   type DecideSurface,
 } from "./contract";
-import { assignHoldout } from "./holdout";
+import { assignHoldout, holdoutRateFromPercent } from "./holdout";
 import { shopAllowsCheckoutDecide } from "../../models/shopCapability.server";
 import { findExperienceForChannel } from "../../models/campaign.server";
 import { getMerchantRuleSet } from "../../models/merchantRuleSet.server";
@@ -189,7 +189,12 @@ export function buildDecideResponse(input: {
 
 export async function decideForRequest(input: DecideRequest & { shop: string }): Promise<DecideResponse> {
   const recommendationId = randomUUID();
-  const holdout = assignHoldout(input.shop, identityKey(input));
+  const merchant = await getMerchantRuleSet(input.shop);
+  const holdout = assignHoldout(
+    input.shop,
+    identityKey(input),
+    holdoutRateFromPercent(merchant.holdoutPercent),
+  );
   const consented = input.consented !== false;
   const inferred = consented
     ? await refreshShopperProfile({
@@ -288,7 +293,6 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     timing = { ...timing, show: false, trigger: "suppressed", reason: frequency.reason };
   }
   const show = products.length > 0 && timing.show;
-  const merchant = await getMerchantRuleSet(input.shop);
   const offer = selectOfferPolicy({
     show,
     intentState: intent.state,

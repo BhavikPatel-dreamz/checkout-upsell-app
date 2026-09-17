@@ -48,6 +48,7 @@ model MerchantRuleSet {
   maxN             Int      @default(5)
   minMarginPercent Float?
   maxDiscountPercent Float    @default(15)
+  holdoutPercent     Float    @default(10)
   priceMin         Decimal? @db.Decimal(12, 2)
   priceMax         Decimal? @db.Decimal(12, 2)
   createdAt        DateTime @default(now())

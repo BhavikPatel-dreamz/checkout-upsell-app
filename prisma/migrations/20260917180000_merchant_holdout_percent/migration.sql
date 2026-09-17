@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "MerchantRuleSet" ADD COLUMN IF NOT EXISTS "holdoutPercent" DOUBLE PRECISION NOT NULL DEFAULT 10;
