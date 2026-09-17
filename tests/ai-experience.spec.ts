@@ -42,6 +42,20 @@ describe("experience selection", () => {
     ).toMatchObject({ channel: "popup", templateId: "wait_you_forgot" });
   });
 
+  it("uses sticky on scroll and honors a requested sticky surface", () => {
+    expect(
+      selectExperience({
+        requestedSurface: "product_page",
+        intentState: "COMPARING",
+        timingTrigger: "scroll",
+      }),
+    ).toMatchObject({ channel: "sticky" });
+    expect(selectExperience({ requestedSurface: "sticky", intentState: "HIGH_INTENT" }).channel).toBe("sticky");
+    expect(fallbackExperience(selectExperience({ requestedSurface: "sticky", intentState: "EXPLORING" }))?.channel).toBe(
+      "product_page",
+    );
+  });
+
   it("falls back from popup/sidebar to inline when interruption is too high", () => {
     const popup = selectExperience({
       requestedSurface: "popup",

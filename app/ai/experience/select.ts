@@ -87,8 +87,16 @@ export function selectExperience(input: {
     return withCopy("popup", intentTemplate, "requested_popup");
   }
 
-  if (requested === "sidebar" || input.timingTrigger === "scroll") {
-    return withCopy("sidebar", intentTemplate, requested === "sidebar" ? "requested_sidebar" : "scroll");
+  if (requested === "sticky") {
+    return withCopy("sticky", intentTemplate, "requested_sticky");
+  }
+
+  if (requested === "sidebar") {
+    return withCopy("sidebar", intentTemplate, "requested_sidebar");
+  }
+
+  if (input.timingTrigger === "scroll") {
+    return withCopy("sticky", intentTemplate, "scroll");
   }
 
   return withCopy("product_page", intentTemplate, "inline_pdp");
@@ -96,6 +104,8 @@ export function selectExperience(input: {
 
 /** Prefer inline when an interruptive channel fails the timing EV gate. */
 export function fallbackExperience(selection: ExperienceSelection): ExperienceSelection | null {
-  if (selection.channel !== "popup" && selection.channel !== "sidebar") return null;
+  if (selection.channel !== "popup" && selection.channel !== "sidebar" && selection.channel !== "sticky") {
+    return null;
+  }
   return withCopy("product_page", selection.templateId === "wait_you_forgot" ? "soft_recs" : selection.templateId, "fallback_inline");
 }

@@ -7,6 +7,7 @@
 <script>
   window.PRODUCT_UPSELL_CONFIG = {
     eligibilityUrl: "/apps/checkout-upsell/api/offers/eligible",
+    decideUrl: "/apps/checkout-upsell/api/ai/decide",
     viewedUrl: "/apps/checkout-upsell/api/offers/viewed",
     clickedUrl: "/apps/checkout-upsell/api/offers/clicked",
     addedToCartUrl: "/apps/checkout-upsell/api/offers/added-to-cart",
@@ -16,7 +17,10 @@
     variantId: {% if product.selected_or_first_available_variant %}"gid://shopify/ProductVariant/{{ product.selected_or_first_available_variant.id }}"{% else %}null{% endif %},
     addToCartLabel: {{ "product_upsell.add_to_cart" | t | json }},
     viewLabel: {{ "product_upsell.view" | t | json }},
-    eventsUrl: "/apps/checkout-upsell/api/ai/events"
+    eventsUrl: "/apps/checkout-upsell/api/ai/events",
+    popupFrequencyHours: {{ block.settings.popup_frequency_hours | default: 24 }},
+    railFrequencyHours: {{ block.settings.rail_frequency_hours | default: 12 }},
+    enabledChannels: [{% if block.settings.enable_inline %}"product_page"{% endif %}{% if block.settings.enable_popup %}{% if block.settings.enable_inline %},{% endif %}"popup"{% endif %}{% if block.settings.enable_sidebar %}{% if block.settings.enable_inline or block.settings.enable_popup %},{% endif %}"sidebar"{% endif %}{% if block.settings.enable_sticky %}{% if block.settings.enable_inline or block.settings.enable_popup or block.settings.enable_sidebar %},{% endif %}"sticky"{% endif %}]
   };
 </script>
 <script src="{{ 'ai-events.js' | asset_url }}" defer></script>
@@ -28,6 +32,52 @@
   "enabled_on": {
     "templates": ["product"]
   },
-  "javascript": "product-upsell.js"
+  "javascript": "product-upsell.js",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "enable_inline",
+      "label": "Inline product block",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_popup",
+      "label": "Popup",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_sidebar",
+      "label": "Sidebar",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_sticky",
+      "label": "Sticky bar",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "popup_frequency_hours",
+      "min": 1,
+      "max": 72,
+      "step": 1,
+      "unit": "h",
+      "label": "Popup frequency cap",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "rail_frequency_hours",
+      "min": 1,
+      "max": 72,
+      "step": 1,
+      "unit": "h",
+      "label": "Sidebar / sticky frequency cap",
+      "default": 12
+    }
+  ]
 }
 {% endschema %}

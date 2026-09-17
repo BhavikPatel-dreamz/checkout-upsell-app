@@ -11,6 +11,7 @@ export const INTERRUPTION_COST: Record<DecideSurface, number> = {
   thank_you: 0.1,
   checkout: 0.2,
   sidebar: 0.28,
+  sticky: 0.2,
   popup: 0.42,
 };
 

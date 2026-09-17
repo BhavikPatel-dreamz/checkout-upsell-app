@@ -366,22 +366,200 @@
       });
   }
 
+  function renderSticky(offers, copy) {
+    var bar = document.getElementById("product-upsell-sticky");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "product-upsell-sticky";
+      bar.style.cssText =
+        "display:none;position:fixed;left:0;right:0;bottom:0;z-index:9997;background:#111;color:#fff;padding:12px 16px;box-shadow:0 -4px 16px rgba(0,0,0,.2)";
+      bar.innerHTML =
+        '<div style="max-width:1100px;margin:0 auto;display:flex;gap:12px;align-items:center;overflow-x:auto">' +
+        '<strong id="product-upsell-sticky-title" style="flex:0 0 auto"></strong>' +
+        '<div id="product-upsell-sticky-items" style="display:flex;gap:10px"></div></div>';
+      document.body.appendChild(bar);
+    }
+    var title = document.getElementById("product-upsell-sticky-title");
+    var items = document.getElementById("product-upsell-sticky-items");
+    if (title) title.textContent = (copy && copy.headline) || "Recommended";
+    if (!items) return;
+    items.innerHTML = "";
+    offers.forEach(function (offer) {
+      bindCard(items, offer, "sticky", "row");
+    });
+    bar.style.display = offers.length ? "block" : "none";
+    markViewed(offers, "sticky");
+  }
+
+  var pageStarted = Date.now();
+  var deepestScroll = 0;
+  var exitIntent = false;
+  var retryTimer = null;
+
+  function identityKey() {
+    var who = identity();
+    return who.customerId || who.guestKey || who.clientId || "anon";
+  }
+
+  function capHoursFor(channel) {
+    if (channel === "popup") return Number(config.popupFrequencyHours || 24);
+    if (channel === "sidebar" || channel === "sticky") return Number(config.railFrequencyHours || 12);
+    return 0;
+  }
+
+  function canShowChannel(channel) {
+    if (config.enabledChannels && config.enabledChannels.indexOf(channel) === -1) return false;
+    var shop = config.shop || "";
+    var key = "cu_freq:" + shop + ":" + identityKey() + ":" + channel;
+    try {
+      if (sessionStorage.getItem(key + ":session") === "1") return false;
+    } catch (_err) {}
+    var hours = capHoursFor(channel);
+    if (hours <= 0) return true;
+    try {
+      var last = Number(localStorage.getItem(key) || "");
+      if (!last) return true;
+      return Date.now() - last >= hours * 3600000;
+    } catch (_err2) {
+      return true;
+    }
+  }
+
+  function markChannelShown(channel) {
+    var shop = config.shop || "";
+    var key = "cu_freq:" + shop + ":" + identityKey() + ":" + channel;
+    try {
+      sessionStorage.setItem(key + ":session", "1");
+      localStorage.setItem(key, String(Date.now()));
+    } catch (_err) {}
+  }
+
+  function scrollDepth() {
+    var doc = document.documentElement;
+    var max = Math.max(doc.scrollHeight - window.innerHeight, 1);
+    return Math.min(1, Math.max(deepestScroll, window.scrollY / max));
+  }
+
+  function decideProducts(decision) {
+    return (decision.products || []).map(function (row) {
+      return {
+        offerId: decision.recommendationId || "decide",
+        offerName: (decision.copy && decision.copy.headline) || "",
+        productId: row.productId,
+        variantId: row.variantId,
+        productTitle: row.strategy || "Recommended",
+        promotionalTitle: decision.copy && decision.copy.headline,
+        price: "",
+        productHandle: "",
+        imageUrl: "",
+      };
+    }).filter(function (row) {
+      return row.variantId;
+    });
+  }
+
+  function applyDecision(decision, fallbackOffers) {
+    if (!decision || !decision.show) {
+      if (fallbackOffers && fallbackOffers.inline && fallbackOffers.inline.length) {
+        renderInline(fallbackOffers.inline);
+      }
+      return;
+    }
+    var channel = (decision.experience && decision.experience.channel) || "product_page";
+    if (!canShowChannel(channel)) {
+      if (channel !== "product_page" && canShowChannel("product_page") && fallbackOffers && fallbackOffers.inline) {
+        renderInline(fallbackOffers.inline);
+      }
+      return;
+    }
+    var products = decideProducts(decision);
+    var copy = decision.copy || {};
+    if (copy.headline) {
+      var heading = document.querySelector("#product-upsell-root h3");
+      if (heading) heading.textContent = copy.headline;
+    }
+    if (channel === "popup") {
+      renderPopup(products.length ? products : (fallbackOffers.popup || []));
+    } else if (channel === "sidebar") {
+      renderSidebar(products.length ? products : (fallbackOffers.sidebar || []));
+    } else if (channel === "sticky") {
+      renderSticky(products.length ? products : (fallbackOffers.inline || []), copy);
+    } else {
+      renderInline(products.length ? products : (fallbackOffers.inline || []));
+    }
+    markChannelShown(channel);
+  }
+
+  function postDecide(variantId, cartValue) {
+    if (!config.decideUrl) return Promise.resolve(null);
+    var who = identity();
+    var consented = true;
+    try {
+      var privacy = window.Shopify && window.Shopify.customerPrivacy;
+      if (privacy && typeof privacy.analyticsProcessingAllowed === "function") {
+        consented = privacy.analyticsProcessingAllowed() !== false;
+      }
+    } catch (_err) {}
+    return fetch(config.decideUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        shop: config.shop,
+        surface: "product_page",
+        productIds: config.productId ? [config.productId] : [],
+        variantIds: variantId ? [variantId] : [],
+        cartProductIds: config.productId ? [config.productId] : [],
+        customerId: who.customerId,
+        anonId: who.clientId || who.guestKey,
+        sessionId: who.guestKey,
+        consented: consented,
+        dwellMs: Date.now() - pageStarted,
+        scrollDepth: scrollDepth(),
+        exitIntent: exitIntent,
+        cartValue: cartValue || 0,
+      }),
+    }).then(function (res) {
+      if (!res.ok) throw Error("decide failed");
+      return res.json();
+    });
+  }
+
   function load() {
-    if (!config.eligibilityUrl || !config.shop || !config.productId) return;
+    if (!config.shop || !config.productId) return;
     var variantId = selectedVariant();
     if (!variantId) return;
     lastVariant = variantId;
     var requestSeq = ++seq;
-    Promise.all([
-      fetchOffers("product_page", variantId, requestSeq),
-      fetchOffers("popup", variantId, requestSeq),
-      fetchOffers("sidebar", variantId, requestSeq),
-    ])
-      .then(function (results) {
+    cartJson()
+      .catch(function () {
+        return { total_price: 0 };
+      })
+      .then(function (cart) {
+        var cartValue = cart && cart.total_price ? Number(cart.total_price) / 100 : 0;
+        var eligible = config.eligibilityUrl
+          ? Promise.all([
+              fetchOffers("product_page", variantId, requestSeq),
+              fetchOffers("popup", variantId, requestSeq),
+              fetchOffers("sidebar", variantId, requestSeq),
+            ])
+          : Promise.resolve([[], [], []]);
+        return Promise.all([postDecide(variantId, cartValue).catch(function () {
+          return null;
+        }), eligible]);
+      })
+      .then(function (pair) {
         if (requestSeq !== seq) return;
-        renderInline(results[0]);
-        renderPopup(results[1]);
-        renderSidebar(results[2]);
+        var decision = pair[0];
+        var offers = pair[1] || [[], [], []];
+        var fallback = { inline: offers[0], popup: offers[1], sidebar: offers[2] };
+        if (decision && !decision.show && decision.timing && decision.timing.delayMs > 0 && !retryTimer) {
+          retryTimer = setTimeout(function () {
+            retryTimer = null;
+            load();
+          }, Math.min(decision.timing.delayMs, 15000));
+        }
+        applyDecision(decision, fallback);
       })
       .catch(function (err) {
         if (requestSeq !== seq) return;
@@ -396,6 +574,12 @@
     if (variantId && variantId !== lastVariant) load();
   }
 
+  window.addEventListener("scroll", function () {
+    deepestScroll = Math.max(deepestScroll, scrollDepth());
+  }, { passive: true });
+  document.addEventListener("mouseout", function (event) {
+    if (!event.relatedTarget && event.clientY <= 0) exitIntent = true;
+  });
   document.addEventListener("variant:change", onVariantChange);
   document.addEventListener("change", function (event) {
     if (event.target && event.target.name === "id") onVariantChange();

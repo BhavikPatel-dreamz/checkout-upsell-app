@@ -5,6 +5,7 @@ export const DECIDE_SURFACES = [
   "cart",
   "popup",
   "sidebar",
+  "sticky",
   "thank_you",
   "checkout",
 ] as const;
