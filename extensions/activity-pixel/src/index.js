@@ -55,12 +55,6 @@ register(({ analytics, browser, init, settings, customerPrivacy }) => {
   }
 
   customerPrivacy.subscribe("visitorConsentCollected", setConsentFromPayload);
-  customerPrivacy.subscribe("analyticsConsentAccepted", () => {
-    analyticsAllowed = true;
-  });
-  customerPrivacy.subscribe("analyticsConsentDeclined", () => {
-    analyticsAllowed = false;
-  });
 
   function endpoints() {
     const urls = [];

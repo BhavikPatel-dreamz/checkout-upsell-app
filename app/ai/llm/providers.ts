@@ -1,4 +1,4 @@
-export const LLM_PROVIDERS = ["openai", "grok", "gemini"] as const;
+export const LLM_PROVIDERS = ["openai", "grok", "groq", "gemini"] as const;
 
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
@@ -9,24 +9,28 @@ export const LLM_PROVIDER_LABELS: Record<LlmProviderChoice, string> = {
   none: "Off (aggregates only)",
   openai: "OpenAI",
   grok: "Grok (xAI)",
+  groq: "Groq",
   gemini: "Gemini (Google)",
 };
 
 export const DEFAULT_LLM_MODELS: Record<LlmProvider, string> = {
   openai: "gpt-4o-mini",
   grok: "grok-2-latest",
+  groq: "openai/gpt-oss-20b",
   gemini: "gemini-2.0-flash",
 };
 
 export const DEFAULT_LLM_BASE_URLS: Record<Exclude<LlmProvider, "gemini">, string> = {
   openai: "https://api.openai.com/v1",
   grok: "https://api.x.ai/v1",
+  groq: "https://api.groq.com/openai/v1",
 };
 
 export function normalizeLlmProvider(value: unknown): LlmProviderChoice {
   const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
   if (raw === "none" || raw === "off" || raw === "disabled") return "none";
   if (raw === "openai" || raw === "chatgpt") return "openai";
+  if (raw === "groq") return "groq";
   if (raw === "grok" || raw === "xai" || raw === "x.ai") return "grok";
   if (raw === "gemini" || raw === "google") return "gemini";
   return "auto";
@@ -51,6 +55,33 @@ function envTrim(env: NodeJS.Dict<string> | undefined, ...keys: string[]): strin
     if (value) return value;
   }
   return "";
+}
+
+export interface ShopLlmKeys {
+  openai?: string;
+  grok?: string;
+  groq?: string;
+  gemini?: string;
+}
+
+/** Shop keys override app env so each store can use its own model credentials. */
+export function mergeShopLlmEnv(
+  env: NodeJS.Dict<string> | undefined,
+  shop?: ShopLlmKeys | null,
+): NodeJS.Dict<string> {
+  const merged: NodeJS.Dict<string> = { ...(env ?? {}) };
+  const openai = shop?.openai?.trim();
+  const grok = shop?.grok?.trim();
+  const groq = shop?.groq?.trim();
+  const gemini = shop?.gemini?.trim();
+  if (openai) merged.OPENAI_API_KEY = openai;
+  if (grok) {
+    merged.XAI_API_KEY = grok;
+    merged.GROK_API_KEY = grok;
+  }
+  if (groq) merged.GROQ_API_KEY = groq;
+  if (gemini) merged.GEMINI_API_KEY = gemini;
+  return merged;
 }
 
 export function llmConfigForProvider(
@@ -80,17 +111,30 @@ export function llmConfigForProvider(
       ),
     };
   }
-  const apiKey = envTrim(env, "GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
-  if (!apiKey) return null;
-  return {
-    provider: "gemini",
-    apiKey,
-    model: envTrim(env, "GEMINI_MODEL") || DEFAULT_LLM_MODELS.gemini,
-    baseUrl: (envTrim(env, "GEMINI_BASE_URL") || "https://generativelanguage.googleapis.com/v1beta").replace(
-      /\/$/,
-      "",
-    ),
-  };
+  if (provider === "groq") {
+    const apiKey = envTrim(env, "GROQ_API_KEY");
+    if (!apiKey) return null;
+    return {
+      provider,
+      apiKey,
+      model: envTrim(env, "GROQ_MODEL") || DEFAULT_LLM_MODELS.groq,
+      baseUrl: (envTrim(env, "GROQ_BASE_URL") || DEFAULT_LLM_BASE_URLS.groq).replace(/\/$/, ""),
+    };
+  }
+  if (provider === "gemini") {
+    const apiKey = envTrim(env, "GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
+    if (!apiKey) return null;
+    return {
+      provider: "gemini",
+      apiKey,
+      model: envTrim(env, "GEMINI_MODEL") || DEFAULT_LLM_MODELS.gemini,
+      baseUrl: (envTrim(env, "GEMINI_BASE_URL") || "https://generativelanguage.googleapis.com/v1beta").replace(
+        /\/$/,
+        "",
+      ),
+    };
+  }
+  return null;
 }
 
 export function configuredLlmProviders(
@@ -99,13 +143,14 @@ export function configuredLlmProviders(
   return {
     openai: llmConfigForProvider("openai", env) != null,
     grok: llmConfigForProvider("grok", env) != null,
+    groq: llmConfigForProvider("groq", env) != null,
     gemini: llmConfigForProvider("gemini", env) != null,
   };
 }
 
 export function anyLlmConfigured(env: NodeJS.Dict<string> | undefined = process.env): boolean {
   const flags = configuredLlmProviders(env);
-  return flags.openai || flags.grok || flags.gemini;
+  return flags.openai || flags.grok || flags.groq || flags.gemini;
 }
 
 export function resolveLlmConfig(
@@ -126,7 +171,7 @@ export function resolveLlmConfig(
   return null;
 }
 
-/** OpenAI-compatible chat/completions body (OpenAI + Grok). */
+/** OpenAI-compatible chat/completions body (OpenAI, xAI Grok, Groq). */
 export function openAiChatBody(input: {
   model: string;
   system: string;
@@ -162,6 +207,23 @@ export function parseOpenAiChatText(body: unknown): string | null {
   const content = choices?.[0]?.message?.content;
   if (typeof content !== "string") return null;
   const text = content.trim();
+  return text || null;
+}
+
+/** Groq / OpenAI Responses API (`client.responses.create`). */
+export function parseOpenAiResponsesText(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const direct = (body as { output_text?: unknown }).output_text;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  const output = (body as { output?: Array<{ content?: Array<{ text?: unknown; type?: string }> }> }).output;
+  if (!Array.isArray(output)) return null;
+  const parts: string[] = [];
+  for (const item of output) {
+    for (const part of item.content ?? []) {
+      if (typeof part.text === "string" && part.text.trim()) parts.push(part.text.trim());
+    }
+  }
+  const text = parts.join("\n").trim();
   return text || null;
 }
 

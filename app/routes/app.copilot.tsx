@@ -26,8 +26,8 @@ export default function CopilotPage() {
         <s-paragraph>
           Copilot answers from incrementality rollups, Smart Moments, and
           campaign/offer counts. It never sends raw browse or purchase events,
-          emails, or shopper ids to a model. Pick OpenAI, Grok, or Gemini in
-          Settings (API keys are environment variables).
+          emails, or shopper ids to a model. Save a Groq (or other) API key in
+          Settings, then Ask again. Source should show groq — not aggregates only.
         </s-paragraph>
         <Form method="post">
           <s-stack direction="block" gap="base">
@@ -40,9 +40,7 @@ export default function CopilotPage() {
                 defaultValue={actionData?.question ?? "What is our incremental revenue vs holdout?"}
               />
             </label>
-            <s-button type="submit" variant="primary">
-              Ask
-            </s-button>
+            <button type="submit">Ask</button>
           </s-stack>
         </Form>
       </s-section>
@@ -52,9 +50,10 @@ export default function CopilotPage() {
           <s-paragraph>
             Source:{" "}
             {actionData.source === "aggregates"
-              ? "aggregates only (no model key, provider off, or the model call failed)"
+              ? "aggregates only (model was not used)"
               : `${actionData.source} over aggregates`}
           </s-paragraph>
+          {actionData.llmError ? <s-paragraph>Model: {actionData.llmError}</s-paragraph> : null}
         </s-section>
       ) : null}
     </s-page>

@@ -1,0 +1,1 @@
+ALTER TABLE "MerchantRuleSet" ADD COLUMN IF NOT EXISTS "copilotGroqKey" TEXT NOT NULL DEFAULT '';

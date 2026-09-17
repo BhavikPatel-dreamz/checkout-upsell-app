@@ -1,7 +1,7 @@
 import db from "../../db.server";
-import { getMerchantRuleSet } from "../../models/merchantRuleSet.server";
+import { getMerchantLlmKeys, getMerchantRuleSet } from "../../models/merchantRuleSet.server";
 import { completeChat } from "../llm/complete.server";
-import { anyLlmConfigured } from "../llm/providers";
+import { anyLlmConfigured, mergeShopLlmEnv, type LlmProvider } from "../llm/providers";
 import {
   answerFromAggregates,
   formatAggregatesForPrompt,
@@ -10,10 +10,10 @@ import {
   type CopilotIncrementalityRow,
 } from "./aggregates";
 
-export function copilotLlmEnabled(): boolean {
-  const flag = process.env.AI_COPILOT_LLM?.trim().toLowerCase();
+export function copilotLlmEnabled(env: NodeJS.Dict<string> | undefined = process.env): boolean {
+  const flag = env.AI_COPILOT_LLM?.trim().toLowerCase() ?? process.env.AI_COPILOT_LLM?.trim().toLowerCase();
   if (flag === "0" || flag === "false" || flag === "off") return false;
-  return anyLlmConfigured();
+  return anyLlmConfigured(env);
 }
 
 function num(value: unknown): number {
@@ -113,26 +113,37 @@ export async function loadCopilotAggregates(shop: string): Promise<CopilotAggreg
 }
 
 async function completeFromLlm(
+  shop: string,
   question: string,
   aggregates: CopilotAggregates,
   provider: unknown,
   model?: string,
-): Promise<{ text: string; provider: "openai" | "grok" | "gemini" } | null> {
-  if (!copilotLlmEnabled()) return null;
-  return completeChat({
+): Promise<{ text: string; provider: LlmProvider } | { error: string }> {
+  const env = mergeShopLlmEnv(process.env, await getMerchantLlmKeys(shop));
+  if (!copilotLlmEnabled(env)) {
+    return {
+      error:
+        "No model key is available for this store (or AI_COPILOT_LLM is off). Save a Groq/OpenAI/Grok/Gemini key in Settings and choose that provider.",
+    };
+  }
+  const completed = await completeChat({
+    env,
     provider,
     model,
-    timeoutMs: 8000,
+    timeoutMs: 25000,
     temperature: 0.2,
     system:
-              "You are a Shopify admin copilot for checkout upsell incrementality. Answer only from the JSON aggregates. Never ask for or invent customer emails, phones, session ids, or raw event logs. If a number is missing, say so. Do not tell Standard merchants to auto-publish; live autopilot is Enterprise-only. Keep answers under 180 words.",
+      "You are a Shopify admin copilot for checkout upsell incrementality. Answer only from the JSON aggregates. Never ask for or invent customer emails, phones, session ids, or raw event logs. If a number is missing, say so. Do not tell Standard merchants to auto-publish; live autopilot is Enterprise-only. Keep answers under 180 words.",
     user: `Question: ${question.slice(0, 500)}\nAggregates JSON:\n${formatAggregatesForPrompt(aggregates)}`,
   });
+  if (!completed.ok) return { error: completed.error };
+  return { text: completed.text, provider: completed.provider };
 }
 
 export async function queryCopilot(shop: string, question: string): Promise<{
   answer: string;
-  source: "openai" | "grok" | "gemini" | "aggregates";
+  source: LlmProvider | "aggregates";
+  llmError?: string;
 }> {
   const trimmed = question.trim();
   if (!trimmed) {
@@ -143,11 +154,12 @@ export async function queryCopilot(shop: string, question: string): Promise<{
     getMerchantRuleSet(shop),
   ]);
   const llm = await completeFromLlm(
+    shop,
     trimmed,
     aggregates,
     merchant.copilotProvider,
     merchant.copilotModel,
   );
-  if (llm) return { answer: llm.text, source: llm.provider };
-  return { answer: answerFromAggregates(trimmed, aggregates), source: "aggregates" };
+  if ("text" in llm) return { answer: llm.text, source: llm.provider };
+  return { answer: answerFromAggregates(trimmed, aggregates), source: "aggregates", llmError: llm.error };
 }

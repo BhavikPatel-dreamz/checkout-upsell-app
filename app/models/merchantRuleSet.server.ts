@@ -13,7 +13,7 @@ import {
   normalizeOptimizationGoal,
   type OptimizationGoal,
 } from "../ai/learn/goal";
-import { normalizeLlmProvider, type LlmProviderChoice } from "../ai/llm/providers";
+import { normalizeLlmProvider, type LlmProviderChoice, type ShopLlmKeys } from "../ai/llm/providers";
 import { isEnterpriseShop } from "../enterprise/tier";
 import db from "../db.server";
 import type { MerchantRules } from "../ai/recommend/pipeline";
@@ -116,6 +116,27 @@ export async function getMerchantRuleSet(shop: string): Promise<MerchantRuleSetR
   return toRecord(row);
 }
 
+/** Server-only. Never send these values to the admin UI. */
+export async function getMerchantLlmKeys(shop: string): Promise<ShopLlmKeys> {
+  const row = await db.merchantRuleSet.findUnique({
+    where: { shop },
+    select: { copilotOpenaiKey: true, copilotGrokKey: true, copilotGroqKey: true, copilotGeminiKey: true },
+  });
+  if (!row) return {};
+  return {
+    openai: row.copilotOpenaiKey.trim() || undefined,
+    grok: row.copilotGrokKey.trim() || undefined,
+    groq: row.copilotGroqKey.trim() || undefined,
+    gemini: row.copilotGeminiKey.trim() || undefined,
+  };
+}
+
+function optionalSecretFromForm(form: FormData, field: string, clearField: string): string | undefined {
+  if (form.get(clearField) === "true") return "";
+  const value = String(form.get(field) ?? "").trim();
+  return value || undefined;
+}
+
 export async function upsertMerchantRuleSet(
   shop: string,
   input: {
@@ -128,6 +149,10 @@ export async function upsertMerchantRuleSet(
     optimizationGoal?: string;
     copilotProvider?: string;
     copilotModel?: string;
+    copilotOpenaiKey?: string;
+    copilotGrokKey?: string;
+    copilotGroqKey?: string;
+    copilotGeminiKey?: string;
     autopilotPublish?: boolean;
     priceMin: number | null;
     priceMax: number | null;
@@ -150,6 +175,10 @@ export async function upsertMerchantRuleSet(
     autopilotPublish: Boolean(input.autopilotPublish) && isEnterpriseShop(shop),
     priceMin: input.priceMin,
     priceMax: input.priceMax,
+    ...(input.copilotOpenaiKey !== undefined ? { copilotOpenaiKey: input.copilotOpenaiKey } : {}),
+    ...(input.copilotGrokKey !== undefined ? { copilotGrokKey: input.copilotGrokKey } : {}),
+    ...(input.copilotGroqKey !== undefined ? { copilotGroqKey: input.copilotGroqKey } : {}),
+    ...(input.copilotGeminiKey !== undefined ? { copilotGeminiKey: input.copilotGeminiKey } : {}),
   };
   const row = await db.merchantRuleSet.upsert({
     where: { shop },
@@ -169,6 +198,10 @@ export function merchantRuleSetFromForm(form: FormData): {
   optimizationGoal: OptimizationGoal;
   copilotProvider: LlmProviderChoice;
   copilotModel: string;
+  copilotOpenaiKey?: string;
+  copilotGrokKey?: string;
+  copilotGroqKey?: string;
+  copilotGeminiKey?: string;
   autopilotPublish: boolean;
   priceMin: number | null;
   priceMax: number | null;
@@ -185,6 +218,10 @@ export function merchantRuleSetFromForm(form: FormData): {
     }),
     copilotProvider: normalizeLlmProvider(form.get("copilotProvider")),
     copilotModel: String(form.get("copilotModel") ?? "").trim(),
+    copilotOpenaiKey: optionalSecretFromForm(form, "openaiApiKey", "clearOpenaiKey"),
+    copilotGrokKey: optionalSecretFromForm(form, "grokApiKey", "clearGrokKey"),
+    copilotGroqKey: optionalSecretFromForm(form, "groqApiKey", "clearGroqKey"),
+    copilotGeminiKey: optionalSecretFromForm(form, "geminiApiKey", "clearGeminiKey"),
     autopilotPublish: form.get("autopilotPublish") === "true",
     priceMin: optionalNumber(form.get("priceMin")),
     priceMax: optionalNumber(form.get("priceMax")),

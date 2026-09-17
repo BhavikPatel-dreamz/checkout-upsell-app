@@ -4,6 +4,7 @@ import { formatProductIdList } from "../config/merchantRules";
 import { RETENTION_DAY_OPTIONS } from "../config/privacy";
 import { authenticate } from "../shopify.server";
 import {
+  getMerchantLlmKeys,
   getMerchantRuleSet,
   merchantRuleSetFromForm,
   upsertMerchantRuleSet,
@@ -16,16 +17,29 @@ import {
   configuredLlmProviders,
   LLM_PROVIDER_LABELS,
   LLM_PROVIDERS,
+  mergeShopLlmEnv,
 } from "../ai/llm/providers";
 import { isEnterpriseShop } from "../enterprise/tier";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
-  const [privacy, merchant] = await Promise.all([
+  const [privacy, merchant, shopKeys] = await Promise.all([
     getShopPrivacySettings(session.shop),
     getMerchantRuleSet(session.shop),
+    getMerchantLlmKeys(session.shop),
   ]);
-  return { privacy, merchant, llmConfigured: configuredLlmProviders(), enterprise: isEnterpriseShop(session.shop) };
+  return {
+    privacy,
+    merchant,
+    llmConfigured: configuredLlmProviders(mergeShopLlmEnv(process.env, shopKeys)),
+    llmKeysSaved: {
+      openai: Boolean(shopKeys.openai),
+      grok: Boolean(shopKeys.grok),
+      groq: Boolean(shopKeys.groq),
+      gemini: Boolean(shopKeys.gemini),
+    },
+    enterprise: isEnterpriseShop(session.shop),
+  };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -55,6 +69,7 @@ export default function SettingsPage() {
       ? actionData.merchant
       : loaded.merchant;
   const llmConfigured = loaded.llmConfigured;
+  const llmKeysSaved = loaded.llmKeysSaved;
   const enterprise = loaded.enterprise;
 
   return (
@@ -90,9 +105,7 @@ export default function SettingsPage() {
                 ))}
               </select>
             </label>
-            <s-button type="submit" variant="primary">
-              Save
-            </s-button>
+            <button type="submit">Save</button>
             {actionData?.ok && actionData.intent === "privacy" ? (
               <s-paragraph>Saved.</s-paragraph>
             ) : null}
@@ -200,9 +213,9 @@ export default function SettingsPage() {
                 <option value="auto">{LLM_PROVIDER_LABELS.auto}</option>
                 <option value="none">{LLM_PROVIDER_LABELS.none}</option>
                 {LLM_PROVIDERS.map((id) => (
-                  <option key={id} value={id} disabled={!llmConfigured[id]}>
+                  <option key={id} value={id}>
                     {LLM_PROVIDER_LABELS[id]}
-                    {llmConfigured[id] ? "" : " (no API key)"}
+                    {llmConfigured[id] ? "" : " (add API key below)"}
                   </option>
                 ))}
               </select>
@@ -213,15 +226,63 @@ export default function SettingsPage() {
                 type="text"
                 name="copilotModel"
                 defaultValue={merchant.copilotModel}
-                placeholder="gpt-4o-mini, grok-2-latest, gemini-2.0-flash"
+                placeholder="gpt-4o-mini, openai/gpt-oss-20b, grok-2-latest, gemini-2.0-flash"
+                autoComplete="off"
               />
             </label>
             <s-paragraph>
-              Keys stay in the app environment, not in this form: OPENAI_API_KEY,
-              XAI_API_KEY or GROK_API_KEY, GEMINI_API_KEY. Copilot and the
-              optional recommend picker use these providers. Raw shopper events
-              are still never sent to Copilot.
+              Each store saves its own keys. Leave a key blank to keep the
+              current one. App-level env keys are only a fallback if this store
+              has none. Copilot never receives raw shopper events.
             </s-paragraph>
+            <label>
+              OpenAI API key
+              <input
+                type="password"
+                name="openaiApiKey"
+                autoComplete="new-password"
+                placeholder={llmKeysSaved.openai ? "Saved for this store — leave blank to keep" : "sk-…"}
+              />
+            </label>
+            <label>
+              <input type="checkbox" name="clearOpenaiKey" value="true" /> Remove this store’s OpenAI key
+            </label>
+            <label>
+              Grok (xAI) API key
+              <input
+                type="password"
+                name="grokApiKey"
+                autoComplete="new-password"
+                placeholder={llmKeysSaved.grok ? "Saved for this store — leave blank to keep" : "xai-…"}
+              />
+            </label>
+            <label>
+              <input type="checkbox" name="clearGrokKey" value="true" /> Remove this store's Grok (xAI) key
+            </label>
+            <label>
+              Groq API key
+              <input
+                type="password"
+                name="groqApiKey"
+                autoComplete="new-password"
+                placeholder={llmKeysSaved.groq ? "Saved for this store — leave blank to keep" : "gsk-…"}
+              />
+            </label>
+            <label>
+              <input type="checkbox" name="clearGroqKey" value="true" /> Remove this store's Groq key
+            </label>
+            <label>
+              Gemini API key
+              <input
+                type="password"
+                name="geminiApiKey"
+                autoComplete="new-password"
+                placeholder={llmKeysSaved.gemini ? "Saved for this store — leave blank to keep" : "AIza…"}
+              />
+            </label>
+            <label>
+              <input type="checkbox" name="clearGeminiKey" value="true" /> Remove this store’s Gemini key
+            </label>
             <label>
               <input
                 type="checkbox"
@@ -256,9 +317,7 @@ export default function SettingsPage() {
                 defaultValue={merchant.priceMax ?? ""}
               />
             </label>
-            <s-button type="submit" variant="primary">
-              Save rules
-            </s-button>
+            <button type="submit">Save rules</button>
             {actionData?.ok && actionData.intent === "rules" ? (
               <s-paragraph>Saved.</s-paragraph>
             ) : null}

@@ -1,7 +1,8 @@
 import type { BrowseActivityRow, IdentityLookup } from "./browseActivity.server";
 import type { EligibleOfferPayload } from "./eligibleOffer";
 import { completeChat } from "../ai/llm/complete.server";
-import { anyLlmConfigured } from "../ai/llm/providers";
+import { anyLlmConfigured, mergeShopLlmEnv } from "../ai/llm/providers";
+import { getMerchantLlmKeys, getMerchantRuleSet } from "./merchantRuleSet.server";
 
 const CACHE_TTL_MS = 1000 * 60 * 5;
 const LLM_TIMEOUT_MS = 2500;
@@ -10,10 +11,10 @@ const cache = new Map<string, { expiresAt: number; ids: string[] }>();
 /** Max SKUs sent to the LLM. The model only reorders this head; it never adds products. */
 export const LLM_TOP_K = 8;
 
-export function llmPickerEnabled(): boolean {
-  const flag = process.env.AI_RECOMMEND_LLM?.trim().toLowerCase();
+export function llmPickerEnabled(env: NodeJS.Dict<string> | undefined = process.env): boolean {
+  const flag = env.AI_RECOMMEND_LLM?.trim().toLowerCase() ?? process.env.AI_RECOMMEND_LLM?.trim().toLowerCase();
   if (flag !== "1" && flag !== "true" && flag !== "on") return false;
-  return anyLlmConfigured();
+  return anyLlmConfigured(env);
 }
 
 export function splitLlmTopK<T>(items: T[], k = LLM_TOP_K): { head: T[]; tail: T[] } {
@@ -78,7 +79,9 @@ async function requestLlmOrder(options: {
   pool: EligibleOfferPayload[];
   activity: BrowseActivityRow[];
 }): Promise<string[] | null> {
-  if (!llmPickerEnabled()) return null;
+  const [keys, merchant] = await Promise.all([getMerchantLlmKeys(options.shop), getMerchantRuleSet(options.shop)]);
+  const env = mergeShopLlmEnv(process.env, keys);
+  if (!llmPickerEnabled(env)) return null;
 
   const allowed = new Set(options.pool.flatMap((item) => [item.variantId, item.productId]));
   const poolLines = options.pool.map(
@@ -89,14 +92,16 @@ async function requestLlmOrder(options: {
   });
 
   const completed = await completeChat({
-    provider: process.env.AI_RECOMMEND_PROVIDER,
+    env,
+    provider: merchant.copilotProvider,
+    model: merchant.copilotModel,
     timeoutMs: LLM_TIMEOUT_MS,
     temperature: 0,
     system:
       "You only reorder the provided upsell pool for one Shopify shop. Return a JSON array of variant ids from that pool, best first. Never invent ids, never add products, never use other shops.",
     user: `Shop: ${options.shop}\nPool:\n${poolLines.join("\n")}\nRecent activity:\n${activityLines.join("\n") || "(none)"}`,
   });
-  if (!completed) return null;
+  if (!completed.ok) return null;
   const ids = parseLlmPoolIds(completed.text, allowed);
   return ids.length > 0 ? ids : null;
 }
@@ -109,7 +114,8 @@ export async function pickPoolWithOptionalLlm(options: {
   activity: BrowseActivityRow[];
 }): Promise<EligibleOfferPayload[]> {
   const { shop, offerId, identity, pool, activity } = options;
-  if (pool.length <= 1 || !llmPickerEnabled()) return pool;
+  const env = mergeShopLlmEnv(process.env, await getMerchantLlmKeys(shop));
+  if (pool.length <= 1 || !llmPickerEnabled(env)) return pool;
 
   pruneCache();
   const key = cacheKey(shop, identity, offerId, pool);
