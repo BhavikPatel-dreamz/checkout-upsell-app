@@ -8,6 +8,7 @@ import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prism
 import prisma from "./db.server";
 import { env } from "./env.server";
 import { ensureWebPixel } from "./lib/ensureWebPixel.server";
+import { refreshShopCheckoutCapability } from "./models/shopCapability.server";
 
 const shopify = shopifyApp({
   apiKey: env.shopifyApiKey,
@@ -24,6 +25,7 @@ const shopify = shopifyApp({
   hooks: {
     afterAuth: async ({ admin, session }) => {
       await ensureWebPixel(admin, session.shop);
+      await refreshShopCheckoutCapability(session.shop, admin);
     },
   },
   ...(env.shopCustomDomain

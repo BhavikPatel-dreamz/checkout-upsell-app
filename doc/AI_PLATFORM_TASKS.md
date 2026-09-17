@@ -54,7 +54,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 | AI-3.5 | Campaign + Experience models wrapping/extending `Offer` (no duplicate offer form) | COMPLETE |
 | AI-3.6 | Theme: PDP block + popup/sidebar/sticky with frequency cap | COMPLETE |
 | AI-3.7 | Cart + thank-you consume decide API | COMPLETE |
-| AI-3.8 | Checkout UI consume decide (Plus gated) | NOT_STARTED |
+| AI-3.8 | Checkout UI consume decide (Plus gated) | COMPLETE |
 | AI-3.9 | Frequency + interruption budget stored per identity | NOT_STARTED |
 
 ---

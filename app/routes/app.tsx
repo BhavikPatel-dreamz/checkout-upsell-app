@@ -5,10 +5,12 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
 import { ensureWebPixel } from "../lib/ensureWebPixel.server";
+import { refreshShopCheckoutCapability } from "../models/shopCapability.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   await ensureWebPixel(admin, session.shop);
+  await refreshShopCheckoutCapability(session.shop, admin);
 
   return {
     // eslint-disable-next-line no-undef

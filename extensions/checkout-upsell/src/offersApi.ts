@@ -14,6 +14,10 @@ export function offersApiUrl(
   return `${offersApiOrigin(settings)}/api/offers/${path}`;
 }
 
+export function decideApiUrl(settings?: { api_base?: string }): string {
+  return `${offersApiOrigin(settings)}/api/ai/decide`;
+}
+
 export function aiEventsUrl(settings?: { api_base?: string }): string {
   return `${offersApiOrigin(settings)}/api/ai/events`;
 }

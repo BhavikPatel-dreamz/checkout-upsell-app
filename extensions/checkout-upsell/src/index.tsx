@@ -15,7 +15,7 @@ import {
   useSettings,
 } from "@shopify/ui-extensions-react/checkout";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { offersApiUrl, emitAiEvents } from "./offersApi";
+import { offersApiUrl, decideApiUrl, emitAiEvents } from "./offersApi";
 
 interface EligibleOffer {
   offerId: string;
@@ -45,6 +45,7 @@ function CheckoutUpsellBlock() {
   const customer = useCustomer();
   const storage = useStorage();
   const applyCartLinesChange = useApplyCartLinesChange();
+  const [headline, setHeadline] = useState("You may also like");
   const [offers, setOffers] = useState<EligibleOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -212,18 +213,56 @@ function CheckoutUpsellBlock() {
         if (customerId) params.set("customerId", customerId);
         if (guestKey) params.set("guestKey", guestKey);
 
-        const res = await fetch(
-          `${offersApiUrl("eligible", settings)}?${params.toString()}`,
-        );
-        if (!res.ok) {
+        const cartValue = (lines ?? []).reduce((sum, line) => {
+          const amount = Number(line.cost?.totalAmount?.amount ?? 0);
+          return sum + (Number.isFinite(amount) ? amount : 0);
+        }, 0);
+
+        const [eligibleRes, decideRes] = await Promise.all([
+          fetch(`${offersApiUrl("eligible", settings)}?${params.toString()}`),
+          fetch(decideApiUrl(settings), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              shop: shopDomain,
+              surface: "checkout",
+              productIds: lineIds.productIds,
+              variantIds: lineIds.variantIds,
+              cartProductIds: lineIds.productIds,
+              customerId,
+              anonId: guestKey,
+              sessionId: guestKey,
+              consented: true,
+              cartValue,
+            }),
+          }).catch(() => null),
+        ]);
+        if (!eligibleRes.ok) {
           setLoading(false);
           return;
         }
 
-        const data = (await res.json()) as { offers?: EligibleOffer[] };
-        if (!cancelled && data?.offers && data.offers.length > 0) {
-          setOffers(data.offers);
-          for (const offer of data.offers) void trackEvent("viewed", offer);
+        const data = (await eligibleRes.json()) as { offers?: EligibleOffer[] };
+        let next = data?.offers ?? [];
+        if (decideRes?.ok) {
+          const decision = (await decideRes.json()) as {
+            show?: boolean;
+            products?: Array<{ productId: string }>;
+            copy?: { headline?: string };
+          };
+          if (!decision.show) next = [];
+          else {
+            const wanted = new Set((decision.products ?? []).map((row) => row.productId));
+            if (wanted.size > 0) {
+              const matched = next.filter((offer) => wanted.has(offer.productId));
+              next = matched.length > 0 ? matched : next;
+            }
+            if (decision.copy?.headline) setHeadline(decision.copy.headline);
+          }
+        }
+        if (!cancelled && next.length > 0) {
+          setOffers(next);
+          for (const offer of next) void trackEvent("viewed", offer);
         }
       } catch (err) {
         console.error("Checkout upsell fetch error:", err);
@@ -236,14 +275,14 @@ function CheckoutUpsellBlock() {
     return () => {
       cancelled = true;
     };
-  }, [shopDomain, lineIds, trackEvent, getCustomerIdentity, settings]);
+  }, [shopDomain, lineIds, lines, trackEvent, getCustomerIdentity, settings]);
 
   if (loading || offers.length === 0) return null;
 
   return (
     <BlockStack spacing="tight" padding={["base", "none"]}>
       <Text emphasis="bold" size="medium">
-        You may also like
+        {headline}
       </Text>
 
       <ScrollView direction="inline">

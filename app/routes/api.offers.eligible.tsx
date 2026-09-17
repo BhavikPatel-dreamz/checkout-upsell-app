@@ -4,6 +4,7 @@ import { OfferPlacement } from "@prisma/client";
 import { parseOfferPlacement } from "../config/offerTypes";
 import { authenticate } from "../shopify.server";
 import { findEligibleCrossSellOffers } from "../models/offerEligibility.server";
+import { shopAllowsCheckoutDecide } from "../models/shopCapability.server";
 import { rankEligibleOffers } from "../models/offerRanker.server";
 
 function isValidShopDomain(value: unknown): value is string {
@@ -70,6 +71,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       },
       { status: 400 },
     );
+  }
+
+  if (placement === OfferPlacement.checkout && !(await shopAllowsCheckoutDecide(shop))) {
+    return jsonWithCors({ offers: [] });
   }
 
   const productIds = parseCsvParam(url.searchParams.get("productIds"));

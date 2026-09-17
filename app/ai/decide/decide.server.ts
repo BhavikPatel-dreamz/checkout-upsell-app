@@ -13,6 +13,7 @@ import {
   type DecideSurface,
 } from "./contract";
 import { assignHoldout } from "./holdout";
+import { shopAllowsCheckoutDecide } from "../../models/shopCapability.server";
 
 function channelForSurface(surface: DecideSurface): DecideSurface {
   return surface;
@@ -182,6 +183,25 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
       })
     : { state: "EXPLORING" as const, purchaseIntent: 0 };
   const intent = { state: inferred.state, purchaseIntent: inferred.purchaseIntent };
+
+  if (input.surface === "checkout" && !(await shopAllowsCheckoutDecide(input.shop))) {
+    const { experience, timing } = resolveExperienceAndTiming({
+      request: input,
+      intentState: intent.state,
+      purchaseIntent: intent.purchaseIntent,
+      maxScore: 0,
+      productCount: 0,
+    });
+    return buildDecideResponse({
+      surface: input.surface,
+      holdout,
+      products: [],
+      recommendationId,
+      intent,
+      timing: { ...timing, show: false, reason: "checkout_not_plus", trigger: "suppressed" },
+      experience,
+    });
+  }
 
   if (holdout || !consented) {
     const { experience, timing } = resolveExperienceAndTiming({
