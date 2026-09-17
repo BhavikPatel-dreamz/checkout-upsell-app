@@ -43,6 +43,80 @@ export interface CohortTotals {
   revenue: number;
 }
 
+function moneyFromUnknown(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
+/** Order total on shopper purchase / checkout_completed context. */
+export function revenueFromShopperContext(context: unknown): number {
+  if (!context || typeof context !== "object") return 0;
+  const row = context as Record<string, unknown>;
+  for (const key of ["cartValue", "totalPrice", "total_price", "orderValue", "current_total_price"]) {
+    const n = moneyFromUnknown(row[key]);
+    if (n > 0) return n;
+  }
+  return 0;
+}
+
+export function purchaseOrderKey(eventId: string): string {
+  if (eventId.startsWith("checkout_completed:")) return eventId.slice("checkout_completed:".length);
+  if (eventId.startsWith("purchase:")) {
+    const rest = eventId.slice("purchase:".length);
+    const lastColon = rest.lastIndexOf(":");
+    return lastColon > 0 ? rest.slice(0, lastColon) : rest;
+  }
+  return eventId;
+}
+
+/**
+ * One order per checkout / Shopify order id. Prefer checkout_completed totals over
+ * attributed offer-line revenue so a purchased OfferEvent with null revenue still
+ * counts the paid order amount.
+ */
+export function cohortOrdersAndRevenue(input: {
+  shopper: Array<{ eventId: string; context: unknown }>;
+  offers: Array<{
+    orderId: string | null;
+    revenue: unknown;
+    customerId: string | null;
+    guestKey: string | null;
+  }>;
+}): { orders: number; revenue: number } {
+  const totals = new Map<string, { amount: number; fromCheckout: boolean }>();
+
+  const bump = (key: string, amount: number, fromCheckout: boolean) => {
+    const prev = totals.get(key) ?? { amount: 0, fromCheckout: false };
+    if (fromCheckout) {
+      totals.set(key, { amount: Math.max(prev.amount, amount), fromCheckout: true });
+      return;
+    }
+    if (prev.fromCheckout && prev.amount > 0) return;
+    if (prev.fromCheckout) {
+      totals.set(key, { amount: Math.max(prev.amount, amount), fromCheckout: true });
+      return;
+    }
+    totals.set(key, { amount: prev.amount + amount, fromCheckout: false });
+  };
+
+  for (const row of input.shopper) {
+    const fromCheckout = row.eventId.startsWith("checkout_completed:");
+    bump(purchaseOrderKey(row.eventId), revenueFromShopperContext(row.context), fromCheckout);
+  }
+  for (const row of input.offers) {
+    const key = row.orderId || `offer:${row.customerId ?? row.guestKey ?? "unknown"}`;
+    bump(key, moneyFromUnknown(row.revenue), false);
+  }
+
+  let revenue = 0;
+  for (const row of totals.values()) revenue += row.amount;
+  return { orders: totals.size, revenue };
+}
+
 export interface IncrementalityResult {
   treatedUsers: number;
   holdoutUsers: number;

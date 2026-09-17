@@ -1,6 +1,13 @@
 import { OfferEventType } from "@prisma/client";
 import db from "../db.server";
-import { computeIncrementality, type CohortTotals, ALL_SURFACES, INCREMENTALITY_SURFACES, SHOP_WIDE_EXPERIMENT_ID } from "../ai/learn/incrementality";
+import {
+  computeIncrementality,
+  cohortOrdersAndRevenue,
+  type CohortTotals,
+  ALL_SURFACES,
+  INCREMENTALITY_SURFACES,
+  SHOP_WIDE_EXPERIMENT_ID,
+} from "../ai/learn/incrementality";
 
 export const INCREMENTALITY_WINDOW_DAYS = 7;
 
@@ -59,25 +66,14 @@ async function cohortFor(
     }),
   ]);
 
-  const orderIds = new Set<string>();
-  let revenue = 0;
-  for (const row of offerPurchases) {
-    if (row.orderId) orderIds.add(row.orderId);
-    else orderIds.add(`offer:${row.customerId ?? row.guestKey}`);
-    revenue += row.revenue == null ? 0 : Number(row.revenue);
-  }
-  if (orderIds.size === 0) {
-    for (const row of purchases) {
-      orderIds.add(row.eventId);
-      const context = row.context && typeof row.context === "object" ? (row.context as { cartValue?: unknown }) : {};
-      const cartValue = Number(context.cartValue);
-      if (Number.isFinite(cartValue)) revenue += cartValue;
-    }
-  }
+  const { orders, revenue } = cohortOrdersAndRevenue({
+    shopper: purchases,
+    offers: offerPurchases,
+  });
 
   return {
     users: subjects.length,
-    orders: orderIds.size,
+    orders,
     revenue,
   };
 }

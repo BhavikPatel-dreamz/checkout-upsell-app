@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeIncrementality, incrementalitySurfaceFor } from "../app/ai/learn/incrementality";
+import {
+  cohortOrdersAndRevenue,
+  computeIncrementality,
+  incrementalitySurfaceFor,
+} from "../app/ai/learn/incrementality";
 
 describe("incrementality rollup", () => {
   it("computes incremental revenue, AOV, and conversion vs holdout", () => {
@@ -20,6 +24,18 @@ describe("incrementality rollup", () => {
       computeIncrementality({ users: 5, orders: 1, revenue: 50 }, { users: 0, orders: 0, revenue: 0 })
         .incrementalRevenue,
     ).toBe(0);
+  });
+
+  it("uses checkout total when an attributed purchase event has no revenue", () => {
+    const { orders, revenue } = cohortOrdersAndRevenue({
+      shopper: [
+        { eventId: "checkout_completed:gid://shopify/Order/1", context: { cartValue: 42.5 } },
+        { eventId: "purchase:gid://shopify/Order/1:line-1", context: {} },
+      ],
+      offers: [{ orderId: "gid://shopify/Order/1", revenue: null, customerId: "c1", guestKey: null }],
+    });
+    expect(orders).toBe(1);
+    expect(revenue).toBe(42.5);
   });
 
   it("maps decide channels onto PDP, cart, popup, thank-you, and recovery", () => {

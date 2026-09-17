@@ -69,8 +69,33 @@ function idCandidates(type: "Product" | "ProductVariant", value: string | null):
   return Array.from(new Set([value, gid, numeric].filter((item): item is string => Boolean(item))));
 }
 
+function moneyFromPriceSet(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const set = value as Record<string, unknown>;
+  const shopMoney = set.shop_money ?? set.shopMoney ?? set.presentment_money ?? set.presentmentMoney;
+  if (!shopMoney || typeof shopMoney !== "object") return null;
+  return getString((shopMoney as Record<string, unknown>).amount);
+}
+
+export function orderTotalPrice(order: Record<string, unknown>): number | null {
+  const raw =
+    getString(order.total_price) ??
+    getString(order.current_total_price) ??
+    getString(order.total_price_usd) ??
+    moneyFromPriceSet(order.total_price_set) ??
+    moneyFromPriceSet(order.current_total_price_set) ??
+    moneyFromPriceSet(order.currentTotalPriceSet) ??
+    moneyFromPriceSet(order.totalPriceSet);
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 function lineRevenue(lineItem: Record<string, unknown>): Prisma.Decimal | null {
-  const priceRaw = getString(lineItem.price ?? lineItem.total_price);
+  const priceRaw =
+    getString(lineItem.price ?? lineItem.total_price ?? lineItem.discounted_price) ??
+    moneyFromPriceSet(lineItem.price_set) ??
+    moneyFromPriceSet(lineItem.discounted_price_set);
   if (!priceRaw) return null;
   const price = Number.parseFloat(priceRaw);
   if (!Number.isFinite(price)) return null;
@@ -247,7 +272,7 @@ export async function emitPurchaseShopperEvents(input: {
   const rows: ReturnType<typeof toShopperEventCreateData>[] = [];
   let created = 0;
   let skipped = 0;
-  const totalPrice = getString(order.total_price);
+  const totalPrice = orderTotalPrice(order);
   const currency = getString(order.currency ?? order.presentment_currency);
 
   const completed = parseShopperEventEnvelope({
@@ -263,9 +288,7 @@ export async function emitPurchaseShopperEvents(input: {
     source: "orders_webhook",
     surface: "admin",
     context: {
-      ...(totalPrice && Number.isFinite(Number(totalPrice))
-        ? { cartValue: Number(totalPrice) }
-        : {}),
+      ...(totalPrice != null ? { cartValue: totalPrice } : {}),
       ...(currency ? { currency } : {}),
     },
   });
@@ -276,6 +299,29 @@ export async function emitPurchaseShopperEvents(input: {
     const completedInsert = await db.shopperEvent.createMany({ data: rows, skipDuplicates: true });
     created += completedInsert.count;
     skipped += rows.length - completedInsert.count;
+  }
+  if (totalPrice != null) {
+    const completedEventId = `checkout_completed:${orderId}`;
+    const existingCompleted = await db.shopperEvent.findUnique({
+      where: { shop_eventId: { shop: input.shop, eventId: completedEventId } },
+    });
+    const priorContext =
+      existingCompleted?.context && typeof existingCompleted.context === "object"
+        ? (existingCompleted.context as Record<string, unknown>)
+        : {};
+    const priorValue = Number(priorContext.cartValue);
+    if (existingCompleted && (!Number.isFinite(priorValue) || priorValue <= 0)) {
+      await db.shopperEvent.update({
+        where: { id: existingCompleted.id },
+        data: {
+          context: {
+            ...priorContext,
+            cartValue: totalPrice,
+            ...(currency ? { currency } : {}),
+          },
+        },
+      });
+    }
   }
 
   const occurredAtIso = getString(order.created_at ?? order.processed_at) ?? new Date().toISOString();
@@ -312,6 +358,7 @@ export async function emitPurchaseShopperEvents(input: {
       offerId = attributed?.offerId ?? null;
     }
     const quantity = getString(lineItem.quantity);
+    const lineTotal = lineRevenue(lineItem);
     const parsed = parseShopperEventEnvelope({
       schemaVersion: 1,
       shop: input.shop,
@@ -329,6 +376,10 @@ export async function emitPurchaseShopperEvents(input: {
         ...(variantId ? { variantId } : {}),
         ...(quantity ? { query: quantity } : {}),
       },
+      context: {
+        ...(lineTotal != null ? { cartValue: Number(lineTotal) } : {}),
+        ...(currency ? { currency } : {}),
+      },
       attribution: {
         ...(offerId ? { recommendationId: offerId, campaignId: offerId } : {}),
       },
@@ -341,17 +392,39 @@ export async function emitPurchaseShopperEvents(input: {
     if (!existing) {
       await db.shopperEvent.create({ data });
       created += 1;
-    } else if (!existing.recommendationId && data.recommendationId) {
-      await db.shopperEvent.update({
-        where: { id: existing.id },
-        data: {
-          recommendationId: data.recommendationId,
-          campaignId: data.campaignId,
-          attribution: data.attribution,
-        },
-      });
     } else {
-      skipped += 1;
+      const priorContext =
+        existing.context && typeof existing.context === "object"
+          ? (existing.context as Record<string, unknown>)
+          : {};
+      const priorValue = Number(priorContext.cartValue);
+      const needsRevenue = lineTotal != null && (!Number.isFinite(priorValue) || priorValue <= 0);
+      const needsAttr = !existing.recommendationId && data.recommendationId;
+      if (needsRevenue || needsAttr) {
+        await db.shopperEvent.update({
+          where: { id: existing.id },
+          data: {
+            ...(needsAttr
+              ? {
+                  recommendationId: data.recommendationId,
+                  campaignId: data.campaignId,
+                  attribution: data.attribution,
+                }
+              : {}),
+            ...(needsRevenue
+              ? {
+                  context: {
+                    ...priorContext,
+                    cartValue: Number(lineTotal),
+                    ...(currency ? { currency } : {}),
+                  },
+                }
+              : {}),
+          },
+        });
+      } else {
+        skipped += 1;
+      }
     }
 
     if (offerId && productId && variantId) {
