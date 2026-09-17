@@ -58,6 +58,7 @@ export async function assignExperienceVariant(input: {
   customerId?: string | null;
   anonId?: string | null;
   sessionId?: string | null;
+  surface?: string | null;
 }): Promise<{
   experimentId: string;
   variantId: string | null;
@@ -95,10 +96,12 @@ export async function assignExperienceVariant(input: {
       subjectId: subject.subjectId,
       variantId,
       holdout: input.holdout,
+      surface: input.surface ?? "_",
     },
     update: {
       variantId,
       holdout: input.holdout,
+      surface: input.surface ?? "_",
     },
   });
 

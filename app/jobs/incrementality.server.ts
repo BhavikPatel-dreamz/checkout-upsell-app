@@ -1,8 +1,7 @@
 import { OfferEventType } from "@prisma/client";
 import db from "../db.server";
-import { computeIncrementality, type CohortTotals } from "../ai/learn/incrementality";
+import { computeIncrementality, type CohortTotals, ALL_SURFACES, INCREMENTALITY_SURFACES, SHOP_WIDE_EXPERIMENT_ID } from "../ai/learn/incrementality";
 
-export const SHOP_WIDE_EXPERIMENT_ID = "_";
 export const INCREMENTALITY_WINDOW_DAYS = 7;
 
 const PURCHASE_NAMES = new Set(["purchase", "checkout_completed", "recommendation_purchase"]);
@@ -86,6 +85,7 @@ async function cohortFor(
 async function upsertStat(input: {
   shop: string;
   experimentId: string;
+  surface: string;
   windowStart: Date;
   windowEnd: Date;
   treated: CohortTotals;
@@ -94,15 +94,17 @@ async function upsertStat(input: {
   const stats = computeIncrementality(input.treated, input.holdout);
   await db.incrementalityStat.upsert({
     where: {
-      shop_experimentId_windowStart: {
+      shop_experimentId_surface_windowStart: {
         shop: input.shop,
         experimentId: input.experimentId,
+        surface: input.surface,
         windowStart: input.windowStart,
       },
     },
     create: {
       shop: input.shop,
       experimentId: input.experimentId,
+      surface: input.surface,
       windowStart: input.windowStart,
       windowEnd: input.windowEnd,
       ...stats,
@@ -130,7 +132,7 @@ export async function rebuildIncrementalityStats(shopFilter?: string): Promise<{
   for (const shop of shops) {
     const assignments = await db.experimentAssignment.findMany({
       where: { shop, assignedAt: { gte: windowStart, lt: windowEnd } },
-      select: { experimentId: true, subjectId: true, holdout: true },
+      select: { experimentId: true, subjectId: true, holdout: true, surface: true },
     });
     if (assignments.length === 0) continue;
 
@@ -154,6 +156,7 @@ export async function rebuildIncrementalityStats(shopFilter?: string): Promise<{
     await upsertStat({
       shop,
       experimentId: SHOP_WIDE_EXPERIMENT_ID,
+      surface: ALL_SURFACES,
       windowStart,
       windowEnd,
       treated,
@@ -161,10 +164,35 @@ export async function rebuildIncrementalityStats(shopFilter?: string): Promise<{
     });
     rows += 1;
 
+    for (const surface of INCREMENTALITY_SURFACES) {
+      const slice = shopWide.filter((row) => (row.surface || ALL_SURFACES) === surface);
+      if (slice.length === 0) continue;
+      const t = await cohortFor(shop, slice, false, windowStart, windowEnd);
+      const h = await cohortFor(shop, slice, true, windowStart, windowEnd);
+      await upsertStat({
+        shop,
+        experimentId: SHOP_WIDE_EXPERIMENT_ID,
+        surface,
+        windowStart,
+        windowEnd,
+        treated: t,
+        holdout: h,
+      });
+      rows += 1;
+    }
+
     for (const [experimentId, group] of byExperiment) {
       const t = await cohortFor(shop, group, false, windowStart, windowEnd);
       const h = await cohortFor(shop, group, true, windowStart, windowEnd);
-      await upsertStat({ shop, experimentId, windowStart, windowEnd, treated: t, holdout: h });
+      await upsertStat({
+        shop,
+        experimentId,
+        surface: ALL_SURFACES,
+        windowStart,
+        windowEnd,
+        treated: t,
+        holdout: h,
+      });
       rows += 1;
     }
   }

@@ -1,3 +1,42 @@
+export const INCREMENTALITY_SURFACES = ["pdp", "cart", "popup", "thank_you", "recovery"] as const;
+
+export type IncrementalitySurface = (typeof INCREMENTALITY_SURFACES)[number];
+
+export const ALL_SURFACES = "_";
+export const SHOP_WIDE_EXPERIMENT_ID = "_";
+
+export const SURFACE_LABELS: Record<string, string> = {
+  [ALL_SURFACES]: "All surfaces",
+  pdp: "PDP",
+  cart: "Cart",
+  popup: "Popup",
+  thank_you: "Thank-you",
+  recovery: "Recovery",
+};
+
+/** Map decide channel / recovery template onto dashboard surfaces. */
+export function incrementalitySurfaceFor(input: {
+  channel?: string | null;
+  templateId?: string | null;
+  reason?: string | null;
+}): IncrementalitySurface {
+  const template = input.templateId ?? "";
+  const reason = input.reason ?? "";
+  if (
+    template.startsWith("recovery_") ||
+    template === "in_session_recovery" ||
+    reason.startsWith("recovery_") ||
+    reason.startsWith("exit_recovery")
+  ) {
+    return "recovery";
+  }
+  const channel = input.channel ?? "";
+  if (channel === "cart" || channel === "checkout") return "cart";
+  if (channel === "thank_you") return "thank_you";
+  if (channel === "popup") return "popup";
+  return "pdp";
+}
+
 export interface CohortTotals {
   users: number;
   orders: number;

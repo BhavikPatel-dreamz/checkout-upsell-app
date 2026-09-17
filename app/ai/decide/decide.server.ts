@@ -19,6 +19,7 @@ import { assignExperienceVariant } from "../../models/experiment.server";
 import { getMerchantRuleSet } from "../../models/merchantRuleSet.server";
 import { selectOfferPolicy, type OfferPolicy } from "../offer/policy";
 import { inferAbandonReason } from "../offer/recoveryReason";
+import { incrementalitySurfaceFor } from "../learn/incrementality";
 
 function channelForSurface(surface: DecideSurface): DecideSurface {
   return surface;
@@ -103,6 +104,11 @@ async function withPersistedExperience(
     customerId: identity.customerId,
     anonId: identity.anonId,
     sessionId: identity.sessionId,
+    surface: incrementalitySurfaceFor({
+      channel: experience.channel,
+      templateId: experience.templateId,
+      reason: experience.reason,
+    }),
   });
   const templateId = EXPERIENCE_TEMPLATES.includes(row.templateId as (typeof EXPERIENCE_TEMPLATES)[number])
     ? (row.templateId as ExperienceSelection["templateId"])

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeIncrementality } from "../app/ai/learn/incrementality";
+import { computeIncrementality, incrementalitySurfaceFor } from "../app/ai/learn/incrementality";
 
 describe("incrementality rollup", () => {
   it("computes incremental revenue, AOV, and conversion vs holdout", () => {
@@ -20,5 +20,20 @@ describe("incrementality rollup", () => {
       computeIncrementality({ users: 5, orders: 1, revenue: 50 }, { users: 0, orders: 0, revenue: 0 })
         .incrementalRevenue,
     ).toBe(0);
+  });
+
+  it("maps decide channels onto PDP, cart, popup, thank-you, and recovery", () => {
+    expect(incrementalitySurfaceFor({ channel: "product_page" })).toBe("pdp");
+    expect(incrementalitySurfaceFor({ channel: "sidebar" })).toBe("pdp");
+    expect(incrementalitySurfaceFor({ channel: "cart" })).toBe("cart");
+    expect(incrementalitySurfaceFor({ channel: "popup" })).toBe("popup");
+    expect(incrementalitySurfaceFor({ channel: "thank_you" })).toBe("thank_you");
+    expect(
+      incrementalitySurfaceFor({
+        channel: "popup",
+        templateId: "recovery_free_ship",
+        reason: "recovery_price",
+      }),
+    ).toBe("recovery");
   });
 });

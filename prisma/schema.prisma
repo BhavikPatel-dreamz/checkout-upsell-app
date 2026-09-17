@@ -169,6 +169,7 @@ model ExperimentAssignment {
   subjectId    String
   variantId    String?
   holdout      Boolean            @default(false)
+  surface      String             @default("_")
   assignedAt   DateTime           @default(now())
 
   @@unique([shop, experimentId, subjectType, subjectId])
@@ -181,6 +182,7 @@ model IncrementalityStat {
   id                   String   @id @default(cuid())
   shop                 String
   experimentId         String   @default("_")
+  surface              String   @default("_")
   windowStart          DateTime
   windowEnd            DateTime
   treatedUsers         Int      @default(0)
@@ -196,8 +198,8 @@ model IncrementalityStat {
   incrementalRevenue   Decimal  @default(0) @db.Decimal(12, 2)
   computedAt           DateTime @default(now())
 
-  @@unique([shop, experimentId, windowStart])
-  @@index([shop, computedAt])
+  @@unique([shop, experimentId, surface, windowStart])
+  @@index([shop, surface, computedAt])
 }
 
 model BrowseActivity {
