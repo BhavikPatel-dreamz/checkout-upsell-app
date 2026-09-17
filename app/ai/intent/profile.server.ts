@@ -43,12 +43,29 @@ export async function refreshShopperProfile(input: {
         ...(input.sessionId ? [{ sessionId: input.sessionId }, { anonId: input.sessionId }] : []),
       ],
     },
-    select: { name: true, productId: true, occurredAt: true },
+    select: { name: true, productId: true, query: true, context: true, occurredAt: true },
     orderBy: { occurredAt: "asc" },
     take: 500,
   });
 
-  const inferred = inferIntent(events);
+  const productIds = [
+    ...new Set(events.map((event) => event.productId).filter((id): id is string => Boolean(id))),
+  ];
+  const catalog = productIds.length
+    ? (
+        await db.productIntelligence.findMany({
+          where: { shop: input.shop, productId: { in: productIds } },
+          select: { productId: true, priceMin: true, priceMax: true, compareAtMax: true },
+        })
+      ).map((row) => ({
+        productId: row.productId,
+        priceMin: row.priceMin == null ? null : Number(row.priceMin),
+        priceMax: row.priceMax == null ? null : Number(row.priceMax),
+        compareAtMax: row.compareAtMax == null ? null : Number(row.compareAtMax),
+      }))
+    : [];
+
+  const inferred = inferIntent(events, new Date(), catalog);
   const intentState = inferred.state as ShopperIntentState;
   const now = new Date();
 

@@ -65,7 +65,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 | --- | --- | --- |
 | AI-4.1 | Offer policy types under merchant max discount | COMPLETE |
 | AI-4.2 | Function / discount application only for allowed policies | COMPLETE |
-| AI-4.3 | Price/discount sensitivity features on profile | NOT_STARTED |
+| AI-4.3 | Price/discount sensitivity features on profile | COMPLETE |
 | AI-4.4 | Abandon risk heuristic + in-session recovery experience | NOT_STARTED |
 | AI-4.5 | Recovery copy variants (reminder vs free ship vs accessory) chosen by reason heuristic | NOT_STARTED |
 

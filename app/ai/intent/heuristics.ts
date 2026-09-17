@@ -1,3 +1,5 @@
+import { computePriceDiscountSensitivity, type CatalogPriceRow } from "./sensitivity";
+
 export const SHOPPER_INTENT_STATES = [
   "EXPLORING",
   "RESEARCHING",
@@ -11,9 +13,13 @@ export const SHOPPER_INTENT_STATES = [
 
 export type ShopperIntentStateName = (typeof SHOPPER_INTENT_STATES)[number];
 
+export type { CatalogPriceRow };
+
 export interface IntentEventLike {
   name: string;
   productId?: string | null;
+  query?: string | null;
+  context?: unknown;
   occurredAt: Date;
 }
 
@@ -125,7 +131,11 @@ export function collectIntentSignals(events: IntentEventLike[], now = new Date()
   };
 }
 
-export function inferIntent(events: IntentEventLike[], now = new Date()): IntentInference {
+export function inferIntent(
+  events: IntentEventLike[],
+  now = new Date(),
+  catalog: CatalogPriceRow[] = [],
+): IntentInference {
   const signals = collectIntentSignals(events, now);
   const recentProductIds = [
     ...new Set(
@@ -157,8 +167,7 @@ export function inferIntent(events: IntentEventLike[], now = new Date()): Intent
       signals.removes * 0.2,
   );
   const productInterest = clamp01(signals.distinctProductsViewed / 6);
-  const priceSensitivity = clamp01(signals.variantSelects * 0.15 + signals.distinctProductsViewed * 0.05);
-  const discountSensitivity = clamp01(signals.searches * 0.1);
+  const { priceSensitivity, discountSensitivity } = computePriceDiscountSensitivity({ events, catalog });
   const crossSellPotential = clamp01(signals.distinctProductsViewed * 0.12 + signals.atc * 0.1);
 
   let state: ShopperIntentStateName = "EXPLORING";
