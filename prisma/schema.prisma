@@ -176,6 +176,30 @@ model ExperimentAssignment {
   @@index([shop, subjectId])
 }
 
+/// Shop-scoped treated vs holdout rollup (AI-5.3). experimentId "_" = all experiments.
+model IncrementalityStat {
+  id                   String   @id @default(cuid())
+  shop                 String
+  experimentId         String   @default("_")
+  windowStart          DateTime
+  windowEnd            DateTime
+  treatedUsers         Int      @default(0)
+  holdoutUsers         Int      @default(0)
+  treatedOrders        Int      @default(0)
+  holdoutOrders        Int      @default(0)
+  treatedRevenue       Decimal  @default(0) @db.Decimal(12, 2)
+  holdoutRevenue       Decimal  @default(0) @db.Decimal(12, 2)
+  treatedConversion    Float    @default(0)
+  holdoutConversion    Float    @default(0)
+  treatedAov           Float    @default(0)
+  holdoutAov           Float    @default(0)
+  incrementalRevenue   Decimal  @default(0) @db.Decimal(12, 2)
+  computedAt           DateTime @default(now())
+
+  @@unique([shop, experimentId, windowStart])
+  @@index([shop, computedAt])
+}
+
 model BrowseActivity {
   id           String              @id @default(cuid())
   shop         String
