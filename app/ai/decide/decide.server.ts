@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import db from "../../db.server";
 import { EXPERIENCE_TEMPLATES, fallbackExperience, selectExperience, type ExperienceSelection } from "../experience/select";
 import { refreshShopperProfile } from "../intent/profile.server";
-import { findExperienceForChannel } from "../../models/campaign.server";
+import { gateAndRecordInterruption } from "../experience/budget.server";
 import { runHybridRecommend } from "../recommend/hybridRecommend.server";
 import { evaluateTiming, type TimingDecision } from "../timing/timing";
 import {
@@ -227,14 +227,28 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
 
   const products = await productsFromHybrid(input);
   const maxScore = products.reduce((max, row) => Math.max(max, row.score), 0);
-  const { experience, timing } = resolveExperienceAndTiming({
+  const resolved = resolveExperienceAndTiming({
     request: input,
     intentState: intent.state,
     purchaseIntent: intent.purchaseIntent,
     maxScore,
     productCount: products.length,
   });
+  const experience = resolved.experience;
+  let timing = resolved.timing;
   const persisted = await withPersistedExperience(input.shop, experience);
+  const wouldShow = products.length > 0 && timing.show;
+  const frequency = await gateAndRecordInterruption({
+    shop: input.shop,
+    customerId: input.customerId,
+    anonId: input.anonId,
+    sessionId: input.sessionId,
+    channel: persisted.experience.channel,
+    wouldShow,
+  });
+  if (!frequency.allow) {
+    timing = { ...timing, show: false, trigger: "suppressed", reason: frequency.reason };
+  }
   return buildDecideResponse({
     surface: input.surface,
     holdout: false,

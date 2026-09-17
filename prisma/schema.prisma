@@ -227,6 +227,24 @@ model IdentityLink {
   @@index([shop, toType, toId])
 }
 
+/// Per-identity frequency caps and interruption budget (AI-3.9). Opaque ids only.
+model IdentityInterruption {
+  id             String    @id @default(cuid())
+  shop           String
+  identityKey    String
+  channel        String
+  sessionId      String?
+  lastShownAt    DateTime?
+  sessionShownAt DateTime?
+  windowStart    DateTime  @default(now())
+  shownInWindow  Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([shop, identityKey, channel])
+  @@index([shop, identityKey])
+}
+
 enum ShopperIntentState {
   EXPLORING
   RESEARCHING
