@@ -12,6 +12,11 @@ import {
   getShopPrivacySettings,
   upsertShopPrivacySettings,
 } from "../models/shopPrivacy.server";
+import {
+  configuredLlmProviders,
+  LLM_PROVIDER_LABELS,
+  LLM_PROVIDERS,
+} from "../ai/llm/providers";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -19,7 +24,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     getShopPrivacySettings(session.shop),
     getMerchantRuleSet(session.shop),
   ]);
-  return { privacy, merchant };
+  return { privacy, merchant, llmConfigured: configuredLlmProviders() };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -48,6 +53,7 @@ export default function SettingsPage() {
     actionData && "merchant" in actionData && actionData.merchant
       ? actionData.merchant
       : loaded.merchant;
+  const llmConfigured = loaded.llmConfigured;
 
   return (
     <s-page heading="Settings">
@@ -185,6 +191,34 @@ export default function SettingsPage() {
               Profit is available only when min margin % is set so ranking can
               use margin data. Incrementality still reports all metrics; this
               goal highlights the primary one.
+            </s-paragraph>
+            <label>
+              Copilot model provider
+              <select name="copilotProvider" defaultValue={merchant.copilotProvider}>
+                <option value="auto">{LLM_PROVIDER_LABELS.auto}</option>
+                <option value="none">{LLM_PROVIDER_LABELS.none}</option>
+                {LLM_PROVIDERS.map((id) => (
+                  <option key={id} value={id} disabled={!llmConfigured[id]}>
+                    {LLM_PROVIDER_LABELS[id]}
+                    {llmConfigured[id] ? "" : " (no API key)"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Model id (optional; blank uses the provider default)
+              <input
+                type="text"
+                name="copilotModel"
+                defaultValue={merchant.copilotModel}
+                placeholder="gpt-4o-mini, grok-2-latest, gemini-2.0-flash"
+              />
+            </label>
+            <s-paragraph>
+              Keys stay in the app environment, not in this form: OPENAI_API_KEY,
+              XAI_API_KEY or GROK_API_KEY, GEMINI_API_KEY. Copilot and the
+              optional recommend picker use these providers. Raw shopper events
+              are still never sent to Copilot.
             </s-paragraph>
             <label>
               Price min{" "}

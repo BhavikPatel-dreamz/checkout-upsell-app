@@ -13,6 +13,7 @@ import {
   normalizeOptimizationGoal,
   type OptimizationGoal,
 } from "../ai/learn/goal";
+import { normalizeLlmProvider, type LlmProviderChoice } from "../ai/llm/providers";
 import db from "../db.server";
 import type { MerchantRules } from "../ai/recommend/pipeline";
 
@@ -32,6 +33,8 @@ export interface MerchantRuleSetRecord {
   maxDiscountPercent: number;
   holdoutPercent: number;
   optimizationGoal: OptimizationGoal;
+  copilotProvider: LlmProviderChoice;
+  copilotModel: string;
   priceMin: number | null;
   priceMax: number | null;
 }
@@ -50,6 +53,8 @@ function toRecord(row: {
   maxDiscountPercent: number;
   holdoutPercent?: number;
   optimizationGoal?: string;
+  copilotProvider?: string;
+  copilotModel?: string;
   priceMin: Prisma.Decimal | number | null;
   priceMax: Prisma.Decimal | number | null;
 }): MerchantRuleSetRecord {
@@ -64,6 +69,8 @@ function toRecord(row: {
     optimizationGoal: normalizeOptimizationGoal(row.optimizationGoal, {
       allowProfit: row.minMarginPercent != null,
     }),
+    copilotProvider: normalizeLlmProvider(row.copilotProvider),
+    copilotModel: typeof row.copilotModel === "string" ? row.copilotModel.trim() : "",
     priceMin: decimalToNumber(row.priceMin),
     priceMax: decimalToNumber(row.priceMax),
   };
@@ -79,6 +86,8 @@ export function emptyMerchantRuleSet(shop: string): MerchantRuleSetRecord {
     maxDiscountPercent: DEFAULT_MAX_DISCOUNT_PERCENT,
     holdoutPercent: DEFAULT_HOLDOUT_PERCENT,
     optimizationGoal: DEFAULT_OPTIMIZATION_GOAL,
+    copilotProvider: "auto",
+    copilotModel: "",
     priceMin: null,
     priceMax: null,
   };
@@ -112,6 +121,8 @@ export async function upsertMerchantRuleSet(
     maxDiscountPercent?: number;
     holdoutPercent?: number;
     optimizationGoal?: string;
+    copilotProvider?: string;
+    copilotModel?: string;
     priceMin: number | null;
     priceMax: number | null;
   },
@@ -128,6 +139,8 @@ export async function upsertMerchantRuleSet(
     optimizationGoal: normalizeOptimizationGoal(input.optimizationGoal, {
       allowProfit: input.minMarginPercent != null,
     }),
+    copilotProvider: normalizeLlmProvider(input.copilotProvider),
+    copilotModel: (input.copilotModel ?? "").trim(),
     priceMin: input.priceMin,
     priceMax: input.priceMax,
   };
@@ -147,6 +160,8 @@ export function merchantRuleSetFromForm(form: FormData): {
   maxDiscountPercent: number;
   holdoutPercent: number;
   optimizationGoal: OptimizationGoal;
+  copilotProvider: LlmProviderChoice;
+  copilotModel: string;
   priceMin: number | null;
   priceMax: number | null;
 } {
@@ -160,6 +175,8 @@ export function merchantRuleSetFromForm(form: FormData): {
     optimizationGoal: normalizeOptimizationGoal(form.get("optimizationGoal"), {
       allowProfit: optionalNumber(form.get("minMarginPercent")) != null,
     }),
+    copilotProvider: normalizeLlmProvider(form.get("copilotProvider")),
+    copilotModel: String(form.get("copilotModel") ?? "").trim(),
     priceMin: optionalNumber(form.get("priceMin")),
     priceMax: optionalNumber(form.get("priceMax")),
   };

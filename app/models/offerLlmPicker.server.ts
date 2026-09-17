@@ -1,5 +1,7 @@
 import type { BrowseActivityRow, IdentityLookup } from "./browseActivity.server";
 import type { EligibleOfferPayload } from "./eligibleOffer";
+import { completeChat } from "../ai/llm/complete.server";
+import { anyLlmConfigured } from "../ai/llm/providers";
 
 const CACHE_TTL_MS = 1000 * 60 * 5;
 const LLM_TIMEOUT_MS = 2500;
@@ -11,7 +13,7 @@ export const LLM_TOP_K = 8;
 export function llmPickerEnabled(): boolean {
   const flag = process.env.AI_RECOMMEND_LLM?.trim().toLowerCase();
   if (flag !== "1" && flag !== "true" && flag !== "on") return false;
-  return Boolean(process.env.OPENAI_API_KEY?.trim());
+  return anyLlmConfigured();
 }
 
 export function splitLlmTopK<T>(items: T[], k = LLM_TOP_K): { head: T[]; tail: T[] } {
@@ -76,11 +78,8 @@ async function requestLlmOrder(options: {
   pool: EligibleOfferPayload[];
   activity: BrowseActivityRow[];
 }): Promise<string[] | null> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
+  if (!llmPickerEnabled()) return null;
 
-  const endpoint = process.env.OPENAI_BASE_URL?.replace(/\/$/, "") || "https://api.openai.com/v1";
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const allowed = new Set(options.pool.flatMap((item) => [item.variantId, item.productId]));
   const poolLines = options.pool.map(
     (item) => `${item.variantId} | product ${item.productId} | ${item.productTitle}`,
@@ -89,45 +88,17 @@ async function requestLlmOrder(options: {
     return `${row.eventType} product=${row.productId ?? ""} variant=${row.variantId ?? ""} collection=${row.collectionId ?? ""} query=${row.query ?? ""} at=${row.occurredAt.toISOString()}`;
   });
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(`${endpoint}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You only reorder the provided upsell pool for one Shopify shop. Return a JSON array of variant ids from that pool, best first. Never invent ids, never add products, never use other shops.",
-          },
-          {
-            role: "user",
-            content: `Shop: ${options.shop}\nPool:\n${poolLines.join("\n")}\nRecent activity:\n${activityLines.join("\n") || "(none)"}`,
-          },
-        ],
-      }),
-    });
-    if (!response.ok) return null;
-    const body = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = body.choices?.[0]?.message?.content ?? "";
-    const ids = parseLlmPoolIds(content, allowed);
-    return ids.length > 0 ? ids : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  const completed = await completeChat({
+    provider: process.env.AI_RECOMMEND_PROVIDER,
+    timeoutMs: LLM_TIMEOUT_MS,
+    temperature: 0,
+    system:
+      "You only reorder the provided upsell pool for one Shopify shop. Return a JSON array of variant ids from that pool, best first. Never invent ids, never add products, never use other shops.",
+    user: `Shop: ${options.shop}\nPool:\n${poolLines.join("\n")}\nRecent activity:\n${activityLines.join("\n") || "(none)"}`,
+  });
+  if (!completed) return null;
+  const ids = parseLlmPoolIds(completed.text, allowed);
+  return ids.length > 0 ? ids : null;
 }
 
 export async function pickPoolWithOptionalLlm(options: {
