@@ -48,7 +48,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 | ID | Task | Status |
 | --- | --- | --- |
 | AI-3.1 | `POST /api/ai/decide` response contract + holdout assignment | COMPLETE |
-| AI-3.2 | Intent heuristics from events (states enum) + profile snapshot table | NOT_STARTED |
+| AI-3.2 | Intent heuristics from events (states enum) + profile snapshot table | COMPLETE |
 | AI-3.3 | Timing engine: dwell/scroll/exit/cart-value; default show=false if low expected value | NOT_STARTED |
 | AI-3.4 | Experience selection: inline vs popup vs cart vs thank-you | NOT_STARTED |
 | AI-3.5 | Campaign + Experience models wrapping/extending `Offer` (no duplicate offer form) | NOT_STARTED |

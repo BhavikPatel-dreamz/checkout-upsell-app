@@ -13,10 +13,12 @@ function hasRequiredDelegates(client: PrismaClient): boolean {
   const asAny = client as PrismaClient & {
     productRelation?: { findMany?: unknown };
     merchantRuleSet?: { findUnique?: unknown };
+    shopperProfile?: { upsert?: unknown };
   };
   return (
     typeof asAny.productRelation?.findMany === "function" &&
-    typeof asAny.merchantRuleSet?.findUnique === "function"
+    typeof asAny.merchantRuleSet?.findUnique === "function" &&
+    typeof asAny.shopperProfile?.upsert === "function"
   );
 }
 

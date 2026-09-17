@@ -56,6 +56,8 @@ export async function redactCustomerData(input: {
         consentStates: 0,
         upsellHistory: 0,
         customerProductAffinity: 0,
+        shopperProfiles: 0,
+        shopperIntentSnapshots: 0,
       },
     };
   }
@@ -105,6 +107,8 @@ export async function redactCustomerData(input: {
     consentStates,
     upsellHistory,
     customerProductAffinity,
+    shopperProfiles,
+    shopperIntentSnapshots,
   ] = await Promise.all([
     db.shopperEvent.deleteMany({ where: shopperWhere }),
     db.browseActivity.deleteMany({ where: browseWhere }),
@@ -128,6 +132,12 @@ export async function redactCustomerData(input: {
         ],
       },
     }),
+    db.shopperProfile.deleteMany({
+      where: { shop, subjectId: { in: [...keys, ...guestKeys] } },
+    }),
+    db.shopperIntentSnapshot.deleteMany({
+      where: { shop, subjectId: { in: [...keys, ...guestKeys] } },
+    }),
   ]);
 
   return {
@@ -139,6 +149,8 @@ export async function redactCustomerData(input: {
       consentStates: consentStates.count,
       upsellHistory: upsellHistory.count,
       customerProductAffinity: customerProductAffinity.count,
+      shopperProfiles: shopperProfiles.count,
+      shopperIntentSnapshots: shopperIntentSnapshots.count,
     },
   };
 }
@@ -158,6 +170,8 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
         productProductAffinity: 0,
         productRelations: 0,
         merchantRuleSets: 0,
+        shopperProfiles: 0,
+        shopperIntentSnapshots: 0,
       },
     };
   }
@@ -173,6 +187,8 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
     productProductAffinity,
     productRelations,
     merchantRuleSets,
+    shopperProfiles,
+    shopperIntentSnapshots,
   ] = await Promise.all([
     db.shopperEvent.deleteMany({ where: { shop } }),
     db.browseActivity.deleteMany({ where: { shop } }),
@@ -184,6 +200,8 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
     db.productProductAffinity.deleteMany({ where: { shop } }),
     db.productRelation.deleteMany({ where: { shop } }),
     db.merchantRuleSet.deleteMany({ where: { shop } }),
+    db.shopperProfile.deleteMany({ where: { shop } }),
+    db.shopperIntentSnapshot.deleteMany({ where: { shop } }),
   ]);
 
   return {
@@ -198,6 +216,8 @@ export async function redactShopData(shopDomain: string): Promise<{ deleted: Rec
       productProductAffinity: productProductAffinity.count,
       productRelations: productRelations.count,
       merchantRuleSets: merchantRuleSets.count,
+      shopperProfiles: shopperProfiles.count,
+      shopperIntentSnapshots: shopperIntentSnapshots.count,
     },
   };
 }

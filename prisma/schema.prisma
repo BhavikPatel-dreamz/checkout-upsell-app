@@ -155,6 +155,53 @@ model IdentityLink {
   @@index([shop, toType, toId])
 }
 
+enum ShopperIntentState {
+  EXPLORING
+  RESEARCHING
+  COMPARING
+  HIGH_INTENT
+  READY_TO_BUY
+  ABANDONING
+  RETURNING
+  LOYAL
+}
+
+/// Shop-scoped shopper snapshot (AI-3.2). Opaque subject ids only.
+model ShopperProfile {
+  id                  String             @id @default(cuid())
+  shop                String
+  subjectType         ConsentSubjectType
+  subjectId           String
+  intentState         ShopperIntentState @default(EXPLORING)
+  purchaseIntent      Float              @default(0)
+  productInterest     Float              @default(0)
+  priceSensitivity    Float              @default(0)
+  discountSensitivity Float              @default(0)
+  crossSellPotential  Float              @default(0)
+  abandonRisk         Float              @default(0)
+  recentProductIds    String[]           @default([])
+  purchasedProductIds String[]           @default([])
+  snapshotAt          DateTime           @default(now())
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@unique([shop, subjectType, subjectId])
+  @@index([shop, intentState])
+}
+
+model ShopperIntentSnapshot {
+  id             String             @id @default(cuid())
+  shop           String
+  subjectType    ConsentSubjectType
+  subjectId      String
+  intentState    ShopperIntentState
+  purchaseIntent Float
+  abandonRisk    Float
+  recordedAt     DateTime           @default(now())
+
+  @@index([shop, subjectId, recordedAt])
+}
+
 /// Shop-scoped customer (or anon/session) interest in a product. Rebuilt by the affinity job.
 model CustomerProductAffinity {
   id             String             @id @default(cuid())

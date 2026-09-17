@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import db from "../../db.server";
+import { refreshShopperProfile } from "../intent/profile.server";
 import { runHybridRecommend } from "../recommend/hybridRecommend.server";
 import {
   identityKey,
@@ -9,8 +10,6 @@ import {
   type DecideSurface,
 } from "./contract";
 import { assignHoldout } from "./holdout";
-
-const STUB_INTENT = { state: "EXPLORING", purchaseIntent: 0 } as const;
 
 function channelForSurface(surface: DecideSurface): DecideSurface {
   return surface;
@@ -49,6 +48,7 @@ export function buildDecideResponse(input: {
   holdout: boolean;
   products?: DecideProduct[];
   recommendationId?: string;
+  intent?: { state: string; purchaseIntent: number };
 }): DecideResponse {
   const holdout = input.holdout;
   const products = holdout ? [] : (input.products ?? []);
@@ -60,7 +60,7 @@ export function buildDecideResponse(input: {
     offer: { type: "none", value: null },
     copy: { headline: "", cta: "" },
     recommendationId: input.recommendationId ?? randomUUID(),
-    intent: { ...STUB_INTENT },
+    intent: input.intent ?? { state: "EXPLORING", purchaseIntent: 0 },
     holdout,
   };
 }
@@ -69,6 +69,15 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
   const recommendationId = randomUUID();
   const holdout = assignHoldout(input.shop, identityKey(input));
   const consented = input.consented !== false;
+  const inferred = consented
+    ? await refreshShopperProfile({
+        shop: input.shop,
+        customerId: input.customerId,
+        anonId: input.anonId,
+        sessionId: input.sessionId,
+      })
+    : { state: "EXPLORING" as const, purchaseIntent: 0 };
+  const intent = { state: inferred.state, purchaseIntent: inferred.purchaseIntent };
 
   if (holdout || !consented) {
     return buildDecideResponse({
@@ -76,6 +85,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
       holdout,
       products: [],
       recommendationId,
+      intent,
     });
   }
 
@@ -85,5 +95,6 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     holdout: false,
     products,
     recommendationId,
+    intent,
   });
 }
