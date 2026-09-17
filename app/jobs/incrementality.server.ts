@@ -118,6 +118,63 @@ async function upsertStat(input: {
   return stats;
 }
 
+async function rebuildBanditArms(
+  shop: string,
+  assignments: Array<{ experimentId: string; subjectId: string; holdout: boolean; variantId: string | null }>,
+  since: Date,
+  until: Date,
+) {
+  const treated = assignments.filter((row) => !row.holdout && row.variantId);
+  const byExperiment = new Map<string, typeof treated>();
+  for (const row of treated) {
+    const list = byExperiment.get(row.experimentId) ?? [];
+    list.push(row);
+    byExperiment.set(row.experimentId, list);
+  }
+
+  for (const [experimentId, group] of byExperiment) {
+    const experiment = await db.experiment.findFirst({
+      where: { id: experimentId, shop },
+      select: { experienceId: true },
+    });
+    if (!experiment) continue;
+
+    const variants = await db.experienceVariant.findMany({
+      where: { shop, experienceId: experiment.experienceId },
+      select: { id: true },
+    });
+    const byVariant = new Map<string, typeof group>();
+    for (const row of group) {
+      const id = row.variantId as string;
+      const list = byVariant.get(id) ?? [];
+      list.push(row);
+      byVariant.set(id, list);
+    }
+
+    for (const variant of variants) {
+      const slice = byVariant.get(variant.id) ?? [];
+      const cohort =
+        slice.length === 0
+          ? emptyCohort()
+          : await cohortFor(
+              shop,
+              slice.map((row) => ({ subjectId: row.subjectId, holdout: false })),
+              false,
+              since,
+              until,
+            );
+      await db.experienceVariant.update({
+        where: { id: variant.id },
+        data: {
+          banditTrials: cohort.users,
+          banditSuccesses: Math.min(cohort.orders, cohort.users),
+          banditRewardSum: cohort.revenue,
+        },
+      });
+    }
+  }
+}
+
 export async function rebuildIncrementalityStats(shopFilter?: string): Promise<{
   shops: number;
   rows: number;
@@ -132,7 +189,13 @@ export async function rebuildIncrementalityStats(shopFilter?: string): Promise<{
   for (const shop of shops) {
     const assignments = await db.experimentAssignment.findMany({
       where: { shop, assignedAt: { gte: windowStart, lt: windowEnd } },
-      select: { experimentId: true, subjectId: true, holdout: true, surface: true },
+      select: {
+        experimentId: true,
+        subjectId: true,
+        holdout: true,
+        surface: true,
+        variantId: true,
+      },
     });
     if (assignments.length === 0) continue;
 
@@ -195,6 +258,8 @@ export async function rebuildIncrementalityStats(shopFilter?: string): Promise<{
       });
       rows += 1;
     }
+
+    await rebuildBanditArms(shop, assignments, windowStart, windowEnd);
   }
 
   return { shops: shops.length, rows };

@@ -138,13 +138,16 @@ model ExperienceVariant {
   cta          String     @default("")
   layout       String     @default("default")
   offerPolicy  Json?
+  banditTrials     Int      @default(0)
+  banditSuccesses  Int      @default(0)
+  banditRewardSum  Float    @default(0)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
   @@index([shop, experienceId])
 }
 
-/// A/B on experience variants. Shop-level holdout (AI-5.1) still applies first.
+/// A/B or bandit on experience variants. Shop-level holdout (AI-5.1) always applies first and is never an arm.
 model Experiment {
   id           String                  @id @default(cuid())
   shop         String

@@ -20,6 +20,7 @@ import { getMerchantRuleSet } from "../../models/merchantRuleSet.server";
 import { selectOfferPolicy, type OfferPolicy } from "../offer/policy";
 import { inferAbandonReason } from "../offer/recoveryReason";
 import { incrementalitySurfaceFor } from "../learn/incrementality";
+import type { OptimizationGoal } from "../learn/goal";
 
 function channelForSurface(surface: DecideSurface): DecideSurface {
   return surface;
@@ -92,6 +93,7 @@ async function withPersistedExperience(
     customerId?: string | null;
     anonId?: string | null;
     sessionId?: string | null;
+    optimizationGoal?: OptimizationGoal;
   },
 ): Promise<{ experience: ExperienceSelection; campaignId: string | null; experienceId: string | null }> {
   const row = await findExperienceForChannel(shop, experience.channel);
@@ -104,6 +106,7 @@ async function withPersistedExperience(
     customerId: identity.customerId,
     anonId: identity.anonId,
     sessionId: identity.sessionId,
+    optimizationGoal: identity.optimizationGoal,
     surface: incrementalitySurfaceFor({
       channel: experience.channel,
       templateId: experience.templateId,
@@ -268,6 +271,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
       customerId: input.customerId,
       anonId: input.anonId,
       sessionId: input.sessionId,
+      optimizationGoal: merchant.optimizationGoal,
     });
     return buildDecideResponse({
       surface: input.surface,
@@ -310,6 +314,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     customerId: input.customerId,
     anonId: input.anonId,
     sessionId: input.sessionId,
+    optimizationGoal: merchant.optimizationGoal,
   });
   const wouldShow = products.length > 0 && timing.show;
   const frequency = await gateAndRecordInterruption({

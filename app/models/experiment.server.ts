@@ -2,7 +2,8 @@ import { ConsentSubjectType } from "@prisma/client";
 import db from "../db.server";
 import { subjectFromIdentity } from "../ai/intent/profile.server";
 import { identityKey } from "../ai/decide/contract";
-import { pickAbVariantId } from "../ai/experiment/assign";
+import { pickBanditVariantId } from "../ai/experiment/bandit";
+import type { OptimizationGoal } from "../ai/learn/goal";
 
 export async function ensureAbExperiment(input: {
   shop: string;
@@ -59,6 +60,7 @@ export async function assignExperienceVariant(input: {
   anonId?: string | null;
   sessionId?: string | null;
   surface?: string | null;
+  optimizationGoal?: OptimizationGoal;
 }): Promise<{
   experimentId: string;
   variantId: string | null;
@@ -76,9 +78,46 @@ export async function assignExperienceVariant(input: {
     subjectType: ConsentSubjectType.anon,
     subjectId: identityKey(input),
   };
-  const variantId = input.holdout
-    ? null
-    : pickAbVariantId(input.shop, experimentId, identityKey(input), variantIds);
+
+  const existing = await db.experimentAssignment.findUnique({
+    where: {
+      shop_experimentId_subjectType_subjectId: {
+        shop: input.shop,
+        experimentId,
+        subjectType: subject.subjectType,
+        subjectId: subject.subjectId,
+      },
+    },
+    select: { variantId: true, holdout: true },
+  });
+
+  const arms = input.holdout
+    ? []
+    : await db.experienceVariant.findMany({
+        where: { shop: input.shop, experienceId: input.experienceId },
+        select: {
+          id: true,
+          banditTrials: true,
+          banditSuccesses: true,
+          banditRewardSum: true,
+        },
+      });
+
+  const variantId = pickBanditVariantId({
+    holdout: input.holdout,
+    variantIds,
+    existingVariantId: input.holdout ? null : existing?.variantId,
+    shop: input.shop,
+    experimentId,
+    identity: identityKey(input),
+    goal: input.optimizationGoal,
+    arms: arms.map((row) => ({
+      variantId: row.id,
+      trials: row.banditTrials,
+      successes: row.banditSuccesses,
+      rewardSum: row.banditRewardSum,
+    })),
+  });
 
   await db.experimentAssignment.upsert({
     where: {

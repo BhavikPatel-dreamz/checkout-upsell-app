@@ -162,6 +162,11 @@ export default function SettingsPage() {
                 defaultValue={merchant.holdoutPercent}
               />
             </label>
+            <s-paragraph>
+              Experience variants for treated shoppers use a bandit (Thompson
+              sampling). Holdout is assigned first and is never an arm — the
+              bandit cannot turn holdout off.
+            </s-paragraph>
             <label>
               Optimization goal
               <select name="optimizationGoal" defaultValue={merchant.optimizationGoal}>

@@ -84,6 +84,8 @@ export default function IncrementalityPage() {
           holdout metrics stay visible; the primary metric is highlighted per
           that goal. Conversion is orders per assigned identity; AOV is revenue
           per order. Last 7 days. Surfaces: PDP, cart, popup, thank-you, recovery.
+          Experience copy/layout for treated shoppers is chosen by a bandit;
+          holdout never enters that choice.
         </s-paragraph>
         <Form method="post">
           <s-button type="submit" variant="primary">

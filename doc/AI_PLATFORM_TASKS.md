@@ -80,7 +80,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 | AI-5.3 | Incrementality stats job + dashboard: incremental revenue, AOV, conversion | COMPLETE |
 | AI-5.4 | Surface breakdown (PDP, cart, popup, thank-you, recovery) | COMPLETE |
 | AI-5.5 | Optimization goal setting (revenue/AOV/conversion; profit if margin data) | COMPLETE |
-| AI-5.6 | Bandit **with** holdout retained (do not ship bandit without holdout) | NOT_STARTED |
+| AI-5.6 | Bandit **with** holdout retained (do not ship bandit without holdout) | COMPLETE |
 
 ---
 
