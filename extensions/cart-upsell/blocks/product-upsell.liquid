@@ -23,6 +23,7 @@
     enabledChannels: [{% if block.settings.enable_inline %}"product_page"{% endif %}{% if block.settings.enable_popup %}{% if block.settings.enable_inline %},{% endif %}"popup"{% endif %}{% if block.settings.enable_sidebar %}{% if block.settings.enable_inline or block.settings.enable_popup %},{% endif %}"sidebar"{% endif %}{% if block.settings.enable_sticky %}{% if block.settings.enable_inline or block.settings.enable_popup or block.settings.enable_sidebar %},{% endif %}"sticky"{% endif %}]
   };
 </script>
+<script src="{{ 'upsell-runtime.js' | asset_url }}" defer></script>
 <script src="{{ 'ai-events.js' | asset_url }}" defer></script>
 
 {% schema %}

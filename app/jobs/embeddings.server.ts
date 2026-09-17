@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { ProductRelationKind, ProductRelationSource } from "@prisma/client";
 import db from "../db.server";
 import {
@@ -6,7 +5,6 @@ import {
   cosineSimilarity,
   hashEmbedding,
   parseVectorLiteral,
-  toVectorLiteral,
 } from "../ai/embeddings/hashEmbed";
 
 const NEIGHBORS = 10;
@@ -19,17 +17,17 @@ export interface EmbeddingJobResult {
   pgvector: boolean;
 }
 
-let pgvectorChecked: boolean | null = null;
-
+/** Embeddings are stored as JSON arrays; pgvector is not required. */
 export async function pgvectorAvailable(): Promise<boolean> {
-  if (pgvectorChecked != null) return pgvectorChecked;
-  try {
-    await db.$queryRaw`SELECT 'vector'::regtype`;
-    pgvectorChecked = true;
-  } catch {
-    pgvectorChecked = false;
+  return true;
+}
+
+function asNumberVector(value: unknown): number[] | null {
+  if (Array.isArray(value) && value.every((item) => typeof item === "number" && Number.isFinite(item))) {
+    return value;
   }
-  return pgvectorChecked;
+  if (typeof value === "string") return parseVectorLiteral(value);
+  return null;
 }
 
 async function shopsForEmbeddings(shopFilter?: string): Promise<string[]> {
@@ -47,7 +45,6 @@ export async function writeProductEmbedding(input: {
   tags?: string[];
   collections?: string[];
 }): Promise<boolean> {
-  if (!(await pgvectorAvailable())) return false;
   const vector = hashEmbedding(
     catalogEmbeddingText({
       title: input.title,
@@ -57,14 +54,14 @@ export async function writeProductEmbedding(input: {
       collections: input.collections,
     }),
   );
-  await db.$executeRaw(
-    Prisma.sql`UPDATE "ProductIntelligence" SET embedding = CAST(${toVectorLiteral(vector)} AS vector) WHERE shop = ${input.shop} AND "productId" = ${input.productId}`,
-  );
+  await db.productIntelligence.updateMany({
+    where: { shop: input.shop, productId: input.productId },
+    data: { embedding: vector },
+  });
   return true;
 }
 
 export async function embedShopCatalog(shop: string): Promise<number> {
-  if (!(await pgvectorAvailable())) return 0;
   const rows = await db.productIntelligence.findMany({
     where: { shop },
     select: {
@@ -91,16 +88,15 @@ type EmbeddedRow = {
 };
 
 async function loadEmbeddedRows(shop: string): Promise<EmbeddedRow[]> {
-  const rows = await db.$queryRaw<Array<{ productId: string; category: string | null; embedding: string }>>(
-    Prisma.sql`SELECT "productId", category, embedding::text AS embedding
-     FROM "ProductIntelligence"
-     WHERE shop = ${shop} AND embedding IS NOT NULL`,
-  );
+  const rows = await db.productIntelligence.findMany({
+    where: { shop },
+    select: { productId: true, category: true, embedding: true },
+  });
   return rows
     .map((row) => ({
       productId: row.productId,
       category: row.category,
-      vector: parseVectorLiteral(row.embedding),
+      vector: asNumberVector(row.embedding),
     }))
     .filter((row): row is EmbeddedRow => Array.isArray(row.vector) && row.vector.length > 0);
 }
@@ -159,11 +155,7 @@ export async function rebuildEmbeddingRelations(shop: string): Promise<number> {
 }
 
 export async function refreshCatalogEmbeddings(shopFilter?: string): Promise<EmbeddingJobResult> {
-  const available = await pgvectorAvailable();
   const shops = await shopsForEmbeddings(shopFilter);
-  if (!available) {
-    return { shops: shops.length, embedded: 0, relations: 0, pgvector: false };
-  }
   let embedded = 0;
   let relations = 0;
   for (const shop of shops) {

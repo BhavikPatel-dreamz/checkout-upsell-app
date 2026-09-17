@@ -15,12 +15,8 @@ describe("catalog embeddings", () => {
     expect(cosineSimilarity(bottle, bottle2)).toBeGreaterThan(cosineSimilarity(bottle, shoe));
   });
 
-  it("writes pgvector embeddings and embed relations when the extension exists", async () => {
-    const available = await pgvectorAvailable();
-    if (!available) {
-      expect(available).toBe(false);
-      return;
-    }
+  it("writes embeddings and embed relations without requiring pgvector", async () => {
+    expect(await pgvectorAvailable()).toBe(true);
 
     await db.productRelation.deleteMany({ where: { shop: SHOP } });
     await db.productIntelligence.deleteMany({ where: { shop: SHOP } });

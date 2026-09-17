@@ -496,7 +496,7 @@ model ProductVariant {
   @@index([shop, productId])
 }
 
-/// Catalog features for ranking. Embedding stored as pgvector column (AI-2.9), not a Prisma field.
+/// Catalog features for ranking. Embedding is a JSON number array (AI-2.9); no pgvector required.
 model ProductIntelligence {
   id                 String    @id @default(cuid())
   shop               String
@@ -515,6 +515,7 @@ model ProductIntelligence {
   inventoryQuantity  Int?
   availableForSale   Boolean   @default(true)
   season             String?
+  embedding          Json?
   publishedAt        DateTime?
   syncedAt           DateTime
   computedAt         DateTime  @default(now())
