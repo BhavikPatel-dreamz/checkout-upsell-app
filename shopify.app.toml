@@ -6,7 +6,10 @@ application_url = "https://upsell.dreamzapps.com"
 embedded = true
 
 [build]
-automatically_update_urls_on_dev = true
+# Keep Partner/production URLs on upsell.dreamzapps.com.
+# `true` made `shopify app dev` rewrite the live app to the Cloudflare tunnel,
+# so the storefront fetched https://upsale.dynamicdreamz.net/extensions after the tunnel died.
+automatically_update_urls_on_dev = false
 
 [webhooks]
 api_version = "2026-10"
