@@ -422,6 +422,27 @@ model ProductRelation {
   @@index([shop, productId, kind, score])
 }
 
+/// Offline Smart Moment (AI-6.1). Activate creates a draft campaign; Standard never auto-publishes.
+model SmartMoment {
+  id                 String   @id @default(cuid())
+  shop               String
+  kind               String
+  status             String   @default("detected")
+  productId          String
+  relatedProductId   String
+  support            Int      @default(0)
+  lift               Float    @default(0)
+  expectedImpact     Float    @default(0)
+  explanation        String   @default("")
+  campaignId         String?
+  offerId            String?
+  detectedAt         DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([shop, kind, productId, relatedProductId])
+  @@index([shop, status, expectedImpact])
+}
+
 model OfferEvent {
   id         String          @id @default(cuid())
   offerId    String

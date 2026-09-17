@@ -32,6 +32,7 @@ export default function App() {
         <s-link href="/app/product-sync">Product Sync</s-link>
         <s-link href="/app/analytics">Analytics</s-link>
         <s-link href="/app/incrementality">Incrementality</s-link>
+        <s-link href="/app/smart-moments">Smart Moments</s-link>
         <s-link href="/app/settings">Settings</s-link>
         <s-link href="/app/onboarding">Onboarding</s-link>
       </s-app-nav>
