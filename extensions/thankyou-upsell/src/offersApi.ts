@@ -1,5 +1,5 @@
 /** Direct app origin — checkout UI runs on extensions.shopifycdn.com, so app-proxy URLs fail CORS. */
-export const DEFAULT_APP_ORIGIN = "https://upsale.dynamicdreamz.net";
+export const DEFAULT_APP_ORIGIN = "https://upsell.dreamzapps.com";
 
 export function offersApiOrigin(settings?: { api_base?: string }): string {
   const fromSettings = settings?.api_base?.trim().replace(/\/$/, "");
