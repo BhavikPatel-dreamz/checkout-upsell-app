@@ -41,6 +41,8 @@ import {
 import { validateOfferFields } from "../validation/offerSchemas";
 import { placementFromDisplayLocation } from "../types/offer";
 import { getSmartMoment, attachSmartMomentToOffer } from "../models/smartMoment.server";
+import { getMerchantRuleSet } from "../models/merchantRuleSet.server";
+import { autopilotMayPublish, isEnterpriseShop } from "../enterprise/tier";
 import { offerDraftFromSmartMoment } from "../ai/moments/fromMoment";
 import "../styles/app._index.css";
 
@@ -210,8 +212,13 @@ export async function action({ request }: ActionFunctionArgs) {
   };
 
   if (smartMomentId) {
-    payload.isActive = false;
-    payload.status = "Draft";
+    const merchant = await getMerchantRuleSet(session.shop);
+    const publish = autopilotMayPublish({
+      enterprise: isEnterpriseShop(session.shop),
+      autopilotEnabled: merchant.autopilotPublish,
+    });
+    payload.isActive = publish;
+    payload.status = publish ? "Active" : "Draft";
     payload.triggerRules = { smartMomentId };
   }
 
@@ -270,7 +277,7 @@ export async function action({ request }: ActionFunctionArgs) {
       placement: built.placement,
       targetProductIds: built.targetProductIds,
       triggerRules: built.triggerRules,
-      isActive: smartMomentId ? false : built.isActive,
+      isActive: built.isActive,
     });
     if (smartMomentId) {
       await attachSmartMomentToOffer(session.shop, smartMomentId, offerId);

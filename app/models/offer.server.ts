@@ -4,6 +4,8 @@
 import { Prisma, OfferType, OfferPlacement } from "@prisma/client";
 import db from "../db.server";
 import { wrapOfferAsCampaign } from "./campaign.server";
+import { getMerchantRuleSet } from "./merchantRuleSet.server";
+import { autopilotMayPublish, isEnterpriseShop } from "../enterprise/tier";
 import { getOfferTypeConfig, offerRequiresTriggerProducts } from "../config/offerTypes";
 import { validateOfferFields } from "../validation/offerSchemas";
 
@@ -354,10 +356,24 @@ export function getOffer(shop: string, id: string) {
   return db.offer.findFirst({ where: { id, shop } });
 }
 
+function triggerHasSmartMoment(rules: unknown): boolean {
+  return isPlainObject(rules) && typeof rules.smartMomentId === "string" && rules.smartMomentId.trim().length > 0;
+}
+
+async function applyMomentPublishPolicy(shop: string, isActive: boolean, triggerRules: unknown): Promise<boolean> {
+  if (!triggerHasSmartMoment(triggerRules)) return isActive;
+  const merchant = await getMerchantRuleSet(shop);
+  return autopilotMayPublish({
+    enterprise: isEnterpriseShop(shop),
+    autopilotEnabled: merchant.autopilotPublish,
+  });
+}
+
 export async function createOffer(shop: string, input: OfferCreateInput | OfferFormPayload) {
   const normalized = buildOfferPayload(
     (input as OfferFormPayload) ?? {},
   );
+  const isActive = await applyMomentPublishPolicy(shop, normalized.isActive, normalized.triggerRules);
 
   const offer = await db.offer.create({
     data: {
@@ -366,7 +382,7 @@ export async function createOffer(shop: string, input: OfferCreateInput | OfferF
       type: normalized.type,
       placement: normalized.placement,
       targetProductIds: normalized.targetProductIds,
-      isActive: normalized.isActive,
+      isActive,
       ...(normalized.triggerRules !== undefined
         ? { triggerRules: normalized.triggerRules }
         : {}),
@@ -377,7 +393,7 @@ export async function createOffer(shop: string, input: OfferCreateInput | OfferF
     offerId: offer.id,
     name: offer.name,
     placement: offer.placement,
-    isActive: offer.isActive,
+    isActive,
   });
   return offer;
 }
@@ -388,8 +404,15 @@ export async function updateOffer(
   id: string,
   data: Prisma.OfferUpdateInput,
 ) {
-  const result = await db.offer.updateMany({ where: { id, shop }, data });
-  if (result.count === 0) return null;
+  const existing = await db.offer.findFirst({ where: { id, shop } });
+  if (!existing) return null;
+  const rules =
+    data.triggerRules !== undefined ? data.triggerRules : existing.triggerRules;
+  const next = { ...data };
+  if (typeof next.isActive === "boolean") {
+    next.isActive = await applyMomentPublishPolicy(shop, next.isActive, rules);
+  }
+  await db.offer.updateMany({ where: { id, shop }, data: next });
   const offer = await db.offer.findFirst({ where: { id, shop } });
   if (offer) {
     await wrapOfferAsCampaign({

@@ -17,6 +17,7 @@ import {
   LLM_PROVIDER_LABELS,
   LLM_PROVIDERS,
 } from "../ai/llm/providers";
+import { isEnterpriseShop } from "../enterprise/tier";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -24,7 +25,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     getShopPrivacySettings(session.shop),
     getMerchantRuleSet(session.shop),
   ]);
-  return { privacy, merchant, llmConfigured: configuredLlmProviders() };
+  return { privacy, merchant, llmConfigured: configuredLlmProviders(), enterprise: isEnterpriseShop(session.shop) };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -54,6 +55,7 @@ export default function SettingsPage() {
       ? actionData.merchant
       : loaded.merchant;
   const llmConfigured = loaded.llmConfigured;
+  const enterprise = loaded.enterprise;
 
   return (
     <s-page heading="Settings">
@@ -219,6 +221,22 @@ export default function SettingsPage() {
               XAI_API_KEY or GROK_API_KEY, GEMINI_API_KEY. Copilot and the
               optional recommend picker use these providers. Raw shopper events
               are still never sent to Copilot.
+            </s-paragraph>
+            <label>
+              <input
+                type="checkbox"
+                name="autopilotPublish"
+                value="true"
+                defaultChecked={merchant.autopilotPublish}
+                disabled={!enterprise}
+              />{" "}
+              Autopilot publish Smart Moments (Enterprise only)
+            </label>
+            <s-paragraph>
+              Standard always reviews: Activate still opens OfferForm as a draft.
+              Autopilot live-publish is Enterprise only (`AI_TIER=enterprise` or
+              shop listed in ENTERPRISE_SHOPS) and this checkbox. Shopify Plus
+              is not Enterprise.
             </s-paragraph>
             <label>
               Price min{" "}

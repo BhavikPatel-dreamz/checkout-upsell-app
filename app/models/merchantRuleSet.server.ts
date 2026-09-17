@@ -14,6 +14,7 @@ import {
   type OptimizationGoal,
 } from "../ai/learn/goal";
 import { normalizeLlmProvider, type LlmProviderChoice } from "../ai/llm/providers";
+import { isEnterpriseShop } from "../enterprise/tier";
 import db from "../db.server";
 import type { MerchantRules } from "../ai/recommend/pipeline";
 
@@ -35,6 +36,7 @@ export interface MerchantRuleSetRecord {
   optimizationGoal: OptimizationGoal;
   copilotProvider: LlmProviderChoice;
   copilotModel: string;
+  autopilotPublish: boolean;
   priceMin: number | null;
   priceMax: number | null;
 }
@@ -55,6 +57,7 @@ function toRecord(row: {
   optimizationGoal?: string;
   copilotProvider?: string;
   copilotModel?: string;
+  autopilotPublish?: boolean;
   priceMin: Prisma.Decimal | number | null;
   priceMax: Prisma.Decimal | number | null;
 }): MerchantRuleSetRecord {
@@ -71,6 +74,7 @@ function toRecord(row: {
     }),
     copilotProvider: normalizeLlmProvider(row.copilotProvider),
     copilotModel: typeof row.copilotModel === "string" ? row.copilotModel.trim() : "",
+    autopilotPublish: Boolean(row.autopilotPublish) && isEnterpriseShop(row.shop),
     priceMin: decimalToNumber(row.priceMin),
     priceMax: decimalToNumber(row.priceMax),
   };
@@ -88,6 +92,7 @@ export function emptyMerchantRuleSet(shop: string): MerchantRuleSetRecord {
     optimizationGoal: DEFAULT_OPTIMIZATION_GOAL,
     copilotProvider: "auto",
     copilotModel: "",
+    autopilotPublish: false,
     priceMin: null,
     priceMax: null,
   };
@@ -123,6 +128,7 @@ export async function upsertMerchantRuleSet(
     optimizationGoal?: string;
     copilotProvider?: string;
     copilotModel?: string;
+    autopilotPublish?: boolean;
     priceMin: number | null;
     priceMax: number | null;
   },
@@ -141,6 +147,7 @@ export async function upsertMerchantRuleSet(
     }),
     copilotProvider: normalizeLlmProvider(input.copilotProvider),
     copilotModel: (input.copilotModel ?? "").trim(),
+    autopilotPublish: Boolean(input.autopilotPublish) && isEnterpriseShop(shop),
     priceMin: input.priceMin,
     priceMax: input.priceMax,
   };
@@ -162,6 +169,7 @@ export function merchantRuleSetFromForm(form: FormData): {
   optimizationGoal: OptimizationGoal;
   copilotProvider: LlmProviderChoice;
   copilotModel: string;
+  autopilotPublish: boolean;
   priceMin: number | null;
   priceMax: number | null;
 } {
@@ -177,6 +185,7 @@ export function merchantRuleSetFromForm(form: FormData): {
     }),
     copilotProvider: normalizeLlmProvider(form.get("copilotProvider")),
     copilotModel: String(form.get("copilotModel") ?? "").trim(),
+    autopilotPublish: form.get("autopilotPublish") === "true",
     priceMin: optionalNumber(form.get("priceMin")),
     priceMax: optionalNumber(form.get("priceMax")),
   };

@@ -49,7 +49,8 @@ export default function SmartMomentsPage() {
           These moments come from product–product co-occurrence (support and
           lift), not an LLM. Activate opens the unified offer form as a
           <strong>draft</strong> campaign. Save there to create the campaign.
-          Standard never publishes this live.
+          Standard never publishes this live. Enterprise shops can enable
+          Autopilot publish in Settings.
         </s-paragraph>
         <Form method="post">
           <input type="hidden" name="intent" value="detect" />
