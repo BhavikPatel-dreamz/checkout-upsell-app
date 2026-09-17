@@ -17,6 +17,7 @@ import { shopAllowsCheckoutDecide } from "../../models/shopCapability.server";
 import { findExperienceForChannel } from "../../models/campaign.server";
 import { getMerchantRuleSet } from "../../models/merchantRuleSet.server";
 import { selectOfferPolicy, type OfferPolicy } from "../offer/policy";
+import { inferAbandonReason } from "../offer/recoveryReason";
 
 function channelForSurface(surface: DecideSurface): DecideSurface {
   return surface;
@@ -47,8 +48,12 @@ function resolveExperienceAndTiming(input: {
   intentState: string;
   purchaseIntent: number;
   abandonRisk?: number;
+  abandonReason?: ReturnType<typeof inferAbandonReason>;
   maxScore: number;
   productCount: number;
+  strategies?: string[];
+  priceSensitivity?: number;
+  discountSensitivity?: number;
 }): { experience: ExperienceSelection; timing: TimingDecision } {
   const probe = timingFor(input.request, input.request.surface, input, input.maxScore, input.productCount);
   let experience = selectExperience({
@@ -57,6 +62,11 @@ function resolveExperienceAndTiming(input: {
     timingTrigger: probe.trigger,
     exitIntent: input.request.exitIntent,
     abandonRisk: input.abandonRisk ?? 0,
+    abandonReason: input.abandonReason,
+    strategies: input.strategies,
+    cartValue: input.request.cartValue,
+    priceSensitivity: input.priceSensitivity,
+    discountSensitivity: input.discountSensitivity,
   });
   let timing = timingFor(input.request, experience.channel, input, input.maxScore, input.productCount);
   if (!timing.show) {
@@ -188,7 +198,13 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
         anonId: input.anonId,
         sessionId: input.sessionId,
       })
-    : { state: "EXPLORING" as const, purchaseIntent: 0, abandonRisk: 0 };
+    : {
+        state: "EXPLORING" as const,
+        purchaseIntent: 0,
+        abandonRisk: 0,
+        priceSensitivity: 0,
+        discountSensitivity: 0,
+      };
   const abandonRisk = inferred.abandonRisk ?? 0;
   const intent = { state: inferred.state, purchaseIntent: inferred.purchaseIntent };
 
@@ -237,13 +253,24 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
 
   const products = await productsFromHybrid(input);
   const maxScore = products.reduce((max, row) => Math.max(max, row.score), 0);
+  const strategies = products.map((row) => row.strategy);
+  const abandonReason = inferAbandonReason({
+    priceSensitivity: inferred.priceSensitivity ?? 0,
+    discountSensitivity: inferred.discountSensitivity ?? 0,
+    strategies,
+    cartValue: input.cartValue ?? 0,
+  });
   const resolved = resolveExperienceAndTiming({
     request: input,
     intentState: intent.state,
     purchaseIntent: intent.purchaseIntent,
     abandonRisk,
+    abandonReason,
     maxScore,
     productCount: products.length,
+    strategies,
+    priceSensitivity: inferred.priceSensitivity ?? 0,
+    discountSensitivity: inferred.discountSensitivity ?? 0,
   });
   const experience = resolved.experience;
   let timing = resolved.timing;
@@ -266,9 +293,12 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     show,
     intentState: intent.state,
     purchaseIntent: intent.purchaseIntent,
-    strategies: products.map((row) => row.strategy),
+    strategies,
     cartValue: input.cartValue ?? 0,
     maxDiscountPercent: merchant.maxDiscountPercent,
+    recoveryReason: abandonReason,
+    priceSensitivity: inferred.priceSensitivity ?? 0,
+    discountSensitivity: inferred.discountSensitivity ?? 0,
   });
   return buildDecideResponse({
     surface: input.surface,

@@ -1,3 +1,5 @@
+import { inferAbandonReason, type AbandonReason } from "./recoveryReason";
+
 export const OFFER_POLICY_TYPES = [
   "none",
   "percent",
@@ -49,14 +51,32 @@ export function selectOfferPolicy(input: {
   strategies?: string[];
   cartValue?: number;
   maxDiscountPercent: number;
+  recoveryReason?: AbandonReason | null;
+  priceSensitivity?: number | null;
+  discountSensitivity?: number | null;
 }): OfferPolicy {
   if (!input.show) return { type: "none", value: null };
   const max = normalizeMaxDiscountPercent(input.maxDiscountPercent);
   const strategies = input.strategies ?? [];
   const cartValue = input.cartValue ?? 0;
+  const recovering = input.intentState === "ABANDONING" || Boolean(input.recoveryReason);
+  const reason =
+    input.recoveryReason ??
+    (recovering
+      ? inferAbandonReason({
+          priceSensitivity: input.priceSensitivity,
+          discountSensitivity: input.discountSensitivity,
+          strategies,
+          cartValue,
+        })
+      : null);
 
   let chosen: OfferPolicy = { type: "none", value: null };
-  if (input.intentState === "ABANDONING") {
+  if (reason === "forgot") {
+    chosen = { type: "none", value: null };
+  } else if (reason === "price") {
+    chosen = { type: "free_shipping", value: null };
+  } else if (reason === "accessory") {
     chosen = { type: "percent", value: Math.min(10, max) };
   } else if (strategies.includes("complementary") || strategies.includes("fbt")) {
     chosen = { type: "bundle", value: null };

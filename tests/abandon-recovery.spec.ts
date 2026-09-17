@@ -49,8 +49,9 @@ describe("abandon risk and in-session recovery", () => {
       }),
     ).toMatchObject({
       channel: "popup",
-      templateId: "in_session_recovery",
-      reason: "in_session_recovery",
+      templateId: "recovery_reminder",
+      reason: "recovery_forgot",
+      headline: "You left items in your cart",
     });
     expect(
       selectExperience({
@@ -58,6 +59,6 @@ describe("abandon risk and in-session recovery", () => {
         intentState: "ABANDONING",
         abandonRisk: 0.7,
       }),
-    ).toMatchObject({ channel: "cart", templateId: "in_session_recovery" });
+    ).toMatchObject({ channel: "cart", templateId: "recovery_reminder" });
   });
 });

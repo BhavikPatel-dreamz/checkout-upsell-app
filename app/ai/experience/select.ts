@@ -1,6 +1,12 @@
 import type { DecideSurface } from "../decide/contract";
 import type { TimingTrigger } from "../timing/timing";
 import { shouldRecoverInSession } from "../intent/abandon";
+import {
+  inferAbandonReason,
+  recoveryTemplateForReason,
+  RECOVERY_COPY,
+  type AbandonReason,
+} from "../offer/recoveryReason";
 
 export const EXPERIENCE_TEMPLATES = [
   "default",
@@ -8,6 +14,9 @@ export const EXPERIENCE_TEMPLATES = [
   "complete_the_setup",
   "wait_you_forgot",
   "in_session_recovery",
+  "recovery_reminder",
+  "recovery_free_ship",
+  "recovery_accessory",
   "welcome_back",
   "post_purchase",
   "checkout_inline",
@@ -29,6 +38,9 @@ const COPY: Record<ExperienceTemplateId, { headline: string; cta: string }> = {
   complete_the_setup: { headline: "Complete your setup", cta: "Add to cart" },
   wait_you_forgot: { headline: "Wait — you forgot this", cta: "Add before you go" },
   in_session_recovery: { headline: "Still thinking it over?", cta: "Return to cart" },
+  recovery_reminder: RECOVERY_COPY.forgot,
+  recovery_free_ship: RECOVERY_COPY.price,
+  recovery_accessory: RECOVERY_COPY.accessory,
   welcome_back: { headline: "Welcome back", cta: "Continue" },
   post_purchase: { headline: "Add to your order", cta: "Add now" },
   checkout_inline: { headline: "Recommended with your order", cta: "Add" },
@@ -68,6 +80,11 @@ export function selectExperience(input: {
   timingTrigger?: TimingTrigger | string | null;
   exitIntent?: boolean | null;
   abandonRisk?: number | null;
+  abandonReason?: AbandonReason | null;
+  priceSensitivity?: number | null;
+  discountSensitivity?: number | null;
+  strategies?: string[];
+  cartValue?: number | null;
 }): ExperienceSelection {
   const requested = input.requestedSurface;
   const exit = Boolean(input.exitIntent) || input.timingTrigger === "exit";
@@ -77,12 +94,21 @@ export function selectExperience(input: {
     intentState: input.intentState,
     exitIntent: exit,
   });
+  const abandonReason =
+    input.abandonReason ??
+    inferAbandonReason({
+      priceSensitivity: input.priceSensitivity,
+      discountSensitivity: input.discountSensitivity,
+      strategies: input.strategies,
+      cartValue: input.cartValue,
+    });
+  const recoveryTemplate = recoveryTemplateForReason(abandonReason);
 
   if (requested === "cart") {
     return withCopy(
       "cart",
-      recover ? "in_session_recovery" : "complete_the_setup",
-      recover ? "in_session_recovery" : "requested_cart",
+      recover ? recoveryTemplate : "complete_the_setup",
+      recover ? `recovery_${abandonReason}` : "requested_cart",
     );
   }
   if (requested === "thank_you") {
@@ -93,7 +119,7 @@ export function selectExperience(input: {
   }
 
   if (recover && (requested === "product_page" || requested === "popup" || requested === "sticky" || requested === "sidebar")) {
-    return withCopy("popup", "in_session_recovery", exit ? "exit_recovery" : "in_session_recovery");
+    return withCopy("popup", recoveryTemplate, exit ? `exit_recovery_${abandonReason}` : `recovery_${abandonReason}`);
   }
 
   if (exit || (input.intentState === "ABANDONING" && requested === "popup")) {
@@ -126,7 +152,11 @@ export function fallbackExperience(selection: ExperienceSelection): ExperienceSe
   }
   return withCopy(
     "product_page",
-    selection.templateId === "wait_you_forgot" || selection.templateId === "in_session_recovery"
+    selection.templateId === "wait_you_forgot" ||
+      selection.templateId === "in_session_recovery" ||
+      selection.templateId === "recovery_reminder" ||
+      selection.templateId === "recovery_free_ship" ||
+      selection.templateId === "recovery_accessory"
       ? "soft_recs"
       : selection.templateId,
     "fallback_inline",
