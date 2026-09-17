@@ -14,6 +14,9 @@ import {
 } from "./contract";
 import { assignHoldout } from "./holdout";
 import { shopAllowsCheckoutDecide } from "../../models/shopCapability.server";
+import { findExperienceForChannel } from "../../models/campaign.server";
+import { getMerchantRuleSet } from "../../models/merchantRuleSet.server";
+import { selectOfferPolicy, type OfferPolicy } from "../offer/policy";
 
 function channelForSurface(surface: DecideSurface): DecideSurface {
   return surface;
@@ -135,6 +138,7 @@ export function buildDecideResponse(input: {
   experience?: ExperienceSelection;
   campaignId?: string | null;
   experienceId?: string | null;
+  offer?: OfferPolicy;
 }): DecideResponse {
   const holdout = input.holdout;
   const products = holdout ? [] : (input.products ?? []);
@@ -153,7 +157,7 @@ export function buildDecideResponse(input: {
     show,
     experience: { channel: experience.channel, templateId: experience.templateId },
     products,
-    offer: { type: "none", value: null },
+    offer: input.offer ?? { type: "none", value: null },
     copy: { headline: experience.headline, cta: experience.cta },
     recommendationId: input.recommendationId ?? randomUUID(),
     intent: input.intent ?? { state: "EXPLORING", purchaseIntent: 0 },
@@ -249,6 +253,16 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
   if (!frequency.allow) {
     timing = { ...timing, show: false, trigger: "suppressed", reason: frequency.reason };
   }
+  const show = products.length > 0 && timing.show;
+  const merchant = await getMerchantRuleSet(input.shop);
+  const offer = selectOfferPolicy({
+    show,
+    intentState: intent.state,
+    purchaseIntent: intent.purchaseIntent,
+    strategies: products.map((row) => row.strategy),
+    cartValue: input.cartValue ?? 0,
+    maxDiscountPercent: merchant.maxDiscountPercent,
+  });
   return buildDecideResponse({
     surface: input.surface,
     holdout: false,
@@ -259,5 +273,6 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     experience: persisted.experience,
     campaignId: persisted.campaignId,
     experienceId: persisted.experienceId,
+    offer,
   });
 }

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "MerchantRuleSet" ADD COLUMN IF NOT EXISTS "maxDiscountPercent" DOUBLE PRECISION NOT NULL DEFAULT 15;

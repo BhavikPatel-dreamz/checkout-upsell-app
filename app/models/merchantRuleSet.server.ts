@@ -6,6 +6,7 @@ import {
   parseProductIdList,
 } from "../config/merchantRules";
 import { MAX_UPSELL_PRODUCTS } from "./eligibleOffer";
+import { DEFAULT_MAX_DISCOUNT_PERCENT, normalizeMaxDiscountPercent } from "../ai/offer/policy";
 import db from "../db.server";
 import type { MerchantRules } from "../ai/recommend/pipeline";
 
@@ -22,6 +23,7 @@ export interface MerchantRuleSetRecord {
   alwaysProductIds: string[];
   maxN: number;
   minMarginPercent: number | null;
+  maxDiscountPercent: number;
   priceMin: number | null;
   priceMax: number | null;
 }
@@ -31,6 +33,28 @@ function decimalToNumber(value: Prisma.Decimal | number | null | undefined): num
   return Number(value);
 }
 
+function toRecord(row: {
+  shop: string;
+  neverProductIds: string[];
+  alwaysProductIds: string[];
+  maxN: number;
+  minMarginPercent: number | null;
+  maxDiscountPercent: number;
+  priceMin: Prisma.Decimal | number | null;
+  priceMax: Prisma.Decimal | number | null;
+}): MerchantRuleSetRecord {
+  return {
+    shop: row.shop,
+    neverProductIds: row.neverProductIds,
+    alwaysProductIds: row.alwaysProductIds,
+    maxN: normalizeMaxN(row.maxN),
+    minMarginPercent: row.minMarginPercent,
+    maxDiscountPercent: normalizeMaxDiscountPercent(row.maxDiscountPercent),
+    priceMin: decimalToNumber(row.priceMin),
+    priceMax: decimalToNumber(row.priceMax),
+  };
+}
+
 export function emptyMerchantRuleSet(shop: string): MerchantRuleSetRecord {
   return {
     shop,
@@ -38,6 +62,7 @@ export function emptyMerchantRuleSet(shop: string): MerchantRuleSetRecord {
     alwaysProductIds: [],
     maxN: MAX_UPSELL_PRODUCTS,
     minMarginPercent: null,
+    maxDiscountPercent: DEFAULT_MAX_DISCOUNT_PERCENT,
     priceMin: null,
     priceMax: null,
   };
@@ -57,15 +82,7 @@ export function toPipelineMerchantRules(row: MerchantRuleSetRecord): MerchantRul
 export async function getMerchantRuleSet(shop: string): Promise<MerchantRuleSetRecord> {
   const row = await db.merchantRuleSet.findUnique({ where: { shop } });
   if (!row) return emptyMerchantRuleSet(shop);
-  return {
-    shop: row.shop,
-    neverProductIds: row.neverProductIds,
-    alwaysProductIds: row.alwaysProductIds,
-    maxN: normalizeMaxN(row.maxN),
-    minMarginPercent: row.minMarginPercent,
-    priceMin: decimalToNumber(row.priceMin),
-    priceMax: decimalToNumber(row.priceMax),
-  };
+  return toRecord(row);
 }
 
 export async function upsertMerchantRuleSet(
@@ -75,6 +92,7 @@ export async function upsertMerchantRuleSet(
     alwaysProductIds: string[];
     maxN: number;
     minMarginPercent: number | null;
+    maxDiscountPercent?: number;
     priceMin: number | null;
     priceMax: number | null;
   },
@@ -84,6 +102,9 @@ export async function upsertMerchantRuleSet(
     alwaysProductIds: input.alwaysProductIds,
     maxN: normalizeMaxN(input.maxN),
     minMarginPercent: input.minMarginPercent,
+    maxDiscountPercent: normalizeMaxDiscountPercent(
+      input.maxDiscountPercent ?? DEFAULT_MAX_DISCOUNT_PERCENT,
+    ),
     priceMin: input.priceMin,
     priceMax: input.priceMax,
   };
@@ -92,15 +113,7 @@ export async function upsertMerchantRuleSet(
     create: { shop, ...data },
     update: data,
   });
-  return {
-    shop: row.shop,
-    neverProductIds: row.neverProductIds,
-    alwaysProductIds: row.alwaysProductIds,
-    maxN: normalizeMaxN(row.maxN),
-    minMarginPercent: row.minMarginPercent,
-    priceMin: decimalToNumber(row.priceMin),
-    priceMax: decimalToNumber(row.priceMax),
-  };
+  return toRecord(row);
 }
 
 export function merchantRuleSetFromForm(form: FormData): {
@@ -108,6 +121,7 @@ export function merchantRuleSetFromForm(form: FormData): {
   alwaysProductIds: string[];
   maxN: number;
   minMarginPercent: number | null;
+  maxDiscountPercent: number;
   priceMin: number | null;
   priceMax: number | null;
 } {
@@ -116,6 +130,7 @@ export function merchantRuleSetFromForm(form: FormData): {
     alwaysProductIds: parseProductIdList(String(form.get("alwaysProductIds") ?? "")),
     maxN: normalizeMaxN(form.get("maxN")),
     minMarginPercent: optionalNumber(form.get("minMarginPercent")),
+    maxDiscountPercent: normalizeMaxDiscountPercent(form.get("maxDiscountPercent")),
     priceMin: optionalNumber(form.get("priceMin")),
     priceMax: optionalNumber(form.get("priceMax")),
   };

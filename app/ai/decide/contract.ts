@@ -12,7 +12,14 @@ export const DECIDE_SURFACES = [
 
 export type DecideSurface = (typeof DECIDE_SURFACES)[number];
 
-export const DECIDE_OFFER_TYPES = ["none", "percent", "bundle", "free_shipping"] as const;
+export const DECIDE_OFFER_TYPES = [
+  "none",
+  "percent",
+  "amount",
+  "bundle",
+  "free_shipping",
+  "upgrade",
+] as const;
 
 export const decideRequestSchema = z
   .object({

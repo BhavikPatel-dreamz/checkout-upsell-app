@@ -63,7 +63,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 
 | ID | Task | Status |
 | --- | --- | --- |
-| AI-4.1 | Offer policy types under merchant max discount | NOT_STARTED |
+| AI-4.1 | Offer policy types under merchant max discount | COMPLETE |
 | AI-4.2 | Function / discount application only for allowed policies | NOT_STARTED |
 | AI-4.3 | Price/discount sensitivity features on profile | NOT_STARTED |
 | AI-4.4 | Abandon risk heuristic + in-session recovery experience | NOT_STARTED |

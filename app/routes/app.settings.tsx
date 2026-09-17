@@ -141,6 +141,17 @@ export default function SettingsPage() {
               />
             </label>
             <label>
+              Max discount % (AI offer policies never exceed this)
+              <input
+                type="number"
+                name="maxDiscountPercent"
+                min={0}
+                max={50}
+                step="1"
+                defaultValue={merchant.maxDiscountPercent}
+              />
+            </label>
+            <label>
               Price min{" "}
               <input
                 type="number"
