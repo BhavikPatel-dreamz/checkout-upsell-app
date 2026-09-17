@@ -4,6 +4,11 @@ import {
   detectSmartMomentCandidates,
   expectedImpactFromLift,
 } from "../app/ai/moments/detect";
+import {
+  momentOfferFormPath,
+  offerDraftFromSmartMoment,
+} from "../app/ai/moments/fromMoment";
+import { buildOfferPayload } from "../app/models/offer.server";
 
 describe("Smart Moments detectors (AI-6.1)", () => {
   it("computes association lift from pair support", () => {
@@ -68,5 +73,33 @@ describe("Smart Moments detectors (AI-6.1)", () => {
       },
     ]);
     expect(moments).toEqual([]);
+  });
+});
+
+describe("Smart Moment → OfferForm (AI-6.3)", () => {
+  it("prefills the unified form and forces a draft payload", () => {
+    expect(momentOfferFormPath("mom_1")).toContain("momentId=mom_1");
+    expect(momentOfferFormPath("mom_1")).toContain("offerType=cross_sell");
+
+    const draft = offerDraftFromSmartMoment({
+      id: "mom_1",
+      kind: "fbt_lift",
+      productId: "gid://shopify/Product/1",
+      relatedProductId: "gid://shopify/Product/2",
+      explanation: "Lift 2.0",
+      relatedVariantId: "gid://shopify/ProductVariant/2",
+    });
+    expect(draft.isActive).toBe(false);
+    expect(draft.triggerProductIds).toEqual(["gid://shopify/Product/1"]);
+    expect(draft.manualSelections[0]?.productId).toBe("gid://shopify/Product/2");
+    expect(draft.displayLocation).toBe("product_page");
+
+    const built = buildOfferPayload({
+      ...draft,
+      status: "Draft",
+      triggerRules: { smartMomentId: draft.smartMomentId },
+    });
+    expect(built.isActive).toBe(false);
+    expect(built.targetProductIds).toEqual(["gid://shopify/Product/1"]);
   });
 });

@@ -1,11 +1,8 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { Form, useActionData, useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
-import {
-  activateSmartMoment,
-  dismissSmartMoment,
-  listSmartMoments,
-} from "../models/smartMoment.server";
+import { dismissSmartMoment, listSmartMoments } from "../models/smartMoment.server";
+import { momentOfferEditPath, momentOfferFormPath } from "../ai/moments/fromMoment";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -32,11 +29,6 @@ export async function action({ request }: ActionFunctionArgs) {
     return { ok: dismissed, intent: "dismiss" as const };
   }
 
-  if (intent === "activate") {
-    const result = await activateSmartMoment(session.shop, id);
-    return { intent: "activate" as const, ...result };
-  }
-
   return { ok: false as const, error: "Unknown action." };
 }
 
@@ -55,8 +47,9 @@ export default function SmartMomentsPage() {
       <s-section heading="Detected from affinity and lift">
         <s-paragraph>
           These moments come from product–product co-occurrence (support and
-          lift), not an LLM. Activate creates a <strong>draft</strong> campaign
-          and upsell for review. Standard never publishes this live.
+          lift), not an LLM. Activate opens the unified offer form as a
+          <strong>draft</strong> campaign. Save there to create the campaign.
+          Standard never publishes this live.
         </s-paragraph>
         <Form method="post">
           <input type="hidden" name="intent" value="detect" />
@@ -66,11 +59,6 @@ export default function SmartMomentsPage() {
         </Form>
         {actionData && "intent" in actionData && actionData.intent === "detect" && actionData.ok ? (
           <s-paragraph>Updated {actionData.result.upserted} moment(s).</s-paragraph>
-        ) : null}
-        {actionData && "intent" in actionData && actionData.intent === "activate" && actionData.ok ? (
-          <s-paragraph>
-            Draft campaign created. Review it under All Upsells before going live.
-          </s-paragraph>
         ) : null}
         {actionData && "error" in actionData && actionData.error ? (
           <s-paragraph>{actionData.error}</s-paragraph>
@@ -96,19 +84,16 @@ export default function SmartMomentsPage() {
                 <s-paragraph>{row.explanation}</s-paragraph>
                 {row.status === "detected" ? (
                   <s-stack direction="inline" gap="base">
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="activate" />
-                      <input type="hidden" name="id" value={row.id} />
-                      <s-button type="submit" variant="primary">
-                        Activate
-                      </s-button>
-                    </Form>
+                    <s-link href={momentOfferFormPath(row.id)}>Activate in offer form</s-link>
                     <Form method="post">
                       <input type="hidden" name="intent" value="dismiss" />
                       <input type="hidden" name="id" value={row.id} />
                       <s-button type="submit">Dismiss</s-button>
                     </Form>
                   </s-stack>
+                ) : null}
+                {row.status === "activated" && row.offerId ? (
+                  <s-link href={momentOfferEditPath(row.offerId)}>Open draft offer</s-link>
                 ) : null}
               </s-section>
             ))}

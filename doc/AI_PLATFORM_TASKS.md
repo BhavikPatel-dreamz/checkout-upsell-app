@@ -90,7 +90,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 | --- | --- | --- |
 | AI-6.1 | Smart Moments detectors from affinity/lift; merchant Activate → campaign draft | COMPLETE |
 | AI-6.2 | Copilot over aggregates (no raw events to LLM) | COMPLETE |
-| AI-6.3 | “Create campaign from moment” uses unified OfferForm / Campaign | NOT_STARTED |
+| AI-6.3 | “Create campaign from moment” uses unified OfferForm / Campaign | COMPLETE |
 | AI-6.4 | Autopilot publish = Enterprise only; Standard always review | NOT_STARTED |
 
 ---

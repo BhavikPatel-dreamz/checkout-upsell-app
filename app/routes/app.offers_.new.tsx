@@ -6,6 +6,7 @@
  * GET /app/offers/new?offerType=<type>&placement=<placement>
  *                                          → unified create form
  * GET /app/offers/new?type=post-purchase   → legacy alias → create form
+ * GET /app/offers/new?offerType=&placement=&momentId=  → create from Smart Moment (AI-6.3)
  * GET /app/offers/new?id=<offerId>         → edit (type + placement from DB)
  *
  * Create and edit share the same OfferForm component, the same type-aware
@@ -39,6 +40,8 @@ import {
 } from "../config/offerTypes";
 import { validateOfferFields } from "../validation/offerSchemas";
 import { placementFromDisplayLocation } from "../types/offer";
+import { getSmartMoment, attachSmartMomentToOffer } from "../models/smartMoment.server";
+import { offerDraftFromSmartMoment } from "../ai/moments/fromMoment";
 import "../styles/app._index.css";
 
 // ── Loader ─────────────────────────────────────────────────────────────
@@ -50,6 +53,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const typeParam = url.searchParams.get("type");
   const offerTypeParam = url.searchParams.get("offerType");
   const placementParam = url.searchParams.get("placement");
+  const momentIdParam = url.searchParams.get("momentId")?.trim() || "";
+
+  const moment = momentIdParam ? await getSmartMoment(session.shop, momentIdParam) : null;
+  if (moment?.offerId) {
+    throw redirect(`/app/offers/new?id=${encodeURIComponent(moment.offerId)}`);
+  }
+  const formMoment = moment && moment.status !== "dismissed" ? moment : null;
 
   const [variantRows, offer] = await Promise.all([
     listProductVariants(session.shop, 200),
@@ -84,13 +94,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // default (cross-sell). Only used to render the correct fields.
   const offerType: OfferType = offer
     ? offer.type
-    : normalizeOfferType(offerTypeParam);
+    : formMoment
+      ? "cross_sell"
+      : normalizeOfferType(offerTypeParam);
 
   // Placement priority: (1) existing offer's DB placement, (2) ?placement=,
   // (3) legacy ?type= alias, (4) the offer type's default placement.
   let placement: OfferPlacement;
   if (offer) {
     placement = offer.placement as OfferPlacement;
+  } else if (formMoment) {
+    placement = isOfferPlacement(placementParam) && placementParam ? placementParam : "product_page";
   } else if (isOfferPlacement(placementParam) && placementParam) {
     placement = placementParam;
   } else if (typeParam === "post-purchase") {
@@ -108,13 +122,33 @@ export async function loader({ request }: LoaderFunctionArgs) {
       ? rawRules.manualSelections
       : [];
 
+  const relatedProduct = formMoment
+    ? products.find((row) => row.id === formMoment.relatedProductId)
+    : undefined;
+  const relatedVariant = relatedProduct?.variants[0];
+  const momentDraft =
+    !offer && formMoment
+      ? offerDraftFromSmartMoment({
+          id: formMoment.id,
+          kind: formMoment.kind,
+          productId: formMoment.productId,
+          relatedProductId: formMoment.relatedProductId,
+          explanation: formMoment.explanation,
+          lift: formMoment.lift,
+          expectedImpact: formMoment.expectedImpact,
+          relatedVariantId: relatedVariant?.id,
+          relatedVariantTitle: relatedVariant?.title,
+          relatedTitle: relatedProduct?.title,
+        })
+      : null;
+
   return {
     products,
     placement,
     offerType,
     mode: offer ? ("edit" as const) : ("create" as const),
     // Bare /app/offers/new shows the type+placement selection step first.
-    isSelecting: !offer && !typeParam && !offerTypeParam && !placementParam,
+    isSelecting: !offer && !formMoment && !typeParam && !offerTypeParam && !placementParam,
     offer: offer
       ? {
           id: offer.id,
@@ -139,7 +173,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           promotionalTitle: rawRules.promotionalTitle ?? "",
           isActive: offer.isActive,
         }
-      : null,
+      : momentDraft,
   };
 }
 
@@ -149,6 +183,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const { session } = await authenticate.admin(request);
   const formData = await request.formData();
   const offerId = String(formData.get("offerId") || "");
+  const smartMomentId = String(formData.get("smartMomentId") || "").trim();
 
   const displayLocation = String(formData.get("displayLocation") || "checkout_page");
 
@@ -173,6 +208,12 @@ export async function action({ request }: ActionFunctionArgs) {
     activeTo: String(formData.get("activeTo") || "") || null,
     promotionalTitle: String(formData.get("promotionalTitle") || "").trim(),
   };
+
+  if (smartMomentId) {
+    payload.isActive = false;
+    payload.status = "Draft";
+    payload.triggerRules = { smartMomentId };
+  }
 
   // Verify manual selections reference products/variants that actually exist
   // in this shop's synced catalog and are paired correctly.
@@ -229,12 +270,18 @@ export async function action({ request }: ActionFunctionArgs) {
       placement: built.placement,
       targetProductIds: built.targetProductIds,
       triggerRules: built.triggerRules,
-      isActive: built.isActive,
+      isActive: smartMomentId ? false : built.isActive,
     });
+    if (smartMomentId) {
+      await attachSmartMomentToOffer(session.shop, smartMomentId, offerId);
+    }
     return redirect("/app");
   }
 
-  await createOffer(session.shop, built);
+  const created = await createOffer(session.shop, built);
+  if (smartMomentId) {
+    await attachSmartMomentToOffer(session.shop, smartMomentId, created.id);
+  }
   return redirect("/app?created=1");
 }
 
@@ -277,6 +324,9 @@ export default function CreateOfferPage() {
       >
         {offer?.id ? (
           <input type="hidden" name="offerId" value={offer.id} />
+        ) : null}
+        {offer?.smartMomentId ? (
+          <input type="hidden" name="smartMomentId" value={offer.smartMomentId} />
         ) : null}
 
         <OfferForm

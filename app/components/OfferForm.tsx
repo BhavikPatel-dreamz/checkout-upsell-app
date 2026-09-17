@@ -81,7 +81,7 @@ export type TriggerSelection = {
 };
 
 export interface OfferInitialData {
-  id: string;
+  id?: string;
   title: string;
   showUpsell: string;
   conditions: Array<{ field: string; operator: string; value: string }>;
@@ -100,6 +100,7 @@ export interface OfferInitialData {
   activeTo: string;
   promotionalTitle: string;
   isActive: boolean;
+  smartMomentId?: string;
 }
 
 export interface OfferFormProps {
