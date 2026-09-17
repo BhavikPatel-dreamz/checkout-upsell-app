@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import db from "../../db.server";
+import { fallbackExperience, selectExperience, type ExperienceSelection } from "../experience/select";
 import { refreshShopperProfile } from "../intent/profile.server";
 import { runHybridRecommend } from "../recommend/hybridRecommend.server";
 import { evaluateTiming, type TimingDecision } from "../timing/timing";
@@ -14,6 +15,53 @@ import { assignHoldout } from "./holdout";
 
 function channelForSurface(surface: DecideSurface): DecideSurface {
   return surface;
+}
+
+function timingFor(
+  input: DecideRequest,
+  surface: DecideSurface,
+  intent: { purchaseIntent: number },
+  maxScore: number,
+  productCount: number,
+): TimingDecision {
+  return evaluateTiming({
+    surface,
+    dwellMs: input.dwellMs,
+    scrollDepth: input.scrollDepth,
+    exitIntent: input.exitIntent,
+    cartValue: input.cartValue,
+    purchaseIntent: intent.purchaseIntent,
+    maxScore,
+    productCount,
+  });
+}
+
+function resolveExperienceAndTiming(input: {
+  request: DecideRequest;
+  intentState: string;
+  purchaseIntent: number;
+  maxScore: number;
+  productCount: number;
+}): { experience: ExperienceSelection; timing: TimingDecision } {
+  const probe = timingFor(input.request, input.request.surface, input, input.maxScore, input.productCount);
+  let experience = selectExperience({
+    requestedSurface: input.request.surface,
+    intentState: input.intentState,
+    timingTrigger: probe.trigger,
+    exitIntent: input.request.exitIntent,
+  });
+  let timing = timingFor(input.request, experience.channel, input, input.maxScore, input.productCount);
+  if (!timing.show) {
+    const fallback = fallbackExperience(experience);
+    if (fallback) {
+      const retry = timingFor(input.request, fallback.channel, input, input.maxScore, input.productCount);
+      if (retry.show) {
+        experience = fallback;
+        timing = retry;
+      }
+    }
+  }
+  return { experience, timing };
 }
 
 async function productsFromHybrid(input: DecideRequest & { shop: string }): Promise<DecideProduct[]> {
@@ -60,17 +108,27 @@ export function buildDecideResponse(input: {
   recommendationId?: string;
   intent?: { state: string; purchaseIntent: number };
   timing?: TimingDecision;
+  experience?: ExperienceSelection;
 }): DecideResponse {
   const holdout = input.holdout;
   const products = holdout ? [] : (input.products ?? []);
   const timing = input.timing ?? PASSTHROUGH_TIMING;
+  const experience =
+    input.experience ??
+    ({
+      channel: channelForSurface(input.surface),
+      templateId: "default",
+      headline: "",
+      cta: "",
+      reason: "passthrough",
+    } satisfies ExperienceSelection);
   const show = !holdout && products.length > 0 && timing.show;
   return {
     show,
-    experience: { channel: channelForSurface(input.surface), templateId: "default" },
+    experience: { channel: experience.channel, templateId: experience.templateId },
     products,
     offer: { type: "none", value: null },
-    copy: { headline: "", cta: "" },
+    copy: { headline: experience.headline, cta: experience.cta },
     recommendationId: input.recommendationId ?? randomUUID(),
     intent: input.intent ?? { state: "EXPLORING", purchaseIntent: 0 },
     holdout,
@@ -99,33 +157,29 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
   const intent = { state: inferred.state, purchaseIntent: inferred.purchaseIntent };
 
   if (holdout || !consented) {
+    const { experience, timing } = resolveExperienceAndTiming({
+      request: input,
+      intentState: intent.state,
+      purchaseIntent: intent.purchaseIntent,
+      maxScore: 0,
+      productCount: 0,
+    });
     return buildDecideResponse({
       surface: input.surface,
       holdout,
       products: [],
       recommendationId,
       intent,
-      timing: evaluateTiming({
-        surface: input.surface,
-        dwellMs: input.dwellMs,
-        scrollDepth: input.scrollDepth,
-        exitIntent: input.exitIntent,
-        cartValue: input.cartValue,
-        purchaseIntent: intent.purchaseIntent,
-        maxScore: 0,
-        productCount: 0,
-      }),
+      timing,
+      experience,
     });
   }
 
   const products = await productsFromHybrid(input);
   const maxScore = products.reduce((max, row) => Math.max(max, row.score), 0);
-  const timing = evaluateTiming({
-    surface: input.surface,
-    dwellMs: input.dwellMs,
-    scrollDepth: input.scrollDepth,
-    exitIntent: input.exitIntent,
-    cartValue: input.cartValue,
+  const { experience, timing } = resolveExperienceAndTiming({
+    request: input,
+    intentState: intent.state,
     purchaseIntent: intent.purchaseIntent,
     maxScore,
     productCount: products.length,
@@ -137,5 +191,6 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     recommendationId,
     intent,
     timing,
+    experience,
   });
 }
