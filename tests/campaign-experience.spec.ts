@@ -39,6 +39,7 @@ describe("campaign + experience wrap Offer", () => {
       where: { shop: SHOP, offerId: offer.id, channel: "popup" },
     });
     expect(campaign?.status).toBe("active");
+    expect(campaign?.goal).toBe("revenue");
     expect(experience?.campaignId).toBe(campaign?.id);
 
     const variants = await db.experienceVariant.findMany({

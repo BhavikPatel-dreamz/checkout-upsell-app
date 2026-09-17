@@ -2,6 +2,7 @@ import { MAX_UPSELL_PRODUCTS } from "../../models/eligibleOffer";
 import {
   compareCandidateScores,
   scoreCandidate,
+  scoreWeightsForGoal,
   type CandidateScore,
 } from "../scoring/scoreCandidate";
 
@@ -26,6 +27,8 @@ export interface MerchantRules {
   minMarginPercent?: number;
   priceMin?: number;
   priceMax?: number;
+  /** Shop optimization goal (AI-5.5); used to tilt scoring weights. */
+  optimizationGoal?: string;
 }
 
 export interface HybridCandidate {
@@ -208,22 +211,26 @@ export function applyMerchantRules(
 export function runHybridPipeline(input: HybridPipelineInput): HybridPipelineResult {
   const business = applyBusinessRules(input.candidates, input);
   const merged = mergeCandidatesByProduct(business.kept);
+  const weights = scoreWeightsForGoal(input.merchant?.optimizationGoal);
   const scored: ScoredHybridCandidate[] = merged.map((candidate) => {
     const inCart = idSet(input.cartProductIds).has(candidate.productId);
     return {
       ...candidate,
-      score: scoreCandidate({
-        affinity: candidate.affinity ?? 0,
-        interest: candidate.interest ?? 0,
-        complementarity: candidate.complementarity ?? 0,
-        historicalConversion: candidate.historicalConversion ?? 0,
-        priceFit: candidate.priceFit ?? 0,
-        businessValue: candidate.businessValue ?? 0,
-        repetition: candidate.repetition ?? 0,
-        availableForSale: candidate.availableForSale,
-        inventoryQuantity: candidate.inventoryQuantity,
-        inCart,
-      }),
+      score: scoreCandidate(
+        {
+          affinity: candidate.affinity ?? 0,
+          interest: candidate.interest ?? 0,
+          complementarity: candidate.complementarity ?? 0,
+          historicalConversion: candidate.historicalConversion ?? 0,
+          priceFit: candidate.priceFit ?? 0,
+          businessValue: candidate.businessValue ?? 0,
+          repetition: candidate.repetition ?? 0,
+          availableForSale: candidate.availableForSale,
+          inventoryQuantity: candidate.inventoryQuantity,
+          inCart,
+        },
+        weights,
+      ),
     };
   });
   scored.sort((a, b) => compareCandidateScores(a.score, b.score) || b.relationScore - a.relationScore);

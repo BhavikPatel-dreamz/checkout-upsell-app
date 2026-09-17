@@ -8,6 +8,11 @@ import {
 import { MAX_UPSELL_PRODUCTS } from "./eligibleOffer";
 import { DEFAULT_MAX_DISCOUNT_PERCENT, normalizeMaxDiscountPercent } from "../ai/offer/policy";
 import { DEFAULT_HOLDOUT_PERCENT, normalizeHoldoutPercent } from "../ai/decide/holdout";
+import {
+  DEFAULT_OPTIMIZATION_GOAL,
+  normalizeOptimizationGoal,
+  type OptimizationGoal,
+} from "../ai/learn/goal";
 import db from "../db.server";
 import type { MerchantRules } from "../ai/recommend/pipeline";
 
@@ -26,6 +31,7 @@ export interface MerchantRuleSetRecord {
   minMarginPercent: number | null;
   maxDiscountPercent: number;
   holdoutPercent: number;
+  optimizationGoal: OptimizationGoal;
   priceMin: number | null;
   priceMax: number | null;
 }
@@ -43,6 +49,7 @@ function toRecord(row: {
   minMarginPercent: number | null;
   maxDiscountPercent: number;
   holdoutPercent?: number;
+  optimizationGoal?: string;
   priceMin: Prisma.Decimal | number | null;
   priceMax: Prisma.Decimal | number | null;
 }): MerchantRuleSetRecord {
@@ -54,6 +61,9 @@ function toRecord(row: {
     minMarginPercent: row.minMarginPercent,
     maxDiscountPercent: normalizeMaxDiscountPercent(row.maxDiscountPercent),
     holdoutPercent: normalizeHoldoutPercent(row.holdoutPercent ?? DEFAULT_HOLDOUT_PERCENT),
+    optimizationGoal: normalizeOptimizationGoal(row.optimizationGoal, {
+      allowProfit: row.minMarginPercent != null,
+    }),
     priceMin: decimalToNumber(row.priceMin),
     priceMax: decimalToNumber(row.priceMax),
   };
@@ -68,6 +78,7 @@ export function emptyMerchantRuleSet(shop: string): MerchantRuleSetRecord {
     minMarginPercent: null,
     maxDiscountPercent: DEFAULT_MAX_DISCOUNT_PERCENT,
     holdoutPercent: DEFAULT_HOLDOUT_PERCENT,
+    optimizationGoal: DEFAULT_OPTIMIZATION_GOAL,
     priceMin: null,
     priceMax: null,
   };
@@ -81,6 +92,7 @@ export function toPipelineMerchantRules(row: MerchantRuleSetRecord): MerchantRul
     minMarginPercent: row.minMarginPercent ?? undefined,
     priceMin: row.priceMin ?? undefined,
     priceMax: row.priceMax ?? undefined,
+    optimizationGoal: row.optimizationGoal,
   };
 }
 
@@ -99,6 +111,7 @@ export async function upsertMerchantRuleSet(
     minMarginPercent: number | null;
     maxDiscountPercent?: number;
     holdoutPercent?: number;
+    optimizationGoal?: string;
     priceMin: number | null;
     priceMax: number | null;
   },
@@ -112,6 +125,9 @@ export async function upsertMerchantRuleSet(
       input.maxDiscountPercent ?? DEFAULT_MAX_DISCOUNT_PERCENT,
     ),
     holdoutPercent: normalizeHoldoutPercent(input.holdoutPercent ?? DEFAULT_HOLDOUT_PERCENT),
+    optimizationGoal: normalizeOptimizationGoal(input.optimizationGoal, {
+      allowProfit: input.minMarginPercent != null,
+    }),
     priceMin: input.priceMin,
     priceMax: input.priceMax,
   };
@@ -130,6 +146,7 @@ export function merchantRuleSetFromForm(form: FormData): {
   minMarginPercent: number | null;
   maxDiscountPercent: number;
   holdoutPercent: number;
+  optimizationGoal: OptimizationGoal;
   priceMin: number | null;
   priceMax: number | null;
 } {
@@ -140,6 +157,9 @@ export function merchantRuleSetFromForm(form: FormData): {
     minMarginPercent: optionalNumber(form.get("minMarginPercent")),
     maxDiscountPercent: normalizeMaxDiscountPercent(form.get("maxDiscountPercent")),
     holdoutPercent: normalizeHoldoutPercent(form.get("holdoutPercent")),
+    optimizationGoal: normalizeOptimizationGoal(form.get("optimizationGoal"), {
+      allowProfit: optionalNumber(form.get("minMarginPercent")) != null,
+    }),
     priceMin: optionalNumber(form.get("priceMin")),
     priceMax: optionalNumber(form.get("priceMax")),
   };

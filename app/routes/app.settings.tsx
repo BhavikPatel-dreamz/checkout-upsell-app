@@ -163,6 +163,25 @@ export default function SettingsPage() {
               />
             </label>
             <label>
+              Optimization goal
+              <select name="optimizationGoal" defaultValue={merchant.optimizationGoal}>
+                <option value="revenue">Incremental revenue</option>
+                <option value="aov">Average order value</option>
+                <option value="conversion">Conversion</option>
+                <option
+                  value="profit"
+                  disabled={merchant.minMarginPercent == null}
+                >
+                  Profit (requires min margin %)
+                </option>
+              </select>
+            </label>
+            <s-paragraph>
+              Profit is available only when min margin % is set so ranking can
+              use margin data. Incrementality still reports all metrics; this
+              goal highlights the primary one.
+            </s-paragraph>
+            <label>
               Price min{" "}
               <input
                 type="number"

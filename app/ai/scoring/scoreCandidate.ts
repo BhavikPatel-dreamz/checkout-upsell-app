@@ -20,6 +20,8 @@
  * squash(x) = 1 - exp(-x / 5) maps raw counts/scores into ~[0, 1].
  * Probabilities and 0–1 fits are used as-is (clamped).
  */
+import { normalizeOptimizationGoal, type OptimizationGoal } from "../learn/goal";
+
 export const SCORE_WEIGHTS = {
   affinity: 1.0,
   interest: 0.8,
@@ -35,6 +37,21 @@ export const SCORE_WEIGHTS = {
 } as const;
 
 export type ScoreWeights = typeof SCORE_WEIGHTS;
+
+/** Tilt the heuristic toward the shop's optimization goal (AI-5.5). Not a bandit. */
+export function scoreWeightsForGoal(goal: unknown): ScoreWeights {
+  const g: OptimizationGoal = normalizeOptimizationGoal(goal);
+  if (g === "aov") {
+    return { ...SCORE_WEIGHTS, businessValue: 0.9, priceFit: 0.7 };
+  }
+  if (g === "conversion") {
+    return { ...SCORE_WEIGHTS, historicalConversion: 1.2, pPurchase: 1.5, businessValue: 0.15 };
+  }
+  if (g === "profit") {
+    return { ...SCORE_WEIGHTS, businessValue: 1.1, priceFit: 0.4 };
+  }
+  return SCORE_WEIGHTS;
+}
 
 const SQUASH_SCALE = 5;
 const LOW_STOCK_QTY = 3;

@@ -2,6 +2,7 @@ import { OfferPlacement } from "@prisma/client";
 import db from "../db.server";
 import type { DecideSurface } from "../ai/decide/contract";
 import { ensureAbExperiment } from "./experiment.server";
+import { getMerchantRuleSet } from "./merchantRuleSet.server";
 
 export function channelFromOfferPlacement(placement: OfferPlacement): DecideSurface {
   switch (placement) {
@@ -30,13 +31,15 @@ export async function wrapOfferAsCampaign(input: {
 }): Promise<{ campaignId: string; experienceId: string }> {
   const channel = channelFromOfferPlacement(input.placement);
   const status = input.isActive ? "active" : "draft";
+  const merchant = await getMerchantRuleSet(input.shop);
+  const goal = merchant.optimizationGoal;
 
   const campaign = await db.campaign.upsert({
     where: { shop_offerId: { shop: input.shop, offerId: input.offerId } },
     create: {
       shop: input.shop,
       name: input.name,
-      goal: "revenue",
+      goal,
       status,
       offerId: input.offerId,
       rules: {
@@ -46,6 +49,7 @@ export async function wrapOfferAsCampaign(input: {
     update: {
       name: input.name,
       status,
+      goal,
     },
   });
 

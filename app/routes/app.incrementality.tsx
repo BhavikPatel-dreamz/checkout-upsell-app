@@ -3,6 +3,8 @@ import { Form, useActionData, useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import { SURFACE_LABELS, SHOP_WIDE_EXPERIMENT_ID } from "../ai/learn/incrementality";
+import { GOAL_LABELS, primaryIncrementForGoal } from "../ai/learn/goal";
+import { getMerchantRuleSet } from "../models/merchantRuleSet.server";
 
 function money(value: unknown): string {
   const n = typeof value === "number" ? value : Number(value);
@@ -12,6 +14,34 @@ function money(value: unknown): string {
 
 function pct(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatPrimary(
+  goal: Parameters<typeof primaryIncrementForGoal>[0],
+  row: {
+    incrementalRevenue: unknown;
+    treatedAov: unknown;
+    holdoutAov: unknown;
+    treatedConversion: unknown;
+    holdoutConversion: unknown;
+  },
+  minMarginPercent: number | null,
+): string {
+  const primary = primaryIncrementForGoal(
+    goal,
+    {
+      incrementalRevenue: Number(row.incrementalRevenue),
+      treatedAov: Number(row.treatedAov),
+      holdoutAov: Number(row.holdoutAov),
+      treatedConversion: Number(row.treatedConversion),
+      holdoutConversion: Number(row.holdoutConversion),
+    },
+    { minMarginPercent },
+  );
+  if (primary.unit === "percent" || primary.unit === "points") {
+    return `${primary.value >= 0 ? "+" : ""}${(primary.value * 100).toFixed(1)} pts`;
+  }
+  return `$${money(primary.value)}`;
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -26,7 +56,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     select: { id: true, name: true },
   });
   const names = Object.fromEntries(experiments.map((row) => [row.id, row.name]));
-  return { rows, names };
+  const merchant = await getMerchantRuleSet(session.shop);
+  return {
+    rows,
+    names,
+    optimizationGoal: merchant.optimizationGoal,
+    minMarginPercent: merchant.minMarginPercent,
+  };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -37,16 +73,17 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function IncrementalityPage() {
-  const { rows, names } = useLoaderData<typeof loader>();
+  const { rows, names, optimizationGoal, minMarginPercent } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   return (
     <s-page heading="Incrementality">
       <s-section heading="Treated vs holdout">
         <s-paragraph>
-          North-star metric is incremental revenue: treated revenue per assigned shopper minus the
-          holdout cohort, same shop and last 7 days. Breakdowns are PDP, cart, popup, thank-you, and
-          recovery. Conversion is orders per assigned identity; AOV is revenue per order.
+          Shop optimization goal: {GOAL_LABELS[optimizationGoal]}. All treated vs
+          holdout metrics stay visible; the primary metric is highlighted per
+          that goal. Conversion is orders per assigned identity; AOV is revenue
+          per order. Last 7 days. Surfaces: PDP, cart, popup, thank-you, recovery.
         </s-paragraph>
         <Form method="post">
           <s-button type="submit" variant="primary">
@@ -72,6 +109,10 @@ export default function IncrementalityPage() {
                   (SURFACE_LABELS[row.surface] ?? row.surface)
                 }
               >
+                <s-paragraph>
+                  Primary ({GOAL_LABELS[optimizationGoal]}):{" "}
+                  {formatPrimary(optimizationGoal, row, minMarginPercent)}
+                </s-paragraph>
                 <s-paragraph>
                   Incremental revenue: ${money(row.incrementalRevenue)} · Treated conversion{" "}
                   {pct(row.treatedConversion)} vs holdout {pct(row.holdoutConversion)} · Treated AOV $

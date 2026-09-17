@@ -75,6 +75,29 @@ describe("merchant rule set", () => {
     expect(saved.neverProductIds).toEqual(["gid://shopify/Product/9"]);
     expect(saved.minMarginPercent).toBe(12.5);
     expect(saved.holdoutPercent).toBe(10);
+    expect(saved.optimizationGoal).toBe("revenue");
+
+    const withGoal = await upsertMerchantRuleSet(SHOP, {
+      neverProductIds: ["gid://shopify/Product/9"],
+      alwaysProductIds: ["gid://shopify/Product/8"],
+      maxN: 3,
+      minMarginPercent: 12.5,
+      optimizationGoal: "aov",
+      priceMin: 10,
+      priceMax: 80,
+    });
+    expect(withGoal.optimizationGoal).toBe("aov");
+
+    const profitWithoutMargin = await upsertMerchantRuleSet(SHOP, {
+      neverProductIds: ["gid://shopify/Product/9"],
+      alwaysProductIds: ["gid://shopify/Product/8"],
+      maxN: 3,
+      minMarginPercent: null,
+      optimizationGoal: "profit",
+      priceMin: 10,
+      priceMax: 80,
+    });
+    expect(profitWithoutMargin.optimizationGoal).toBe("revenue");
 
     const tighter = await upsertMerchantRuleSet(SHOP, {
       neverProductIds: ["gid://shopify/Product/9"],
