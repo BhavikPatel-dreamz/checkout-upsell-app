@@ -1,4 +1,5 @@
 import type { DecideSurface } from "../decide/contract";
+import { RECOVERY_ABANDON_THRESHOLD } from "../intent/abandon";
 
 export const TIMING_MIN_DWELL_MS = 8_000;
 export const TIMING_MIN_SCROLL = 0.35;
@@ -40,12 +41,14 @@ export function expectedIncrementalValue(input: {
   purchaseIntent: number;
   cartValue: number;
   exitIntent: boolean;
+  abandonRisk?: number;
 }): number {
   const score = clamp01(input.maxScore);
   const intent = clamp01(input.purchaseIntent);
   const cartLift = Math.min(Math.max(input.cartValue, 0) / 80, 0.35);
   const exitLift = input.exitIntent ? 0.08 : 0;
-  return clamp01(score * (0.35 + 0.55 * intent) + cartLift * 0.4 + exitLift);
+  const abandonLift = clamp01(input.abandonRisk ?? 0) * 0.22;
+  return clamp01(score * (0.35 + 0.55 * intent) + cartLift * 0.4 + exitLift + abandonLift);
 }
 
 export function evaluateTiming(input: {
@@ -57,15 +60,18 @@ export function evaluateTiming(input: {
   purchaseIntent: number;
   maxScore: number;
   productCount: number;
+  abandonRisk?: number | null;
 }): TimingDecision {
   const interruptionCost = INTERRUPTION_COST[input.surface];
   const cartValue = input.cartValue ?? 0;
   const exitIntent = Boolean(input.exitIntent);
+  const abandonRisk = input.abandonRisk ?? 0;
   const expectedValue = expectedIncrementalValue({
     maxScore: input.maxScore,
     purchaseIntent: input.purchaseIntent,
     cartValue,
     exitIntent,
+    abandonRisk,
   });
 
   if (input.productCount <= 0) {
@@ -79,7 +85,10 @@ export function evaluateTiming(input: {
     };
   }
 
-  if (expectedValue < interruptionCost) {
+  const recoverNow =
+    abandonRisk >= RECOVERY_ABANDON_THRESHOLD || (exitIntent && abandonRisk >= 0.2);
+
+  if (expectedValue < interruptionCost && !recoverNow) {
     return {
       show: false,
       delayMs: 0,
@@ -95,14 +104,14 @@ export function evaluateTiming(input: {
   const inFlow =
     input.surface === "cart" || input.surface === "checkout" || input.surface === "thank_you";
 
-  if (exitIntent) {
+  if (exitIntent || recoverNow) {
     return {
       show: true,
       delayMs: 0,
-      trigger: "exit",
+      trigger: exitIntent ? "exit" : "immediate",
       expectedValue,
       interruptionCost,
-      reason: "exit_intent",
+      reason: exitIntent ? "exit_intent" : "abandon_recovery",
     };
   }
   if (inFlow) {

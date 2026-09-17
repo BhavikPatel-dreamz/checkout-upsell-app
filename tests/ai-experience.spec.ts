@@ -39,7 +39,7 @@ describe("experience selection", () => {
         requestedSurface: "popup",
         intentState: "ABANDONING",
       }),
-    ).toMatchObject({ channel: "popup", templateId: "wait_you_forgot" });
+    ).toMatchObject({ channel: "popup", templateId: "in_session_recovery" });
   });
 
   it("uses sticky on scroll and honors a requested sticky surface", () => {

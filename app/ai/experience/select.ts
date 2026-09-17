@@ -1,11 +1,13 @@
 import type { DecideSurface } from "../decide/contract";
 import type { TimingTrigger } from "../timing/timing";
+import { shouldRecoverInSession } from "../intent/abandon";
 
 export const EXPERIENCE_TEMPLATES = [
   "default",
   "soft_recs",
   "complete_the_setup",
   "wait_you_forgot",
+  "in_session_recovery",
   "welcome_back",
   "post_purchase",
   "checkout_inline",
@@ -26,6 +28,7 @@ const COPY: Record<ExperienceTemplateId, { headline: string; cta: string }> = {
   soft_recs: { headline: "You might also like", cta: "See more" },
   complete_the_setup: { headline: "Complete your setup", cta: "Add to cart" },
   wait_you_forgot: { headline: "Wait — you forgot this", cta: "Add before you go" },
+  in_session_recovery: { headline: "Still thinking it over?", cta: "Return to cart" },
   welcome_back: { headline: "Welcome back", cta: "Continue" },
   post_purchase: { headline: "Add to your order", cta: "Add now" },
   checkout_inline: { headline: "Recommended with your order", cta: "Add" },
@@ -64,19 +67,33 @@ export function selectExperience(input: {
   intentState: string;
   timingTrigger?: TimingTrigger | string | null;
   exitIntent?: boolean | null;
+  abandonRisk?: number | null;
 }): ExperienceSelection {
   const requested = input.requestedSurface;
   const exit = Boolean(input.exitIntent) || input.timingTrigger === "exit";
   const intentTemplate = templateForIntent(input.intentState);
+  const recover = shouldRecoverInSession({
+    abandonRisk: input.abandonRisk ?? 0,
+    intentState: input.intentState,
+    exitIntent: exit,
+  });
 
   if (requested === "cart") {
-    return withCopy("cart", "complete_the_setup", "requested_cart");
+    return withCopy(
+      "cart",
+      recover ? "in_session_recovery" : "complete_the_setup",
+      recover ? "in_session_recovery" : "requested_cart",
+    );
   }
   if (requested === "thank_you") {
     return withCopy("thank_you", "post_purchase", "requested_thank_you");
   }
   if (requested === "checkout") {
     return withCopy("checkout", "checkout_inline", "requested_checkout");
+  }
+
+  if (recover && (requested === "product_page" || requested === "popup" || requested === "sticky" || requested === "sidebar")) {
+    return withCopy("popup", "in_session_recovery", exit ? "exit_recovery" : "in_session_recovery");
   }
 
   if (exit || (input.intentState === "ABANDONING" && requested === "popup")) {
@@ -107,5 +124,11 @@ export function fallbackExperience(selection: ExperienceSelection): ExperienceSe
   if (selection.channel !== "popup" && selection.channel !== "sidebar" && selection.channel !== "sticky") {
     return null;
   }
-  return withCopy("product_page", selection.templateId === "wait_you_forgot" ? "soft_recs" : selection.templateId, "fallback_inline");
+  return withCopy(
+    "product_page",
+    selection.templateId === "wait_you_forgot" || selection.templateId === "in_session_recovery"
+      ? "soft_recs"
+      : selection.templateId,
+    "fallback_inline",
+  );
 }

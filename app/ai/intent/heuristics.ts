@@ -1,4 +1,5 @@
 import { computePriceDiscountSensitivity, type CatalogPriceRow } from "./sensitivity";
+import { ABANDON_IDLE_HOURS, computeAbandonRisk } from "./abandon";
 
 export const SHOPPER_INTENT_STATES = [
   "EXPLORING",
@@ -161,21 +162,17 @@ export function inferIntent(
       signals.purchases * 0.4 -
       signals.removes * 0.12,
   );
-  const abandonRisk = clamp01(
-    (signals.checkoutStarts > 0 && signals.purchases === 0 ? 0.45 : 0) +
-      (signals.atc > 0 && signals.purchases === 0 ? 0.25 : 0) +
-      signals.removes * 0.2,
-  );
   const productInterest = clamp01(signals.distinctProductsViewed / 6);
   const { priceSensitivity, discountSensitivity } = computePriceDiscountSensitivity({ events, catalog });
   const crossSellPotential = clamp01(signals.distinctProductsViewed * 0.12 + signals.atc * 0.1);
+  const abandonRisk = computeAbandonRisk(events, now);
 
   let state: ShopperIntentStateName = "EXPLORING";
   if (signals.purchases90d >= 2) state = "LOYAL";
   else if (
     (signals.checkoutStarts >= 1 || signals.atc >= 1) &&
     signals.purchases === 0 &&
-    (signals.removes >= 1 || (signals.hoursSinceLastEvent ?? 0) >= 0.5)
+    (signals.removes >= 1 || (signals.hoursSinceLastEvent ?? 0) >= ABANDON_IDLE_HOURS)
   ) {
     state = "ABANDONING";
   } else if (signals.checkoutStarts >= 1 && signals.purchases === 0) state = "READY_TO_BUY";

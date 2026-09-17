@@ -25,7 +25,7 @@ function channelForSurface(surface: DecideSurface): DecideSurface {
 function timingFor(
   input: DecideRequest,
   surface: DecideSurface,
-  intent: { purchaseIntent: number },
+  intent: { purchaseIntent: number; abandonRisk?: number },
   maxScore: number,
   productCount: number,
 ): TimingDecision {
@@ -38,6 +38,7 @@ function timingFor(
     purchaseIntent: intent.purchaseIntent,
     maxScore,
     productCount,
+    abandonRisk: intent.abandonRisk ?? 0,
   });
 }
 
@@ -45,6 +46,7 @@ function resolveExperienceAndTiming(input: {
   request: DecideRequest;
   intentState: string;
   purchaseIntent: number;
+  abandonRisk?: number;
   maxScore: number;
   productCount: number;
 }): { experience: ExperienceSelection; timing: TimingDecision } {
@@ -54,6 +56,7 @@ function resolveExperienceAndTiming(input: {
     intentState: input.intentState,
     timingTrigger: probe.trigger,
     exitIntent: input.request.exitIntent,
+    abandonRisk: input.abandonRisk ?? 0,
   });
   let timing = timingFor(input.request, experience.channel, input, input.maxScore, input.productCount);
   if (!timing.show) {
@@ -185,7 +188,8 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
         anonId: input.anonId,
         sessionId: input.sessionId,
       })
-    : { state: "EXPLORING" as const, purchaseIntent: 0 };
+    : { state: "EXPLORING" as const, purchaseIntent: 0, abandonRisk: 0 };
+  const abandonRisk = inferred.abandonRisk ?? 0;
   const intent = { state: inferred.state, purchaseIntent: inferred.purchaseIntent };
 
   if (input.surface === "checkout" && !(await shopAllowsCheckoutDecide(input.shop))) {
@@ -193,6 +197,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
       request: input,
       intentState: intent.state,
       purchaseIntent: intent.purchaseIntent,
+      abandonRisk,
       maxScore: 0,
       productCount: 0,
     });
@@ -212,6 +217,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
       request: input,
       intentState: intent.state,
       purchaseIntent: intent.purchaseIntent,
+      abandonRisk,
       maxScore: 0,
       productCount: 0,
     });
@@ -235,6 +241,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     request: input,
     intentState: intent.state,
     purchaseIntent: intent.purchaseIntent,
+    abandonRisk,
     maxScore,
     productCount: products.length,
   });
