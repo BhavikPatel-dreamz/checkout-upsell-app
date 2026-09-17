@@ -46,6 +46,7 @@ export interface DecideProduct {
   variantId: string | null;
   strategy: string;
   score: number;
+  offerId?: string | null;
 }
 
 export interface DecideResponse {

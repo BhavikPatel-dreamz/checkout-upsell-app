@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { OfferPlacement } from "@prisma/client";
 import db from "../../db.server";
 import { EXPERIENCE_TEMPLATES, fallbackExperience, selectExperience, type ExperienceSelection } from "../experience/select";
 import { refreshShopperProfile } from "../intent/profile.server";
@@ -15,6 +16,7 @@ import {
 import { assignHoldout, holdoutRateFromPercent } from "./holdout";
 import { shopAllowsCheckoutDecide } from "../../models/shopCapability.server";
 import { findExperienceForChannel } from "../../models/campaign.server";
+import { findEligibleCrossSellOffers } from "../../models/offerEligibility.server";
 import { assignExperienceVariant } from "../../models/experiment.server";
 import { getMerchantRuleSet } from "../../models/merchantRuleSet.server";
 import { selectOfferPolicy, type OfferPolicy } from "../offer/policy";
@@ -126,6 +128,45 @@ async function withPersistedExperience(
     campaignId: row.campaignId,
     experienceId: row.id,
   };
+}
+
+function placementsForSurface(surface: DecideSurface): OfferPlacement[] {
+  if (surface === "cart") return [OfferPlacement.checkout, OfferPlacement.cart_drawer];
+  if (surface === "popup") return [OfferPlacement.popup];
+  if (surface === "sidebar") return [OfferPlacement.sidebar];
+  if (surface === "thank_you") return [OfferPlacement.post_purchase];
+  if (surface === "checkout") return [OfferPlacement.checkout];
+  return [OfferPlacement.product_page];
+}
+
+async function productsFromEligibleOffers(input: DecideRequest & { shop: string }): Promise<DecideProduct[]> {
+  const seen = new Set<string>();
+  const products: DecideProduct[] = [];
+  for (const placement of placementsForSurface(input.surface)) {
+    const offers = await findEligibleCrossSellOffers({
+      shop: input.shop,
+      placement,
+      productIds: input.productIds ?? [],
+      variantIds: input.variantIds ?? [],
+      identity: {
+        customerId: input.customerId,
+        guestKey: input.sessionId,
+        clientId: input.anonId,
+      },
+    });
+    for (const row of offers) {
+      if (!row.productId || !row.variantId || seen.has(row.productId)) continue;
+      seen.add(row.productId);
+      products.push({
+        productId: row.productId,
+        variantId: row.variantId,
+        strategy: "similar",
+        score: 0.5,
+        offerId: row.offerId,
+      });
+    }
+  }
+  return products;
 }
 
 async function productsFromHybrid(input: DecideRequest & { shop: string }): Promise<DecideProduct[]> {
@@ -287,8 +328,9 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
   }
 
   const products = await productsFromHybrid(input);
-  const maxScore = products.reduce((max, row) => Math.max(max, row.score), 0);
-  const strategies = products.map((row) => row.strategy);
+  const resolvedProducts = products.length ? products : await productsFromEligibleOffers(input);
+  const maxScore = resolvedProducts.reduce((max, row) => Math.max(max, row.score), 0);
+  const strategies = resolvedProducts.map((row) => row.strategy);
   const abandonReason = inferAbandonReason({
     priceSensitivity: inferred.priceSensitivity ?? 0,
     discountSensitivity: inferred.discountSensitivity ?? 0,
@@ -302,7 +344,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     abandonRisk,
     abandonReason,
     maxScore,
-    productCount: products.length,
+    productCount: resolvedProducts.length,
     strategies,
     priceSensitivity: inferred.priceSensitivity ?? 0,
     discountSensitivity: inferred.discountSensitivity ?? 0,
@@ -316,7 +358,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
     sessionId: input.sessionId,
     optimizationGoal: merchant.optimizationGoal,
   });
-  const wouldShow = products.length > 0 && timing.show;
+  const wouldShow = resolvedProducts.length > 0 && timing.show;
   const frequency = await gateAndRecordInterruption({
     shop: input.shop,
     customerId: input.customerId,
@@ -328,7 +370,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
   if (!frequency.allow) {
     timing = { ...timing, show: false, trigger: "suppressed", reason: frequency.reason };
   }
-  const show = products.length > 0 && timing.show;
+  const show = resolvedProducts.length > 0 && timing.show;
   const offer = selectOfferPolicy({
     show,
     intentState: intent.state,
@@ -343,7 +385,7 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
   return buildDecideResponse({
     surface: input.surface,
     holdout: false,
-    products,
+    products: resolvedProducts,
     recommendationId,
     intent,
     timing,

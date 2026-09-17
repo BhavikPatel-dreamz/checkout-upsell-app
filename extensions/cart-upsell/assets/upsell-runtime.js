@@ -76,7 +76,7 @@
   }
 
   function track(cfg, url, offer, placement) {
-    if (!url) return Promise.resolve();
+    if (!url || !offer || !offer.offerId || offer.offerId === "decide") return Promise.resolve();
     var who = identity(cfg);
     return fetch(url, {
       method: "POST",
@@ -120,19 +120,42 @@
     return matched.length ? matched : eligible || [];
   }
 
+  function compactPayload(payload) {
+    var out = {};
+    Object.keys(payload || {}).forEach(function (key) {
+      var value = payload[key];
+      if (value == null || value === "") return;
+      out[key] = value;
+    });
+    return out;
+  }
+
   function postDecide(cfg, payload) {
     if (!cfg.decideUrl) return Promise.resolve(null);
+    var body = JSON.stringify(compactPayload(payload));
+    function parseRes(res) {
+      if (!res.ok) throw new Error("decide failed " + res.status);
+      return res.json();
+    }
+    function asGet() {
+      var joiner = cfg.decideUrl.indexOf("?") >= 0 ? "&" : "?";
+      return fetch(cfg.decideUrl + joiner + "payload=" + encodeURIComponent(body), {
+        credentials: "same-origin",
+      }).then(parseRes);
+    }
     return fetch(cfg.decideUrl, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: body,
     })
-      .then(function (res) {
-        if (!res.ok) throw new Error("decide failed");
-        return res.json();
+      .then(parseRes)
+      .catch(function (err) {
+        console.warn("Decide POST failed, retrying GET", err);
+        return asGet();
       })
-      .catch(function () {
+      .catch(function (err) {
+        console.warn("Decide request failed", err);
         return null;
       });
   }
@@ -320,15 +343,15 @@
         return Promise.resolve();
       }
       return cartJson()
+        .catch(function () {
+          return { items: [], total_price: 0 };
+        })
         .then(function (cart) {
-          if (!cart || !cart.items || !cart.items.length) {
-            hide(rootId);
-            return null;
-          }
-          var ids = cartIds(cart);
+          var empty = !cart || !cart.items || !cart.items.length;
+          var ids = empty ? { productIds: [], variantIds: [] } : cartIds(cart);
           var who = identity(c);
           return Promise.all([
-            fetchEligible(c, ids.productIds, ids.variantIds, "checkout"),
+            empty ? Promise.resolve({ offers: [] }) : fetchEligible(c, ids.productIds, ids.variantIds, "checkout"),
             postDecide(c, {
               shop: c.shop,
               surface: "cart",
@@ -682,7 +705,7 @@
       return (decision.products || [])
         .map(function (row) {
           return {
-            offerId: decision.recommendationId || "decide",
+            offerId: row.offerId || null,
             offerName: (decision.copy && decision.copy.headline) || "",
             productId: row.productId,
             variantId: row.variantId,
@@ -728,7 +751,7 @@
 
     function load() {
       var variantId = selectedVariant();
-      if (!variantId) return;
+      if (!config.shop || !config.productId) return;
       lastVariant = variantId;
       var requestSeq = ++seq;
       cartJson()

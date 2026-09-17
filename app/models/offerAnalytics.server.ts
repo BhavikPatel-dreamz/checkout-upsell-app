@@ -4,6 +4,11 @@ import { getBrowseToOfferMetrics } from "./browseActivity.server";
 
 const VIEW_DEDUPE_WINDOW_MS = 1000 * 60 * 60 * 24;
 
+async function existingOfferId(shop: string, offerId: string): Promise<string | null> {
+  const row = await db.offer.findFirst({ where: { shop, id: offerId }, select: { id: true } });
+  return row?.id ?? null;
+}
+
 export interface AnalyticsDashboardFilters {
   dateFrom?: Date | null;
   dateTo?: Date | null;
@@ -310,6 +315,10 @@ export async function trackOfferImpression(
     return { counted: false, duplicate: false, eventId: null };
   }
 
+  if (!(await existingOfferId(shop, offerId))) {
+    return { counted: false, duplicate: false, eventId: null };
+  }
+
   const isGuest = input.isGuest === true || (!customerId && !!guestKey);
   const identityCustomerId = isGuest ? null : customerId;
   const identityGuestKey = isGuest ? guestKey : null;
@@ -438,6 +447,10 @@ export async function trackOfferClick(
     return { counted: false, duplicate: false, eventId: null };
   }
 
+  if (!(await existingOfferId(shop, offerId))) {
+    return { counted: false, duplicate: false, eventId: null };
+  }
+
   const isGuest = input.isGuest === true || (!customerId && !!guestKey);
   const identityCustomerId = isGuest ? null : customerId;
   const identityGuestKey = isGuest ? guestKey : null;
@@ -551,6 +564,10 @@ export async function trackOfferAddedToCart(
   const guestKey = input.guestKey?.trim() || null;
 
   if (!shop || !offerId || !productId || !variantId || !input.placement) {
+    return { counted: false, duplicate: false, eventId: null };
+  }
+
+  if (!(await existingOfferId(shop, offerId))) {
     return { counted: false, duplicate: false, eventId: null };
   }
 
@@ -668,6 +685,10 @@ export async function trackOfferPurchase(
   const guestKey = input.guestKey?.trim() || null;
 
   if (!shop || !offerId || !productId || !variantId || !orderId || !input.placement) {
+    return { counted: false, duplicate: false, eventId: null };
+  }
+
+  if (!(await existingOfferId(shop, offerId))) {
     return { counted: false, duplicate: false, eventId: null };
   }
 
