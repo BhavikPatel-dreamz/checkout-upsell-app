@@ -1,0 +1,22 @@
+api_version = "2025-07"
+
+[[extensions]]
+name = "Checkout upsell discount"
+handle = "product-discount"
+uid = "b7e2c914-6a0d-4f31-9c8a-2d5e1f0b3a77"
+type = "function"
+description = "Applies percent, amount, or free-shipping only when the upsell policy is allowed and under max discount."
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"
+
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.run"
+  input_query = "src/cart_lines.graphql"
+  export = "cart-lines-discounts-generate-run"
+
+  [[extensions.targeting]]
+  target = "cart.delivery-options.discounts.generate.run"
+  input_query = "src/cart_delivery.graphql"
+  export = "cart-delivery-options-discounts-generate-run"

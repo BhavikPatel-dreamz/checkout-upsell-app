@@ -4,6 +4,8 @@ import { getOfferTypeConfig } from "../config/offerTypes";
 import type { IdentityLookup } from "./browseActivity.server";
 import { MAX_UPSELL_PRODUCTS, type EligibleOfferPayload } from "./eligibleOffer";
 import { rankAiRecommendPool } from "./offerRanker.server";
+import { getMerchantRuleSet } from "./merchantRuleSet.server";
+import { policyFromMerchantDeal } from "../ai/offer/applyDiscount";
 
 export { MAX_UPSELL_PRODUCTS, type EligibleOfferPayload } from "./eligibleOffer";
 
@@ -45,6 +47,8 @@ export async function findEligibleCrossSellOffers(options: {
     displayLocation,
   } = options;
   const identity = options.identity ?? {};
+  const merchant = await getMerchantRuleSet(shop);
+  const maxDiscountPercent = merchant.maxDiscountPercent;
 
   const offers = await db.offer.findMany({
     where: {
@@ -117,6 +121,12 @@ export async function findEligibleCrossSellOffers(options: {
       if (!pv) continue;
       if (cartProductIdSet.has(pv.productId) || excludedProductIdSet.has(pv.productId)) continue;
 
+      const discountValue = typeof triggerRules.discountValue === "number" ? triggerRules.discountValue : null;
+      const policy = policyFromMerchantDeal({
+        dealType: typeof triggerRules.offerType === "string" ? triggerRules.offerType : null,
+        discountValue,
+        maxDiscountPercent,
+      });
       pool.push({
         offerId: offer.id,
         offerName: offer.name,
@@ -130,7 +140,10 @@ export async function findEligibleCrossSellOffers(options: {
         promotionalTitle:
           typeof triggerRules.promotionalTitle === "string" ? triggerRules.promotionalTitle : null,
         offerType: offer.type,
-        discountValue: typeof triggerRules.discountValue === "number" ? triggerRules.discountValue : null,
+        discountValue,
+        policyType: policy.type,
+        policyValue: policy.value,
+        maxDiscountPercent,
       });
     }
 

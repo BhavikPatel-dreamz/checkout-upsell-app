@@ -1,0 +1,21 @@
+query CartLinesDiscountsGenerateRun {
+  cart {
+    lines {
+      id
+      cost {
+        amountPerQuantity {
+          amount
+        }
+      }
+      upsellPolicy: attribute(key: "_upsell_policy") {
+        value
+      }
+      upsellPolicyValue: attribute(key: "_upsell_policy_value") {
+        value
+      }
+      upsellMaxDiscount: attribute(key: "_upsell_max_discount") {
+        value
+      }
+    }
+  }
+}

@@ -15,4 +15,7 @@ export interface EligibleOfferPayload {
   promotionalTitle?: string | null;
   offerType: OfferType;
   discountValue?: number | null;
+  policyType?: string;
+  policyValue?: number | null;
+  maxDiscountPercent?: number;
 }

@@ -27,6 +27,9 @@ interface EligibleOffer {
   price: string | null;
   promotionalTitle: string | null;
   offerType: string;
+  policyType?: string;
+  policyValue?: number | null;
+  maxDiscountPercent?: number;
 }
 
 const GUEST_STORAGE_KEY = "checkout-upsell-guest-key";
@@ -95,6 +98,12 @@ function ThankYouUpsellBlock() {
       params.set("properties[_upsell_variant_id]", selectedOffer.variantId);
       if (customerId) params.set("properties[_upsell_customer_id]", customerId);
       if (guestKey) params.set("properties[_upsell_guest_key]", guestKey);
+      params.set("properties[_upsell_policy]", selectedOffer.policyType || "none");
+      params.set(
+        "properties[_upsell_policy_value]",
+        selectedOffer.policyValue == null ? "" : String(selectedOffer.policyValue),
+      );
+      params.set("properties[_upsell_max_discount]", String(selectedOffer.maxDiscountPercent ?? 15));
 
       return `https://${shopDomain}/cart/add?${params.toString()}`;
     },

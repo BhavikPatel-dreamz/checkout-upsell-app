@@ -31,6 +31,19 @@
     return match ? match[1] : String(value || "");
   }
 
+  function lineProperties(offer, who) {
+    return {
+      _upsell_offer_id: offer.offerId,
+      _upsell_product_id: offer.productId,
+      _upsell_variant_id: offer.variantId,
+      _upsell_customer_id: who.customerId || "",
+      _upsell_guest_key: who.guestKey || who.clientId || "",
+      _upsell_policy: offer.policyType || "none",
+      _upsell_policy_value: offer.policyValue == null ? "" : String(offer.policyValue),
+      _upsell_max_discount: String(offer.maxDiscountPercent == null ? 15 : offer.maxDiscountPercent),
+    };
+  }
+
   function identity() {
     var customerId = config.customerId || null;
     var clientId = (document.cookie.match(/(?:^|; )_shopify_y=([^;]*)/) || [])[1] || null;
@@ -320,13 +333,7 @@
           {
             id: numericId(offer.variantId),
             quantity: 1,
-            properties: {
-              _upsell_offer_id: offer.offerId,
-              _upsell_product_id: offer.productId,
-              _upsell_variant_id: offer.variantId,
-              _upsell_customer_id: who.customerId || "",
-              _upsell_guest_key: who.guestKey || who.clientId || "",
-            },
+            properties: lineProperties(offer, who),
           },
         ],
       }),
@@ -452,6 +459,9 @@
         price: "",
         productHandle: "",
         imageUrl: "",
+        policyType: decision.offer && decision.offer.type ? decision.offer.type : "none",
+        policyValue: decision.offer && decision.offer.value != null ? decision.offer.value : null,
+        maxDiscountPercent: 15,
       };
     }).filter(function (row) {
       return row.variantId;

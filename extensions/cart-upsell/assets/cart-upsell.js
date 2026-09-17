@@ -53,6 +53,19 @@
     return match ? match[1] : String(value);
   }
 
+  function lineProperties(offer, who) {
+    return {
+      _upsell_offer_id: offer.offerId,
+      _upsell_product_id: offer.productId,
+      _upsell_variant_id: offer.variantId,
+      _upsell_customer_id: who.customerId || "",
+      _upsell_guest_key: who.guestKey || who.clientId || "",
+      _upsell_policy: offer.policyType || "none",
+      _upsell_policy_value: offer.policyValue == null ? "" : String(offer.policyValue),
+      _upsell_max_discount: String(offer.maxDiscountPercent == null ? 15 : offer.maxDiscountPercent),
+    };
+  }
+
   function escapeHtml(value) {
     return String(value == null ? "" : value)
       .replace(/&/g, "&amp;")
@@ -235,13 +248,7 @@
       body: JSON.stringify({
         id: numericId(offer.variantId),
         quantity: 1,
-        properties: {
-          _upsell_offer_id: offer.offerId,
-          _upsell_product_id: offer.productId,
-          _upsell_variant_id: offer.variantId,
-          _upsell_customer_id: who.customerId || "",
-          _upsell_guest_key: who.guestKey || who.clientId || "",
-        },
+        properties: lineProperties(offer, who),
       }),
     })
       .then(function (res) {

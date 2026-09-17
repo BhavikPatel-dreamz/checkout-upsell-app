@@ -1,0 +1,15 @@
+query CartDeliveryOptionsDiscountsGenerateRun {
+  cart {
+    deliveryGroups {
+      id
+    }
+    lines {
+      upsellPolicy: attribute(key: "_upsell_policy") {
+        value
+      }
+      upsellMaxDiscount: attribute(key: "_upsell_max_discount") {
+        value
+      }
+    }
+  }
+}

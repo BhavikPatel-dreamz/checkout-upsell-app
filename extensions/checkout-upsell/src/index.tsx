@@ -28,6 +28,17 @@ interface EligibleOffer {
   price: string | null;
   promotionalTitle: string | null;
   offerType: string;
+  policyType?: string;
+  policyValue?: number | null;
+  maxDiscountPercent?: number;
+}
+
+function discountAttributes(offer: EligibleOffer): Array<{ key: string; value: string }> {
+  return [
+    { key: "_upsell_policy", value: offer.policyType || "none" },
+    { key: "_upsell_policy_value", value: offer.policyValue == null ? "" : String(offer.policyValue) },
+    { key: "_upsell_max_discount", value: String(offer.maxDiscountPercent ?? 15) },
+  ];
 }
 
 const GUEST_STORAGE_KEY = "checkout-upsell-guest-key";
@@ -157,6 +168,7 @@ function CheckoutUpsellBlock() {
           attributes.push({ key: "_upsell_guest_key", value: guestKey });
           attributes.push({ key: "upsell_guest_key", value: guestKey });
         }
+        attributes.push(...discountAttributes(selectedOffer));
 
         void trackEvent("clicked", selectedOffer);
         const result = await applyCartLinesChange({

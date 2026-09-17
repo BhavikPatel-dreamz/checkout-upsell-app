@@ -40,7 +40,7 @@ export function clampOfferPolicy(policy: OfferPolicy, maxDiscountPercent: number
 }
 
 /**
- * Heuristic policy only — no bandit (Phase 5). Shopify Function apply is AI-4.2.
+ * Heuristic policy only — no bandit (Phase 5). Function apply is in applyDiscount.
  */
 export function selectOfferPolicy(input: {
   show: boolean;
