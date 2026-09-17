@@ -59,6 +59,7 @@ export async function redactCustomerData(input: {
         shopperProfiles: 0,
         shopperIntentSnapshots: 0,
         identityInterruptions: 0,
+        experimentAssignments: 0,
       },
     };
   }
@@ -111,6 +112,7 @@ export async function redactCustomerData(input: {
     shopperProfiles,
     shopperIntentSnapshots,
     identityInterruptions,
+    experimentAssignments,
   ] = await Promise.all([
     db.shopperEvent.deleteMany({ where: shopperWhere }),
     db.browseActivity.deleteMany({ where: browseWhere }),
@@ -143,6 +145,9 @@ export async function redactCustomerData(input: {
     db.identityInterruption.deleteMany({
       where: { shop, identityKey: { in: [...keys, ...guestKeys] } },
     }),
+    db.experimentAssignment.deleteMany({
+      where: { shop, subjectId: { in: [...keys, ...guestKeys] } },
+    }),
   ]);
 
   return {
@@ -157,6 +162,7 @@ export async function redactCustomerData(input: {
       shopperProfiles: shopperProfiles.count,
       shopperIntentSnapshots: shopperIntentSnapshots.count,
       identityInterruptions: identityInterruptions.count,
+      experimentAssignments: experimentAssignments.count,
     },
   };
 }

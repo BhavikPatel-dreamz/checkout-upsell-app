@@ -14,6 +14,8 @@ describe("campaign + experience wrap Offer", () => {
   });
 
   it("wraps a created offer without a second form", async () => {
+    await db.experimentAssignment.deleteMany({ where: { shop: SHOP } });
+    await db.experiment.deleteMany({ where: { shop: SHOP } });
     await db.experienceVariant.deleteMany({ where: { shop: SHOP } });
     await db.experience.deleteMany({ where: { shop: SHOP } });
     await db.campaignRule.deleteMany({ where: { shop: SHOP } });
@@ -38,6 +40,15 @@ describe("campaign + experience wrap Offer", () => {
     });
     expect(campaign?.status).toBe("active");
     expect(experience?.campaignId).toBe(campaign?.id);
+
+    const variants = await db.experienceVariant.findMany({
+      where: { shop: SHOP, experienceId: experience?.id },
+    });
+    expect(variants.length).toBeGreaterThanOrEqual(2);
+    const experiment = await db.experiment.findFirst({
+      where: { shop: SHOP, experienceId: experience?.id },
+    });
+    expect(experiment?.status).toBe("active");
 
     const again = await wrapOfferAsCampaign({
       shop: SHOP,

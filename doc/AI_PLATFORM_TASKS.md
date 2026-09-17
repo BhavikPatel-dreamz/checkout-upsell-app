@@ -76,7 +76,7 @@ Working agreement: one task at a time. Standard vs Enterprise explicit. Do not i
 | ID | Task | Status |
 | --- | --- | --- |
 | AI-5.1 | Always-on holdout when decide is enabled (default 10%, configurable) | COMPLETE |
-| AI-5.2 | Experiment + assignment tables; A/B on experience variants | NOT_STARTED |
+| AI-5.2 | Experiment + assignment tables; A/B on experience variants | COMPLETE |
 | AI-5.3 | Incrementality stats job + dashboard: incremental revenue, AOV, conversion | NOT_STARTED |
 | AI-5.4 | Surface breakdown (PDP, cart, popup, thank-you, recovery) | NOT_STARTED |
 | AI-5.5 | Optimization goal setting (revenue/AOV/conversion; profit if margin data) | NOT_STARTED |

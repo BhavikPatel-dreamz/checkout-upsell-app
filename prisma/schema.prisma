@@ -120,6 +120,7 @@ model Experience {
   channel    String
   templateId String               @default("default")
   variants   ExperienceVariant[]
+  experiments Experiment[]
   createdAt  DateTime             @default(now())
   updatedAt  DateTime             @updatedAt
 
@@ -140,6 +141,39 @@ model ExperienceVariant {
   updatedAt    DateTime   @updatedAt
 
   @@index([shop, experienceId])
+}
+
+/// A/B on experience variants. Shop-level holdout (AI-5.1) still applies first.
+model Experiment {
+  id           String                  @id @default(cuid())
+  shop         String
+  experienceId String
+  experience   Experience              @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  campaignId   String?
+  name         String
+  status       String                  @default("active")
+  assignments  ExperimentAssignment[]
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@unique([shop, experienceId])
+  @@index([shop, status])
+}
+
+model ExperimentAssignment {
+  id           String             @id @default(cuid())
+  shop         String
+  experimentId String
+  experiment   Experiment         @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  subjectType  ConsentSubjectType
+  subjectId    String
+  variantId    String?
+  holdout      Boolean            @default(false)
+  assignedAt   DateTime           @default(now())
+
+  @@unique([shop, experimentId, subjectType, subjectId])
+  @@index([shop, experimentId])
+  @@index([shop, subjectId])
 }
 
 model BrowseActivity {

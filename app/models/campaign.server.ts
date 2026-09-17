@@ -1,6 +1,7 @@
 import { OfferPlacement } from "@prisma/client";
 import db from "../db.server";
 import type { DecideSurface } from "../ai/decide/contract";
+import { ensureAbExperiment } from "./experiment.server";
 
 export function channelFromOfferPlacement(placement: OfferPlacement): DecideSurface {
   switch (placement) {
@@ -63,13 +64,28 @@ export async function wrapOfferAsCampaign(input: {
       channel,
       templateId: "default",
       variants: {
-        create: { shop: input.shop, layout: channel },
+        create: [
+          { shop: input.shop, layout: "control" },
+          {
+            shop: input.shop,
+            layout: "treatment",
+            headline: "A different take",
+            cta: "See this instead",
+          },
+        ],
       },
     },
     update: {
       campaignId: campaign.id,
       channel,
     },
+  });
+
+  await ensureAbExperiment({
+    shop: input.shop,
+    experienceId: experience.id,
+    campaignId: campaign.id,
+    name: `${input.name} A/B`,
   });
 
   return { campaignId: campaign.id, experienceId: experience.id };
@@ -83,6 +99,6 @@ export async function findExperienceForChannel(shop: string, channel: string) {
       campaign: { status: "active" },
     },
     orderBy: { updatedAt: "desc" },
-    include: { variants: { take: 1, orderBy: { createdAt: "asc" } } },
+    include: { variants: { orderBy: { createdAt: "asc" } } },
   });
 }

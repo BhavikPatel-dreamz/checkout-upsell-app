@@ -15,6 +15,7 @@ import {
 import { assignHoldout, holdoutRateFromPercent } from "./holdout";
 import { shopAllowsCheckoutDecide } from "../../models/shopCapability.server";
 import { findExperienceForChannel } from "../../models/campaign.server";
+import { assignExperienceVariant } from "../../models/experiment.server";
 import { getMerchantRuleSet } from "../../models/merchantRuleSet.server";
 import { selectOfferPolicy, type OfferPolicy } from "../offer/policy";
 import { inferAbandonReason } from "../offer/recoveryReason";
@@ -85,10 +86,24 @@ function resolveExperienceAndTiming(input: {
 async function withPersistedExperience(
   shop: string,
   experience: ExperienceSelection,
+  identity: {
+    holdout: boolean;
+    customerId?: string | null;
+    anonId?: string | null;
+    sessionId?: string | null;
+  },
 ): Promise<{ experience: ExperienceSelection; campaignId: string | null; experienceId: string | null }> {
   const row = await findExperienceForChannel(shop, experience.channel);
   if (!row) return { experience, campaignId: null, experienceId: null };
-  const variant = row.variants[0];
+  const assigned = await assignExperienceVariant({
+    shop,
+    experienceId: row.id,
+    campaignId: row.campaignId,
+    holdout: identity.holdout,
+    customerId: identity.customerId,
+    anonId: identity.anonId,
+    sessionId: identity.sessionId,
+  });
   const templateId = EXPERIENCE_TEMPLATES.includes(row.templateId as (typeof EXPERIENCE_TEMPLATES)[number])
     ? (row.templateId as ExperienceSelection["templateId"])
     : experience.templateId;
@@ -96,8 +111,8 @@ async function withPersistedExperience(
     experience: {
       ...experience,
       templateId,
-      headline: variant?.headline || experience.headline,
-      cta: variant?.cta || experience.cta,
+      headline: assigned.headline || experience.headline,
+      cta: assigned.cta || experience.cta,
     },
     campaignId: row.campaignId,
     experienceId: row.id,
@@ -242,7 +257,12 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
       maxScore: 0,
       productCount: 0,
     });
-    const persisted = await withPersistedExperience(input.shop, experience);
+    const persisted = await withPersistedExperience(input.shop, experience, {
+      holdout,
+      customerId: input.customerId,
+      anonId: input.anonId,
+      sessionId: input.sessionId,
+    });
     return buildDecideResponse({
       surface: input.surface,
       holdout,
@@ -279,7 +299,12 @@ export async function decideForRequest(input: DecideRequest & { shop: string }):
   });
   const experience = resolved.experience;
   let timing = resolved.timing;
-  const persisted = await withPersistedExperience(input.shop, experience);
+  const persisted = await withPersistedExperience(input.shop, experience, {
+    holdout: false,
+    customerId: input.customerId,
+    anonId: input.anonId,
+    sessionId: input.sessionId,
+  });
   const wouldShow = products.length > 0 && timing.show;
   const frequency = await gateAndRecordInterruption({
     shop: input.shop,
