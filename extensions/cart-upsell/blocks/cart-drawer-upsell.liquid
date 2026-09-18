@@ -1,8 +1,120 @@
-<div id="cart-drawer-upsell-root" class="cart-drawer-upsell-block" style="display: none; border-top: 1px solid #e5e5e5; padding: 16px 0; margin-top: 12px;">
-  <h3 style="margin: 0 0 12px; font-size: 16px; font-weight: 600;">{{ "cart_upsell.title" | t }}</h3>
-  <div id="cart-drawer-upsell-items" style="display: flex; flex-direction: row; gap: 12px; overflow-x: auto; overflow-y: hidden; padding-bottom: 8px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;"></div>
-  <div id="cart-drawer-upsell-error" style="display: none; color: #d32f2f; font-size: 12px; margin-top: 8px;"></div>
+<div
+  id="cart-drawer-upsell-root"
+  class="cart-drawer-upsell-block"
+  style="
+    display: none;
+    --upsell-border-top: {% if block.settings.show_top_border %}1px solid {{ block.settings.border_color }}{% else %}none{% endif %};
+    --upsell-heading-color: {{ block.settings.heading_color }};
+    --upsell-heading-size: {{ block.settings.heading_font_size }}px;
+    --upsell-card-bg: {{ block.settings.card_bg_color }};
+    --upsell-card-border: 1px solid {{ block.settings.border_color }};
+    --upsell-card-radius: {{ block.settings.card_corner_radius }}px;
+    --upsell-title-color: {{ block.settings.title_color }};
+    --upsell-subtext-color: {{ block.settings.subtext_color }};
+    --upsell-price-color: {{ block.settings.price_color }};
+    --upsell-btn-bg: {{ block.settings.button_bg_color }};
+    --upsell-btn-text: {{ block.settings.button_text_color }};
+    --upsell-btn-radius: {{ block.settings.button_corner_radius }}px;
+    --upsell-error-color: {{ block.settings.error_color }};
+    padding: 16px 0;
+    margin-top: 12px;
+    border-top: var(--upsell-border-top);
+  "
+>
+  <h3 class="cart-drawer-upsell-heading">
+    {% if block.settings.heading_text != blank %}{{ block.settings.heading_text }}{% else %}{{ "cart_upsell.title" | t }}{% endif %}
+  </h3>
+  <div id="cart-drawer-upsell-items" class="cart-drawer-upsell-items"></div>
+  <div id="cart-drawer-upsell-error" class="cart-drawer-upsell-error"></div>
 </div>
+
+<style>
+  .cart-drawer-upsell-heading {
+    margin: 0 0 12px;
+    font-size: var(--upsell-heading-size);
+    font-weight: 600;
+    color: var(--upsell-heading-color);
+  }
+
+  .cart-drawer-upsell-items {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 8px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cart-drawer-upsell-error {
+    display: none;
+    color: var(--upsell-error-color);
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  .cart-drawer-upsell-card {
+    flex: 0 0 300px;
+    box-sizing: border-box;
+    scroll-snap-align: start;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: var(--upsell-card-bg);
+    border: var(--upsell-card-border);
+    border-radius: var(--upsell-card-radius);
+    padding: 10px;
+    min-height: 150px;
+  }
+
+  .cart-drawer-upsell-card img {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex: none;
+  }
+
+  .cart-drawer-upsell-card .cart-drawer-upsell-promo {
+    font-size: 12px;
+    color: var(--upsell-subtext-color);
+  }
+
+  .cart-drawer-upsell-card .cart-drawer-upsell-product-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--upsell-title-color);
+  }
+
+  .cart-drawer-upsell-card .cart-drawer-upsell-variant {
+    font-size: 12px;
+    color: var(--upsell-subtext-color);
+  }
+
+  .cart-drawer-upsell-card .cart-drawer-upsell-price {
+    color: var(--upsell-price-color);
+  }
+
+  .cart-drawer-upsell-card a.cart-drawer-upsell-view {
+    font-size: 12px;
+    display: block;
+    margin-top: 4px;
+    color: var(--upsell-title-color);
+  }
+
+  .cart-drawer-upsell-btn {
+    display: block;
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: var(--upsell-btn-radius);
+    background: var(--upsell-btn-bg);
+    color: var(--upsell-btn-text);
+    cursor: pointer;
+    font-size: 12px;
+  }
+</style>
 
 <script>
   window.CART_DRAWER_UPSELL_CONFIG = {
@@ -21,6 +133,26 @@
 {
   "name": "Cart Drawer Upsell",
   "target": "body",
-  "javascript": "cart-drawer-upsell.js"
+  "javascript": "cart-drawer-upsell.js",
+  "settings": [
+    { "type": "header", "content": "Heading" },
+    { "type": "text", "id": "heading_text", "label": "Heading text", "default": "You might also like" },
+    { "type": "color", "id": "heading_color", "label": "Heading color", "default": "#111111" },
+    { "type": "range", "id": "heading_font_size", "label": "Heading font size", "min": 12, "max": 24, "step": 1, "unit": "px", "default": 16 },
+    { "type": "checkbox", "id": "show_top_border", "label": "Show divider above upsell", "default": true },
+    { "type": "header", "content": "Card styling" },
+    { "type": "color", "id": "card_bg_color", "label": "Card background", "default": "#ffffff" },
+    { "type": "color", "id": "border_color", "label": "Border / divider color", "default": "#e5e5e5" },
+    { "type": "range", "id": "card_corner_radius", "label": "Card corner radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 6 },
+    { "type": "color", "id": "title_color", "label": "Product title color", "default": "#111111" },
+    { "type": "color", "id": "subtext_color", "label": "Secondary text color", "default": "#666666" },
+    { "type": "color", "id": "price_color", "label": "Price color", "default": "#666666" },
+    { "type": "header", "content": "Button" },
+    { "type": "color", "id": "button_bg_color", "label": "Button background", "default": "#111111" },
+    { "type": "color", "id": "button_text_color", "label": "Button text color", "default": "#ffffff" },
+    { "type": "range", "id": "button_corner_radius", "label": "Button corner radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 4 },
+    { "type": "header", "content": "Error message" },
+    { "type": "color", "id": "error_color", "label": "Error text color", "default": "#d32f2f" }
+  ]
 }
 {% endschema %}
