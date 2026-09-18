@@ -4,6 +4,7 @@ import {
   useCartLines,
   useCustomer,
   useStorage,
+  useSettings,
   Image,
   Text,
   View,
@@ -11,7 +12,6 @@ import {
   InlineLayout,
   ScrollView,
   Button,
-  useSettings,
 } from "@shopify/ui-extensions-react/checkout";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { offersApiUrl } from "./offersApi";
@@ -49,6 +49,16 @@ function ThankYouUpsellBlock() {
   const lines = useCartLines();
   const customer = useCustomer();
   const storage = useStorage();
+
+  const headingText = (settings.heading_text as string) || "You may also like";
+  const buttonLabel = (settings.button_label as string) || "Order";
+  const buttonKind: "primary" | "secondary" = settings.use_secondary_button === true ? "secondary" : "primary";
+  const priceAppearance = settings.price_standard_appearance === true ? undefined : "subdued";
+  const rawSpacing = (settings.card_spacing as string | undefined)?.trim().toLowerCase();
+  const cardSpacing: "tight" | "base" | "loose" =
+    rawSpacing === "base" || rawSpacing === "loose" ? rawSpacing : "tight";
+  const showBorder = settings.show_border !== false;
+
   const [offers, setOffers] = useState<EligibleOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -226,7 +236,7 @@ function ThankYouUpsellBlock() {
   return (
     <BlockStack spacing="tight" padding={["base", "none"]}>
       <Text emphasis="bold" size="medium">
-        You may also like
+        {headingText}
       </Text>
 
       <ScrollView direction="inline">
@@ -241,11 +251,11 @@ function ThankYouUpsellBlock() {
               minBlockSize={330}
               maxBlockSize={330}
               overflow="hidden"
-              border="base"
+              border={showBorder ? "base" : "none"}
               borderRadius="base"
               padding="base"
             >
-              <BlockStack spacing="tight">
+              <BlockStack spacing={cardSpacing}>
                 <View
                   minInlineSize={136}
                   maxInlineSize={136}
@@ -288,7 +298,7 @@ function ThankYouUpsellBlock() {
                       </Text>
                     )}
                     {o.price && (
-                      <Text size="small" appearance="subdued">
+                      <Text size="small" appearance={priceAppearance}>
                         ${o.price}
                       </Text>
                     )}
@@ -301,6 +311,8 @@ function ThankYouUpsellBlock() {
                     processing={processing}
                     buildAcceptUrl={buildAcceptUrl}
                     onAccept={handleAccept}
+                    buttonLabel={buttonLabel}
+                    buttonKind={buttonKind}
                   />
                 </View>
               </BlockStack>
@@ -317,11 +329,15 @@ function AcceptButton({
   processing,
   buildAcceptUrl,
   onAccept,
+  buttonLabel,
+  buttonKind,
 }: {
   offer: EligibleOffer;
   processing: boolean;
   buildAcceptUrl: (offer: EligibleOffer) => Promise<string | null>;
   onAccept: (offer: EligibleOffer) => void;
+  buttonLabel: string;
+  buttonKind: "primary" | "secondary";
 }) {
   const [href, setHref] = useState<string | undefined>(undefined);
 
@@ -337,13 +353,13 @@ function AcceptButton({
 
   return (
     <Button
-      kind="primary"
+      kind={buttonKind}
       to={href}
       onPress={() => onAccept(offer)}
       disabled={processing || !href}
       accessibilityLabel="Add this item to your order"
     >
-      Order
+      {buttonLabel}
     </Button>
   );
-}
+} 
