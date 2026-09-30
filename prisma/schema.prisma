@@ -301,6 +301,7 @@ model StoreBillingOffer {
   discountPercent  Int       @default(0)
   trialDays        Int       @default(15)
   legacySubscriber Boolean   @default(false)
+  shopifyChargeId  String?
   cancelledAt      DateTime?
   updatedAt        DateTime  @updatedAt
 }

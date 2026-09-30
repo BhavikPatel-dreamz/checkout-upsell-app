@@ -10,9 +10,11 @@ import { setStorePlan } from "../models/billing.server";
  */
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session, redirect } = await authenticate.admin(request);
-  const plan = planIdFromShopifyHandle(new URL(request.url).searchParams.get("plan_handle"));
+  const url = new URL(request.url);
+  const plan = planIdFromShopifyHandle(url.searchParams.get("plan_handle"));
+  const chargeId = url.searchParams.get("charge_id");
   if (plan) {
-    await setStorePlan(session.shop, plan);
+    await setStorePlan(session.shop, plan, chargeId);
   }
   return redirect("/app/billing");
 }

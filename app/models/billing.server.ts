@@ -58,7 +58,7 @@ async function nextSubscriptionHistoryId() {
   return (latest._max.id ?? 0) + 1;
 }
 
-async function recordPlanChange(shop: string, plan: PlanId) {
+async function recordPlanChange(shop: string, plan: PlanId, chargeId?: string | null) {
   const selected = planById(plan);
   const active = plan !== "free";
   await db.subscriptionHistory.updateMany({
@@ -69,7 +69,7 @@ async function recordPlanChange(shop: string, plan: PlanId) {
     data: {
       id: await nextSubscriptionHistoryId(),
       shop,
-      chargeId: null,
+      chargeId: chargeId || null,
       name: selected.name,
       price: selected.amount.toFixed(2),
       approved: true,
@@ -79,21 +79,48 @@ async function recordPlanChange(shop: string, plan: PlanId) {
   });
 }
 
-export async function setStorePlan(shop: string, plan: PlanId) {
+export async function setStorePlan(shop: string, plan: PlanId, chargeId?: string | null) {
   const current = await ensureStoreBillingOffer(shop);
   const selected = planById(plan);
-  if (!selected.available || current.plan === plan) {
+  if (!selected.available) return current;
+
+  const updated =
+    current.plan === plan
+      ? current
+      : await db.storeBillingOffer.update({
+          where: { shop },
+          data: {
+            plan,
+            trialDays: current.legacySubscriber ? 0 : selected.trialDays,
+            cancelledAt: plan === "free" ? new Date() : null,
+          },
+        });
+
+  const active = plan !== "free";
+  if (chargeId) {
+    const existing = await db.subscriptionHistory.findFirst({ where: { shop, chargeId } });
+    if (existing) {
+      await db.subscriptionHistory.updateMany({
+        where: { shop, active: true, NOT: { id: existing.id } },
+        data: { active: false },
+      });
+      await db.subscriptionHistory.update({
+        where: { id: existing.id },
+        data: {
+          name: selected.name,
+          price: selected.amount.toFixed(2),
+          approved: true,
+          active,
+          chargedAt: new Date(),
+        },
+      });
+      return updated;
+    }
+  } else if (current.plan === plan) {
     return current;
   }
-  const updated = await db.storeBillingOffer.update({
-    where: { shop },
-    data: {
-      plan,
-      trialDays: current.legacySubscriber ? 0 : selected.trialDays,
-      cancelledAt: plan === "free" ? new Date() : null,
-    },
-  });
-  await recordPlanChange(shop, plan);
+
+  await recordPlanChange(shop, plan, chargeId);
   return updated;
 }
 

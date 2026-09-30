@@ -43,6 +43,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     history: history.map((row) => ({
       id: row.id,
       name: row.name,
+      chargeId: row.chargeId,
       price: row.price,
       approved: row.approved,
       active: row.active,
@@ -193,7 +194,10 @@ export default function BillingPage() {
             <tbody>
               {data.history.map((row) => (
                 <tr key={row.id}>
-                  <td>{row.name || "Charge"}</td>
+                  <td>
+                    {row.name || "Charge"}
+                    {row.chargeId ? <div>Charge {row.chargeId}</div> : null}
+                  </td>
                   <td>${row.price || "0"}</td>
                   <td>
                     <span className={`statusPill${row.approved && row.active ? " statusPillOn" : ""}`}>
