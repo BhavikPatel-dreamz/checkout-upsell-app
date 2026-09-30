@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
 import { badRequest } from "../lib/http.server";
 import { authenticate } from "../shopify.server";
+import { storeCanUse } from "../models/billing.server";
 import { getFilteredDashboardMetrics, getOfferTrendMetrics } from "../models/offerAnalytics.server";
 
 function isValidShopDomain(value: unknown): value is string {
@@ -51,6 +52,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     } else {
       return badRequest({ body: "Unable to load dashboard metrics" });
     }
+  }
+
+  if (!(await storeCanUse(shop, "analytics"))) {
+    return Response.json({ error: "Analytics is not included on the Free plan." }, { status: 403 });
   }
 
   const productParam = url.searchParams.get("product") ?? "all";

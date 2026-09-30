@@ -1,6 +1,7 @@
 import { useLoaderData, useRevalidator, type LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
 import { authenticate } from "../shopify.server";
+import { storeCanUse } from "../models/billing.server";
 import {
   getOfferAddedToCartMetrics,
   getOfferClickMetrics,
@@ -35,6 +36,7 @@ async function getProductMetaMap(shop: string, productIds: string[]) {
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
+  const locked = !(await storeCanUse(session.shop, "analytics"));
   const viewMetrics = await getOfferViewMetrics(session.shop);
   const clickMetrics = await getOfferClickMetrics(session.shop);
   const addedToCartMetrics = await getOfferAddedToCartMetrics(session.shop);
@@ -63,18 +65,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
     viewToPurchase: viewMetrics.totalViews > 0 ? purchaseMetrics.totalPurchases / viewMetrics.totalViews : null,
   };
 
-  return { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, productMetaMap, funnelRates, browseToOffer };
+  return { locked, viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, productMetaMap, funnelRates, browseToOffer };
 }
 
 export default function AnalyticsPage() {
   const revalidator = useRevalidator();
-  const { viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, productMetaMap, funnelRates, browseToOffer } =
-    useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
+  const { locked, viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, trendMetrics, productMetaMap, funnelRates, browseToOffer } =
+    data;
 
   const offerDetailUrl = (offerId: string) =>
     `/app/analytics/${encodeURIComponent(offerId)}`;
 
-  return (
+  const report = (
     <AnalyticsDashboard
       viewMetrics={viewMetrics}
       clickMetrics={clickMetrics}
@@ -88,5 +91,24 @@ export default function AnalyticsPage() {
       onRefresh={() => void revalidator.revalidate()}
       isRefreshing={revalidator.state === "loading"}
     />
+  );
+
+  if (!locked) return report;
+
+  return (
+    <div className="analytics-locked">
+      <div className="analytics-locked-blur" aria-hidden="true">
+        {report}
+      </div>
+      <div className="analytics-locked-overlay">
+        <div className="analytics-locked-card">
+          <h2>Upgrade for the full report</h2>
+          <p>Analytics is not included on the Free plan. Silver includes the full report.</p>
+          <a className="analytics-locked-button" href="/app/billing">
+            View plans
+          </a>
+        </div>
+      </div>
+    </div>
   );
 }

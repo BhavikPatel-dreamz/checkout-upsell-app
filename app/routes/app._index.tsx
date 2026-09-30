@@ -7,6 +7,7 @@ import {
 import type { Offer as OfferRecord } from "@prisma/client";
 
 import { authenticate } from "../shopify.server";
+import { storeOfferUsage } from "../models/billing.server";
 import { listOffers } from "../models/offer.server";
 import {
   getOfferViewMetrics,
@@ -52,15 +53,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (r.productId && r.productTitle) productTitleByProductId[r.productId] = r.productTitle;
   }
 
-  const [viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics] =
+  const [viewMetrics, clickMetrics, addedToCartMetrics, purchaseMetrics, usage] =
     await Promise.all([
       getOfferViewMetrics(session.shop),
       getOfferClickMetrics(session.shop),
       getOfferAddedToCartMetrics(session.shop),
       getOfferPurchaseMetrics(session.shop),
+      storeOfferUsage(session.shop),
     ]);
 
   return {
+    canCreate: usage.canCreate,
     offers,
     productTitleByProductId,
     metrics: viewMetrics,
@@ -78,6 +81,7 @@ export default function OffersPage() {
     clickMetrics,
     addedToCartMetrics,
     purchaseMetrics,
+    canCreate,
   } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const [visibleOffers, setVisibleOffers] = useState(offers);
@@ -238,6 +242,7 @@ export default function OffersPage() {
       activeTab={activeTab}
       toast={toast}
       onActiveTabChange={setActiveTab}
+      canCreate={canCreate}
       createUrl={createNewOfferUrl()}
       editUrl={editUpsellUrl}
       onToggleStatus={toggleStatus}

@@ -36,6 +36,7 @@ type DashboardProps = {
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
   onViewDetails: (section: string) => void;
+  canCreate: boolean;
   analyticsUrl: string;
   allUpsellsUrl: string;
   offerAnalyticsUrl: (offerId: string) => string;
@@ -61,6 +62,7 @@ export default function Dashboard({
   onConfirmDelete,
   onCancelDelete,
   onViewDetails,
+  canCreate,
   analyticsUrl,
   allUpsellsUrl,
   offerAnalyticsUrl,
@@ -198,22 +200,36 @@ export default function Dashboard({
           </div>
 
           <div className="actionRow">
-            <AdminAppLink
-              to={createUrl}
-              className="actionCard actionCardPrimary"
-              style={{ textDecoration: "none", color: "inherit" }}
-            >
-              <span className="actionIcon actionIconPrimary">
-                <BoltIcon />
-              </span>
-              <span className="actionCardText">
-                <span className="actionCardTitle">Create Upsell</span>
-                <span className="actionCardSubtitle actionCardSubtitlePrimary">
-                  Set up a new offer
+            {canCreate ? (
+              <AdminAppLink
+                to={createUrl}
+                className="actionCard actionCardPrimary"
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+                <span className="actionIcon actionIconPrimary">
+                  <BoltIcon />
                 </span>
-              </span>
-              <span className="actionChevron actionChevronPrimary">›</span>
-            </AdminAppLink>
+                <span className="actionCardText">
+                  <span className="actionCardTitle">Create Upsell</span>
+                  <span className="actionCardSubtitle actionCardSubtitlePrimary">
+                    Set up a new offer
+                  </span>
+                </span>
+                <span className="actionChevron actionChevronPrimary">›</span>
+              </AdminAppLink>
+            ) : (
+              <div className="actionCard actionCardPrimary" style={{ opacity: 0.55, cursor: "not-allowed" }} aria-disabled="true">
+                <span className="actionIcon actionIconPrimary">
+                  <BoltIcon />
+                </span>
+                <span className="actionCardText">
+                  <span className="actionCardTitle">Create Upsell</span>
+                  <span className="actionCardSubtitle actionCardSubtitlePrimary">
+                    Offer limit reached. Upgrade to add more.
+                  </span>
+                </span>
+              </div>
+            )}
 
             <AdminAppLink
               to={analyticsUrl}

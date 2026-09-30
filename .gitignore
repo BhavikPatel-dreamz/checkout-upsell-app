@@ -34,3 +34,7 @@ database.sqlite
 .history/
 .vscode/
 temp_auto_push.bat
+
+# Old database dumps contain store access tokens. Never commit them.
+upSell_live*.sql
+*.sql.bak

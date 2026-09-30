@@ -17,6 +17,7 @@ import { useFetcher, useLoaderData, redirect } from "react-router";
 import type { OfferPlacement, OfferType } from "@prisma/client";
 
 import { authenticate } from "../shopify.server";
+import { storeCanUse, storeOfferUsage } from "../models/billing.server";
 import {
   buildOfferPayload,
   createOffer,
@@ -31,6 +32,8 @@ import OfferForm, {
   type Product,
   type ErrorMap,
 } from "../components/OfferForm";
+import { AdminAppLink } from "../components/AdminAppLink";
+import "../styles/analytics.css";
 import OfferTypeSelector from "../components/OfferTypeSelector";
 import {
   getOfferTypeConfig,
@@ -51,9 +54,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const offerTypeParam = url.searchParams.get("offerType");
   const placementParam = url.searchParams.get("placement");
 
-  const [variantRows, offer] = await Promise.all([
+  const [variantRows, offer, usage] = await Promise.all([
     listProductVariants(session.shop, 200),
     offerId ? getOffer(session.shop, offerId) : Promise.resolve(null),
+    storeOfferUsage(session.shop),
   ]);
 
   const products: Product[] = Object.values(
@@ -109,6 +113,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
       : [];
 
   return {
+    canCreate: usage.canCreate,
+    offerLimit: usage.limit,
+    offerCount: usage.count,
+    planName: usage.plan.name,
     products,
     placement,
     offerType,
@@ -222,6 +230,17 @@ export async function action({ request }: ActionFunctionArgs) {
     : built.placement;
   built.placement = placementFromDisplayLocation(displayLocation, fallbackPlacement);
 
+  if (built.placement === "post_purchase") {
+    const allowed = await storeCanUse(session.shop, "post_purchase");
+    if (!allowed) {
+      return {
+        errors: {
+          placement: "Post-purchase offers are included on Silver. Free includes checkout offers only.",
+        },
+      };
+    }
+  }
+
   if (offerId) {
     await updateOffer(session.shop, offerId, {
       name: built.name,
@@ -234,6 +253,15 @@ export async function action({ request }: ActionFunctionArgs) {
     return redirect("/app");
   }
 
+  const usage = await storeOfferUsage(session.shop);
+  if (!usage.canCreate) {
+    return {
+      errors: {
+        name: `The ${usage.plan.name} plan allows ${usage.limit} offers. This store already has ${usage.count}.`,
+      },
+    };
+  }
+
   await createOffer(session.shop, built);
   return redirect("/app?created=1");
 }
@@ -241,7 +269,7 @@ export async function action({ request }: ActionFunctionArgs) {
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function CreateOfferPage() {
-  const { products, offer, placement, offerType, mode, isSelecting } =
+  const { products, offer, placement, offerType, mode, isSelecting, canCreate, offerLimit, offerCount, planName } =
     useLoaderData<{
       products: Product[];
       offer: any;
@@ -249,6 +277,10 @@ export default function CreateOfferPage() {
       offerType: OfferType;
       mode: "create" | "edit";
       isSelecting: boolean;
+      canCreate: boolean;
+      offerLimit: number | null;
+      offerCount: number;
+      planName: string;
     }>();
   const fetcher = useFetcher<{ errors?: ErrorMap }>();
 
@@ -258,6 +290,30 @@ export default function CreateOfferPage() {
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     fetcher.submit(e.currentTarget, { method: "post" });
+  }
+
+  if (mode === "create" && !canCreate) {
+    return (
+      <div className="analytics-locked">
+        <div className="analytics-locked-blur" aria-hidden="true">
+          <OfferFormPage mode="create" offerType={offerType} placement={placement}>
+            <OfferTypeSelector />
+          </OfferFormPage>
+        </div>
+        <div className="analytics-locked-overlay">
+          <div className="analytics-locked-card">
+            <h2>Offer limit reached</h2>
+            <p>
+              The {planName} plan includes {offerLimit ?? "unlimited"} offers. This store already has {offerCount}.
+              Upgrade to add another offer.
+            </p>
+            <AdminAppLink to="/app/billing" className="analytics-locked-button">
+              View plans
+            </AdminAppLink>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (isSelecting) {

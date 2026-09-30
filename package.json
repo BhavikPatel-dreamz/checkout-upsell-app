@@ -6,7 +6,7 @@
     "security:scan": "bash .githooks/pre-commit --ci",
     "preinstall": "node -e \"const ua=process.env.npm_config_user_agent||''; if(!ua.includes('pnpm')){ console.error('This app must be installed with pnpm, not npm. On the server: rm -rf node_modules && pnpm install --frozen-lockfile'); process.exit(1); }\"",
     "build": "prisma generate && react-router build",
-    "dev": "shopify app dev --tunnel-url=https://upsale.dynamicdreamz.net:3001",
+    "dev": "shopify app dev --tunnel-url=https://upsale.dynamicdreamz.net:3003",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
     "deploy": "shopify app deploy",

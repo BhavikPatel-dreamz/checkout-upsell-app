@@ -280,6 +280,31 @@ model RecurringApplicationCharge {
   @@map("recurring_application_charge")
 }
 
+/// Old recurring charges, mapped onto the shop domain. Charge response bodies are not copied.
+model SubscriptionHistory {
+  id        Int      @id
+  shop      String
+  chargeId  String?
+  name      String?
+  price     String?
+  approved  Boolean  @default(false)
+  active    Boolean  @default(false)
+  chargedAt DateTime
+
+  @@index([shop, chargedAt])
+}
+
+/// Per-store plan terms. The public price and trial are $9.99 / 15 days.
+model StoreBillingOffer {
+  shop             String    @id
+  plan             String    @default("free")
+  discountPercent  Int       @default(0)
+  trialDays        Int       @default(15)
+  legacySubscriber Boolean   @default(false)
+  cancelledAt      DateTime?
+  updatedAt        DateTime  @updatedAt
+}
+
 model Webhook {
   id        Int       @id @default(autoincrement())
   clientId  Int?      @map("client_id")
@@ -301,6 +326,31 @@ model Gdpr {
   updatedAt DateTime @default(now()) @map("updated_at")
 
   @@map("GDPR")
+}
+
+/// One row per shop: whether this app is allowed to keep that store's data.
+model ShopDataPolicy {
+  shop               String    @id
+  dataStorageAllowed Boolean   @default(true)
+  redactedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+/// GDPR webhook log, scoped to a shop. Customer email and phone are not stored.
+model GdprEvent {
+  id         String   @id @default(cuid())
+  shop       String
+  topic      String
+  legacyId   Int?     @unique
+  webhookId  String?  @unique
+  customerId String?
+  status     String
+  receivedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([shop, receivedAt])
+  @@index([shop, topic])
 }
 
 model JobsHistory {

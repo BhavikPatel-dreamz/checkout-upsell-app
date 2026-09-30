@@ -5,10 +5,18 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
 import { ensureWebPixel } from "../lib/ensureWebPixel.server";
+import { ensureShopDataPolicy } from "../models/gdpr.server";
+import { planIdFromShopifyHandle } from "../config/billingPlan";
+import { setStorePlan } from "../models/billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
+  await ensureShopDataPolicy(session.shop);
   await ensureWebPixel(admin, session.shop);
+  const plan = planIdFromShopifyHandle(new URL(request.url).searchParams.get("plan_handle"));
+  if (plan) {
+    await setStorePlan(session.shop, plan);
+  }
 
   return {
     // eslint-disable-next-line no-undef
@@ -29,6 +37,7 @@ export default function App() {
         <s-link href="/app/upsells">All Upsells</s-link>
         <s-link href="/app/product-sync">Product Sync</s-link>
         <s-link href="/app/analytics">Analytics</s-link>
+        <s-link href="/app/billing">Subscription</s-link>
         <s-link href="/app/settings">Settings</s-link>
         <s-link href="/app/onboarding">Onboarding</s-link>
       </s-app-nav>

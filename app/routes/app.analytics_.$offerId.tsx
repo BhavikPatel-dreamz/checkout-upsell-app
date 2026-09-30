@@ -3,6 +3,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate } from "react-router";
 
 import { authenticate } from "../shopify.server";
+import { storeCanUse } from "../models/billing.server";
 import { getOfferAnalyticsForOffer, getOfferTrendMetrics } from "../models/offerAnalytics.server";
 import db from "../db.server";
 
@@ -625,6 +626,9 @@ function ConversionFunnel({
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
+  if (!(await storeCanUse(session.shop, "analytics"))) {
+    return { analytics: null, locked: true, trendMetrics: null, productNames: {} as Record<string, string> };
+  }
   const offerId = params.offerId?.trim();
 
   if (!session?.shop) {
@@ -666,8 +670,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 /* ---------------------------------------------------------------------- */
 
 export default function OfferAnalyticsDetailsPage() {
-  const { analytics, trendMetrics, productNames } = useLoaderData<typeof loader>();
+  const { analytics, trendMetrics, productNames, locked } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+
+  if (locked) {
+    return (
+      <div style={{ padding: "1.5rem", fontFamily: "inherit" }}>
+        <h1>Analytics</h1>
+        <p>Analytics is not included on the Free plan.</p>
+        <button type="button" onClick={() => navigate("/app/billing")}>
+          View plans
+        </button>
+      </div>
+    );
+  }
 
   if (!analytics) {
     return (
