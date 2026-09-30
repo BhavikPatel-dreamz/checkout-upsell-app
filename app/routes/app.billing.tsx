@@ -90,13 +90,10 @@ export default function BillingPage() {
             {data.discountPercent > 0 ? ` ${data.discountPercent}% off paid plans.` : ""}
           </span>
         </div>
-        {current.id === "free" ? null : (
-          <form method="post">
-            <input type="hidden" name="plan" value="free" />
-            <button className="billingCancel" type="submit">
-              Cancel and use Free
-            </button>
-          </form>
+        {current.id === "free" || !data.planUrl ? null : (
+          <a className="billingCancel" href={data.planUrl} target="_top" rel="noreferrer">
+            Switch to Free
+          </a>
         )}
       </section>
 
@@ -152,16 +149,9 @@ export default function BillingPage() {
                 <button className="planButton planButtonCurrent" type="button" disabled>
                   Current plan
                 </button>
-              ) : plan.id === "free" ? (
-                <form method="post">
-                  <input type="hidden" name="plan" value="free" />
-                  <button className="planButton planButtonSecondary" type="submit">
-                    Switch to Free
-                  </button>
-                </form>
               ) : data.planUrl ? (
-                <a className="planButton" href={data.planUrl} target="_top" rel="noreferrer">
-                  Choose {plan.name}
+                <a className={`planButton${plan.id === "free" ? " planButtonSecondary" : ""}`} href={data.planUrl} target="_top" rel="noreferrer">
+                  {plan.id === "free" ? "Switch to Free" : `Choose ${plan.name}`}
                 </a>
               ) : (
                 <button className="planButton" type="button" disabled>
@@ -174,16 +164,12 @@ export default function BillingPage() {
       </section>
 
       <p className="billingNote">
-        Paid plans are billed by Shopify.{" "}
-        <a href={data.cancelUrl} target="_top" rel="noreferrer">
-          Open Apps settings
-        </a>{" "}
-        to stop the Shopify charge.
-        {data.currentPlan === "free" && data.planUrl ? (
+        Free and Silver are both chosen on Shopify’s plan page, so a paid charge does not stay active after you switch to Free.{" "}
+        {data.planUrl ? (
           <>
             {" "}
             <a href={data.planUrl} target="_top" rel="noreferrer">
-              Approve a paid plan in Shopify
+              Open the Shopify plan page
             </a>
             .
           </>

@@ -100,8 +100,7 @@ export function planIdFromShopifyHandle(handle: string | null): PlanId | null {
   if (value.includes("gold")) return "gold";
   if (value === "free" || value.includes("free")) return "free";
   if (value === "silver" || value.includes("silver")) return "silver";
-  // The only paid public plan right now is Silver.
-  return "silver";
+  return null;
 }
 
 export function planSelectionUrl(shop: string, appHandle: string): string {
