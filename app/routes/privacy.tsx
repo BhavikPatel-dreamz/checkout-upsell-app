@@ -4,7 +4,7 @@ import type { MetaFunction } from "react-router";
 const OPERATOR = "Dynamic Dreamz";
 const APP_NAME = "Checkout Upsell App";
 const APP_URL = "https://upsell.dreamzapps.com";
-const CONTACT_EMAIL = "privacy@dreamzapps.com";
+const CONTACT_EMAIL = "support@dynamicdreamz.com";
 const EFFECTIVE_DATE = "1 October 2026";
 
 export const meta: MetaFunction = () => [
