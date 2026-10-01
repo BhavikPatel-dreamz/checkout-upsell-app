@@ -1,48 +1,38 @@
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
-import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { Form, useActionData, useLoaderData } from "react-router";
+import { redirect } from "react-router";
 
 import { login } from "../../shopify.server";
 import { loginErrorMessage } from "./error.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const errors = loginErrorMessage(await login(request));
+  const url = new URL(request.url);
+  if (url.searchParams.get("shop")) {
+    return { errors: loginErrorMessage(await login(request)) };
+  }
 
-  return { errors };
+  return { errors: {} as { shop?: string } };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const errors = loginErrorMessage(await login(request));
+  const url = new URL(request.url);
+  if (!url.searchParams.get("shop")) {
+    throw redirect("/");
+  }
 
-  return {
-    errors,
-  };
+  return { errors: loginErrorMessage(await login(request)) };
 };
 
 export default function Auth() {
-  const loaderData = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
-  const [shop, setShop] = useState("");
-  const { errors } = actionData || loaderData;
-
   return (
     <AppProvider embedded={false}>
       <s-page>
-        <Form method="post">
-        <s-section heading="Log in">
-          <s-text-field
-            name="shop"
-            label="Shop domain"
-            details="example.myshopify.com"
-            value={shop}
-            onChange={(e) => setShop(e.currentTarget.value)}
-            autocomplete="on"
-            error={errors.shop}
-          ></s-text-field>
-          <s-button type="submit">Log in</s-button>
+        <s-section heading="Open from Shopify">
+          <s-paragraph>
+            Checkout Upsell App is installed from the Shopify App Store or opened from Shopify
+            Admin. This page does not collect a store domain.
+          </s-paragraph>
         </s-section>
-        </Form>
       </s-page>
     </AppProvider>
   );

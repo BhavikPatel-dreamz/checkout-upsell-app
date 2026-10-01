@@ -1,7 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { redirect, Form, useLoaderData } from "react-router";
-
-import { login } from "../../shopify.server";
+import { redirect } from "react-router";
 
 import styles from "./styles.module.css";
 
@@ -12,43 +10,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  return null;
 };
 
 export default function App() {
-  const { showForm } = useLoaderData<typeof loader>();
-
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
+        <h1 className={styles.heading}>Checkout Upsell App</h1>
         <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
+          Related products in cart, Shopify Checkout, and thank-you. Install and open the
+          app from the Shopify App Store or Shopify Admin. Store URLs are not entered here.
         </p>
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
-            </label>
-            <button className={styles.button} type="submit">
-              Log in
-            </button>
-          </Form>
-        )}
         <ul className={styles.list}>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Cart, checkout, and thank-you.</strong> Show a related product after a
+            trigger item is in the cart.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Merchant-controlled catalog.</strong> You pick trigger products and the
+            product to recommend.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Privacy.</strong>{" "}
+            <a href="/privacy">How we handle store and shopper data</a>.
           </li>
         </ul>
       </div>

@@ -1,4 +1,8 @@
-import { useNavigate } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
+import { authenticate } from "../shopify.server";
+import { env } from "../env.server";
+import { themeEditorLinks } from "../lib/themeEditorLinks";
 import "../styles/app._index.css";
 
 const STEPS = [
@@ -13,7 +17,7 @@ const STEPS = [
   {
     id: 2,
     title: "Create Your First Offer",
-    description: "Set up a cross-sell, bundle, discount, or free gift offer to show customers.",
+    description: "Set up a cross-sell: trigger products and the product to recommend.",
     icon: "offer",
     link: "/app/offers/new",
     linkLabel: "Create an Offer",
@@ -102,7 +106,13 @@ const FAQ_ITEMS = [
   },
 ];
 
+export async function loader({ request }: LoaderFunctionArgs) {
+  const { session } = await authenticate.admin(request);
+  return { editor: themeEditorLinks(session.shop, env.shopifyApiKey) };
+}
+
 export default function OnboardingPage() {
+  const { editor } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   return (
     <div className="appPageShell" style={styles.page}>
@@ -302,17 +312,23 @@ export default function OnboardingPage() {
                 <GuideStep
                   number={1}
                   title="Add Cart Upsell in Theme Editor"
-                  description='From Shopify Admin, go to Online Store → Themes → Customize. Open the cart template, click Add block, and add Cart Upsell.'
+                  description="Opens the current theme on the cart template and adds the Cart Upsell app block. Save the theme after you place the block."
+                  href={editor.cartBlock}
+                  hrefLabel="Open Theme Editor (cart)"
                 />
                 <GuideStep
                   number={2}
                   title="Add Thank You Upsell in Checkout Editor"
-                  description="From Shopify Admin, go to Settings → Checkout → Customize. Open the Thank you page, add the Thank You Upsell app block, and save."
+                  description="Opens checkout customization. Switch to the Thank you page, add Thank You Upsell, and save. Checkout Extensibility must be on."
+                  href={editor.thankYouEditor}
+                  hrefLabel="Open Checkout Editor (thank you)"
                 />
                 <GuideStep
                   number={3}
                   title="Connect browse tracking"
-                  description="Open the app in Shopify admin once so the Activity Pixel is created (Settings → Customer events should show Connected). Then in Theme Editor → App embeds, enable Upsell activity. That embed records product, collection, search, and cart-add on the storefront even if the pixel is delayed. Tracking respects Shopify analytics consent."
+                  description="Open App embeds in the Theme Editor and enable the activity embed if it is listed. The Activity Pixel is created when you open this app in Admin. Tracking respects Shopify analytics consent."
+                  href={editor.appEmbeds}
+                  hrefLabel="Open Theme Editor (app embeds)"
                 />
                 <GuideStep
                   number={4}
@@ -346,8 +362,8 @@ export default function OnboardingPage() {
                   <div style={styles.extensionItem}>
                     <div style={styles.extensionDot} />
                     <div>
-                      <strong>Product Discount Function</strong>
-                      <span style={styles.extensionDesc}> — Automatically applies discounts to qualifying upsell products.</span>
+                      <strong>Checkout Upsell</strong>
+                      <span style={styles.extensionDesc}> — Checkout UI extension on the checkout page (Checkout Editor).</span>
                     </div>
                   </div>
                   <div style={styles.extensionItem}>
@@ -475,10 +491,14 @@ function GuideStep({
   number,
   title,
   description,
+  href,
+  hrefLabel,
 }: {
   number: number;
   title: string;
   description: string;
+  href?: string;
+  hrefLabel?: string;
 }) {
   return (
     <div style={styles.guideStep}>
@@ -486,6 +506,11 @@ function GuideStep({
       <div>
         <h4 style={styles.guideStepTitle}>{title}</h4>
         <p style={styles.guideStepDesc}>{description}</p>
+        {href ? (
+          <a href={href} target="_top" rel="noreferrer" style={styles.stepLink}>
+            {hrefLabel ?? "Open editor"} →
+          </a>
+        ) : null}
       </div>
     </div>
   );
