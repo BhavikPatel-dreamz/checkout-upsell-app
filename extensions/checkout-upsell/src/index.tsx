@@ -13,6 +13,8 @@ import {
   ScrollView,
   Button,
   useSettings,
+  useApi,
+  Banner,
 } from "@shopify/ui-extensions-react/checkout";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { offersApiUrl } from "./offersApi";
@@ -40,6 +42,8 @@ export default reactExtension(
 function CheckoutUpsellBlock() {
   const shop = useShop();
   const shopDomain = shop.myshopifyDomain;
+  const { environment } = useApi();
+  const isEditor = Boolean(environment?.editor);
   const settings = useSettings() as { api_base?: string };
   const lines = useCartLines();
   const customer = useCustomer();
@@ -202,7 +206,18 @@ function CheckoutUpsellBlock() {
     };
   }, [shopDomain, lineIds, trackEvent, getCustomerIdentity, settings]);
 
-  if (loading || offers.length === 0) return null;
+  if (loading) return null;
+
+  if (offers.length === 0) {
+    if (!isEditor) return null;
+    return (
+      <Banner status="info" title="Dynamic Dreamz Upsell">
+        No matching checkout offer. On this store: open the app, sync products, create an
+        active Cross-sell with display Checkout, add a trigger product to this cart, and leave
+        App API URL blank.
+      </Banner>
+    );
+  }
 
   return (
     <BlockStack spacing="tight" padding={["base", "none"]}>

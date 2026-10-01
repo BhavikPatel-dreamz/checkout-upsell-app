@@ -6,28 +6,28 @@ application_url = "https://upsell.dreamzapps.com"
 embedded = true
 
 [build]
-# Production URLs stay on Vercel. Do not set true — that rewrites Partner Dashboard
-# to the Cloudflare tunnel and checkout keeps calling /extensions on the tunnel.
-automatically_update_urls_on_dev = true
+# Do not rewrite the live public app to the Cloudflare tunnel.
+# Dev preview uses /extensions on the tunnel; production needs shopify app deploy.
+automatically_update_urls_on_dev = false
 
 [webhooks]
 api_version = "2026-10"
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/orders/paid"
-  topics = [ "orders/paid" ]
+  uri = "/webhooks/gdpr"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/scopes_update"
   topics = [ "app/scopes_update" ]
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/app/uninstalled"
-  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/orders/paid"
+  topics = [ "orders/paid" ]
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/gdpr"
-  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
