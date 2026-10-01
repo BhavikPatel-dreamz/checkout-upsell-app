@@ -5,7 +5,9 @@ import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server";
 import { storeCanUse } from "../models/billing.server";
 import { getOfferAnalyticsForOffer, getOfferTrendMetrics } from "../models/offerAnalytics.server";
+import { AdminAppLink } from "../components/AdminAppLink";
 import db from "../db.server";
+import "../styles/analytics.css";
 
 const colors = {
   border: "#E3E5E7",
@@ -678,9 +680,9 @@ export default function OfferAnalyticsDetailsPage() {
       <div style={{ padding: "1.5rem", fontFamily: "inherit" }}>
         <h1>Analytics</h1>
         <p>Analytics is not included on the Free plan.</p>
-        <button type="button" onClick={() => navigate("/app/billing")}>
+        <AdminAppLink to="/app/billing" className="analytics-locked-button">
           View plans
-        </button>
+        </AdminAppLink>
       </div>
     );
   }

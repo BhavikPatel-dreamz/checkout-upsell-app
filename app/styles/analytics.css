@@ -727,6 +727,10 @@
   background: #008060;
   color: #fff;
   text-decoration: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
   border-radius: 8px;
   padding: 10px 16px;
   font-weight: 600;

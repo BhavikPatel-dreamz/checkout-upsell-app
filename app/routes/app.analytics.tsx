@@ -11,6 +11,7 @@ import {
 } from "../models/offerAnalytics.server";
 import { getBrowseToOfferMetrics } from "../models/browseActivity.server";
 import AnalyticsDashboard from "../components/analytics/AnalyticsDashboard";
+import { AdminAppLink } from "../components/AdminAppLink";
 import "../styles/analytics.css";
 
 async function getProductMetaMap(shop: string, productIds: string[]) {
@@ -104,9 +105,9 @@ export default function AnalyticsPage() {
         <div className="analytics-locked-card">
           <h2>Upgrade for the full report</h2>
           <p>Analytics is not included on the Free plan. Silver includes the full report.</p>
-          <a className="analytics-locked-button" href="/app/billing">
+          <AdminAppLink to="/app/billing" className="analytics-locked-button">
             View plans
-          </a>
+          </AdminAppLink>
         </div>
       </div>
     </div>
