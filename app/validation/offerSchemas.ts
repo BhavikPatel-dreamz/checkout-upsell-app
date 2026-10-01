@@ -9,7 +9,7 @@
 
 import type { OfferType } from "@prisma/client";
 
-import { getOfferTypeConfig, offerRequiresTriggerProducts } from "../config/offerTypes";
+import { getOfferTypeConfig, isPaidDealType, offerRequiresTriggerProducts } from "../config/offerTypes";
 
 export type ValidationResult<T> =
   | { ok: true; data: T }
@@ -63,6 +63,7 @@ export function validateOfferFields(
   body: Record<string, unknown>,
   offerType: OfferType,
   nameKey = "title",
+  options?: { allowPaidDealTypes?: boolean },
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   const config = getOfferTypeConfig(offerType);
@@ -119,9 +120,13 @@ export function validateOfferFields(
   if (config.fields.includes("dealType") && isPresent(body, ["offerType"])) {
     const dealType = stringValue(body, "offerType");
     if (!dealType) errors.offerType = "Select an offer type";
+    if (options?.allowPaidDealTypes === false && isPaidDealType(dealType)) {
+      errors.offerType = "Free and Discount deals require Gold. Use As it is, or upgrade.";
+    }
     const discountValue = fieldValue(body, "discountValue");
     if (
       dealType === "discount" &&
+      options?.allowPaidDealTypes !== false &&
       (discountValue === undefined ||
         discountValue === null ||
         discountValue === "" ||

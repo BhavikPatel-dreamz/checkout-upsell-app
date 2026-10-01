@@ -115,6 +115,8 @@ export interface OfferFormProps {
   products: Product[];
   /** The <fetcher.Form> that owns this component provides the fetcher. */
   fetcherErrors?: ErrorMap;
+  /** Gold-only: Free and Discount. Free/Silver can only use As it is. */
+  allowPaidDealTypes?: boolean;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────
@@ -181,6 +183,7 @@ export default function OfferForm({
   initialData,
   products,
   fetcherErrors = {},
+  allowPaidDealTypes = false,
 }: OfferFormProps) {
   const hasSyncedProducts = products.length > 0;
   const locationOptions = displayLocationOptions(placement);
@@ -282,7 +285,7 @@ export default function OfferForm({
   }, [manualSelections]);
 
   const [dealType, setDealType] = useState<"free" | "discount" | "as-is" | "">(
-    (initialData?.offerType as any) ?? ""
+    allowPaidDealTypes ? ((initialData?.offerType as any) ?? "as-is") : "as-is",
   );
   const [discountValue, setDiscountValue] = useState(
     String(initialData?.discountValue ?? "")
@@ -320,6 +323,7 @@ export default function OfferForm({
     setUpsellProduct(value);
   }
   function selectDealType(value: "free" | "discount" | "as-is") {
+    if (!allowPaidDealTypes && value !== "as-is") return;
     setDealType(value);
   }
 
@@ -466,6 +470,7 @@ export default function OfferForm({
             hasSyncedProducts={hasSyncedProducts}
             fieldIds={typeSpecificFieldIds}
             poolOnly={Boolean(typeConfig.poolOnly)}
+            allowPaidDealTypes={allowPaidDealTypes}
           />
         </SectionRow>
       )}
@@ -684,6 +689,7 @@ function TypeSpecificFields({
   hasSyncedProducts,
   fieldIds,
   poolOnly,
+  allowPaidDealTypes,
 }: {
   state: OfferFormState;
   errors: ErrorMap;
@@ -691,6 +697,7 @@ function TypeSpecificFields({
   hasSyncedProducts: boolean;
   fieldIds: string[];
   poolOnly?: boolean;
+  allowPaidDealTypes: boolean;
 }) {
   return (
     <>
@@ -703,7 +710,9 @@ function TypeSpecificFields({
           poolOnly={poolOnly}
         />
       )}
-      {fieldIds.includes("dealType") && <DealTypeField state={state} errors={errors} />}
+      {fieldIds.includes("dealType") && (
+        <DealTypeField state={state} errors={errors} allowPaidDealTypes={allowPaidDealTypes} />
+      )}
     </>
   );
 }
@@ -870,34 +879,53 @@ function TriggerProductField({
   );
 }
 
-function DealTypeField({ state, errors }: { state: OfferFormState; errors: ErrorMap }) {
+function DealTypeField({
+  state,
+  errors,
+  allowPaidDealTypes,
+}: {
+  state: OfferFormState;
+  errors: ErrorMap;
+  allowPaidDealTypes: boolean;
+}) {
   return (
     <Field label="Offer on Upsell" required error={errors.offerType} last>
       <div style={styles.checkCol}>
-        {DEAL_TYPE_OPTIONS.map((option) => (
-          <div key={option.value}>
-            <Checkbox
-              label={option.label}
-              checked={state.dealType === option.value}
-              onClick={() => state.setDealType(option.value)}
-              noBorder
-            />
-            {option.value === "discount" && state.dealType === "discount" && (
-              <input
-                name="discountValue"
-                type="number"
-                min={0}
-                max={100}
-                placeholder="e.g. 15"
-                className="of-input"
-                style={{ ...styles.input, width: 140, marginLeft: 28, marginTop: 8 }}
-                value={state.discountValue}
-                onChange={(e) => state.setDiscountValue(e.target.value)}
+        {DEAL_TYPE_OPTIONS.map((option) => {
+          const locked = !allowPaidDealTypes && option.value !== "as-is";
+          return (
+            <div key={option.value}>
+              <Checkbox
+                label={locked ? `${option.label} (Gold)` : option.label}
+                checked={state.dealType === option.value}
+                disabled={locked}
+                onClick={() => state.setDealType(option.value)}
+                noBorder
               />
-            )}
-          </div>
-        ))}
+              {option.value === "discount" && state.dealType === "discount" && allowPaidDealTypes && (
+                <input
+                  name="discountValue"
+                  type="number"
+                  min={0}
+                  max={100}
+                  placeholder="e.g. 15"
+                  className="of-input"
+                  style={{ ...styles.input, width: 140, marginLeft: 28, marginTop: 8 }}
+                  value={state.discountValue}
+                  onChange={(e) => state.setDiscountValue(e.target.value)}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
+      {!allowPaidDealTypes ? (
+        <div style={{ ...styles.emptyNotice, marginTop: 10 }}>
+          Free and Discount are not on the Free or Silver plan. This offer uses{" "}
+          <strong>As it is</strong> (full price).{" "}
+          <AdminAppLink to="/app/billing">View plans</AdminAppLink>
+        </div>
+      ) : null}
       <input type="hidden" name="offerType" value={state.dealType} />
     </Field>
   );
@@ -1354,25 +1382,32 @@ function Checkbox({
   checked,
   onClick,
   noBorder,
+  disabled,
 }: {
   label: string;
   checked: boolean;
   onClick: () => void;
   noBorder?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div
       role="checkbox"
       aria-checked={checked}
-      tabIndex={0}
+      aria-disabled={disabled || undefined}
+      tabIndex={disabled ? -1 : 0}
       className={`of-option-card${checked ? " of-option-card-selected" : ""}`}
       style={{
         ...styles.optionCard,
         ...(noBorder ? { border: "none", padding: "10px 0" } : {}),
         ...(checked ? styles.optionCardSelected : {}),
+        ...(disabled ? { opacity: 0.45, cursor: "not-allowed" } : {}),
       }}
-      onClick={onClick}
+      onClick={() => {
+        if (!disabled) onClick();
+      }}
       onKeyDown={(e) => {
+        if (disabled) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onClick();

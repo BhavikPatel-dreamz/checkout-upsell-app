@@ -170,5 +170,12 @@ export function isDealType(value: unknown): value is DealType {
 }
 
 export function normalizeDealType(value: unknown): DealType {
-  return isDealType(value) ? value : "free";
+  return isDealType(value) ? value : "as-is";
+}
+
+/** Free and % discount on the extra product. Free/Silver stay on as-is. */
+export const PAID_DEAL_TYPES: DealType[] = ["free", "discount"];
+
+export function isPaidDealType(value: unknown): boolean {
+  return PAID_DEAL_TYPES.includes(value as DealType);
 }

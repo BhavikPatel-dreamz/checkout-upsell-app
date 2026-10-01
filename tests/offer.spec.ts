@@ -103,6 +103,17 @@ describe("type-aware build + validation", () => {
     }
   });
 
+  it("blocks free and discount deals when the plan is Free or Silver", () => {
+    expect(
+      validateOfferFields(
+        { ...sample, type: OfferType.cross_sell, offerType: "discount", discountValue: 15 },
+        OfferType.cross_sell,
+        "title",
+        { allowPaidDealTypes: false },
+      ).offerType,
+    ).toBe("Free and Discount deals require Gold. Use As it is, or upgrade.");
+  });
+
   it("requires at least one trigger product for cross-sell offers", async () => {
     const result = validateCreateOffer({
       name: "No Trigger Offer",

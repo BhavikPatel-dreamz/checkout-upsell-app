@@ -6,13 +6,15 @@ export type PlanFeature =
   | "checkout_upsell"
   | "post_purchase"
   | "analytics"
-  | "ai_recommend";
+  | "ai_recommend"
+  | "upsell_deals";
 
 export const PLAN_FEATURE_LABELS: Record<PlanFeature, string> = {
   checkout_upsell: "Checkout upsells",
   post_purchase: "Post-purchase upsells",
   analytics: "Analytics",
   ai_recommend: "AI recommendations",
+  upsell_deals: "Free and % discount on the upsell product",
 };
 
 export const PLAN_FEATURE_ORDER: PlanFeature[] = [
@@ -20,6 +22,7 @@ export const PLAN_FEATURE_ORDER: PlanFeature[] = [
   "post_purchase",
   "analytics",
   "ai_recommend",
+  "upsell_deals",
 ];
 
 export interface AppPlan {
@@ -44,7 +47,7 @@ export const APP_PLANS: Record<PlanId, AppPlan> = {
     trialDays: 0,
     offerLimit: 2,
     features: ["checkout_upsell"],
-    summary: "Two checkout offers. Analytics is not included.",
+    summary: "Two checkout offers at full price. Analytics is not included.",
     available: true,
   },
   silver: {
@@ -55,7 +58,7 @@ export const APP_PLANS: Record<PlanId, AppPlan> = {
     trialDays: 15,
     offerLimit: 10,
     features: ["checkout_upsell", "post_purchase", "analytics"],
-    summary: "Up to 10 offers, plus analytics.",
+    summary: "Up to 10 offers, plus analytics. Upsells stay at full catalog price.",
     available: true,
   },
   gold: {
@@ -65,8 +68,8 @@ export const APP_PLANS: Record<PlanId, AppPlan> = {
     currency: "USD",
     trialDays: 15,
     offerLimit: null,
-    features: ["checkout_upsell", "post_purchase", "analytics", "ai_recommend"],
-    summary: "Unlimited upsells, analytics, and AI recommendations.",
+    features: ["checkout_upsell", "post_purchase", "analytics", "ai_recommend", "upsell_deals"],
+    summary: "Unlimited upsells, analytics, AI, and free or discounted upsell deals.",
     available: false,
   },
 };

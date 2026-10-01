@@ -18,6 +18,7 @@ import type { OfferPlacement, OfferType } from "@prisma/client";
 
 import { authenticate } from "../shopify.server";
 import { storeCanUse, storeOfferUsage } from "../models/billing.server";
+import { planAllows } from "../config/billingPlan";
 import {
   buildOfferPayload,
   createOffer,
@@ -38,6 +39,7 @@ import OfferTypeSelector from "../components/OfferTypeSelector";
 import {
   getOfferTypeConfig,
   isOfferPlacement,
+  isPaidDealType,
   normalizeOfferType,
 } from "../config/offerTypes";
 import { validateOfferFields } from "../validation/offerSchemas";
@@ -117,6 +119,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     offerLimit: usage.limit,
     offerCount: usage.count,
     planName: usage.plan.name,
+    allowPaidDealTypes: planAllows(usage.plan.id, "upsell_deals"),
     products,
     placement,
     offerType,
@@ -181,6 +184,12 @@ export async function action({ request }: ActionFunctionArgs) {
     activeTo: String(formData.get("activeTo") || "") || null,
     promotionalTitle: String(formData.get("promotionalTitle") || "").trim(),
   };
+
+  const allowPaidDealTypes = await storeCanUse(session.shop, "upsell_deals");
+  if (!allowPaidDealTypes && isPaidDealType(payload.offerType)) {
+    payload.offerType = "as-is";
+    payload.discountValue = null;
+  }
 
   // Verify manual selections reference products/variants that actually exist
   // in this shop's synced catalog and are paired correctly.
@@ -269,7 +278,7 @@ export async function action({ request }: ActionFunctionArgs) {
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function CreateOfferPage() {
-  const { products, offer, placement, offerType, mode, isSelecting, canCreate, offerLimit, offerCount, planName } =
+  const { products, offer, placement, offerType, mode, isSelecting, canCreate, offerLimit, offerCount, planName, allowPaidDealTypes } =
     useLoaderData<{
       products: Product[];
       offer: any;
@@ -281,6 +290,7 @@ export default function CreateOfferPage() {
       offerLimit: number | null;
       offerCount: number;
       planName: string;
+      allowPaidDealTypes: boolean;
     }>();
   const fetcher = useFetcher<{ errors?: ErrorMap }>();
 
@@ -342,6 +352,7 @@ export default function CreateOfferPage() {
           initialData={offer}
           products={products}
           fetcherErrors={errors}
+          allowPaidDealTypes={allowPaidDealTypes}
         />
 
         <OfferActions mode={mode} submitting={submitting} cancelUrl="/app" />
