@@ -3,7 +3,7 @@ import type { MetaFunction } from "react-router";
 
 const OPERATOR = "Dynamic Dreamz";
 const APP_NAME = "Checkout Upsell App";
-const APP_URL = "https://upsell.dreamzapps.com";
+const APP_URL = "https://dynamicdreamz.com";
 const CONTACT_EMAIL = "support@dynamicdreamz.com";
 const EFFECTIVE_DATE = "1 October 2026";
 
