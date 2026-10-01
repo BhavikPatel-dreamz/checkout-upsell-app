@@ -17,7 +17,7 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>Checkout Upsell App</h1>
+        <h1 className={styles.heading}>Dynamic Dreamz Upsell</h1>
         <p className={styles.text}>
           Related products in cart, Shopify Checkout, and thank-you. Install and open the
           app from the Shopify App Store or Shopify Admin. Store URLs are not entered here.

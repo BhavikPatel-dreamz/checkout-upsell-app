@@ -124,7 +124,7 @@ export default function OnboardingPage() {
               <WelcomeIcon />
             </div>
             <div>
-              <h1 style={styles.welcomeTitle}>Welcome to Checkout Upsell</h1>
+              <h1 style={styles.welcomeTitle}>Welcome to Dynamic Dreamz Upsell</h1>
               <p style={styles.welcomeSubtitle}>
                 Set up your first upsell offer in minutes. Follow the steps below
                 to start increasing your average order value.

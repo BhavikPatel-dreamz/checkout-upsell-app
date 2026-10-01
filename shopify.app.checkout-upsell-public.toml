@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "7bc495cef52d80d38b17f5f420dc57c3"
-name = "Checkout Upsell Public App"
+name = "Dynamic Dreamz Upsell"
 application_url = "https://upsell.dreamzapps.com"
 embedded = true
 
