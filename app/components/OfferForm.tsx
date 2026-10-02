@@ -1957,16 +1957,24 @@ function DateRangePicker({
 
   function handleDayClick(date: Date) {
     const iso = toISO(date);
-    if (!tempFrom || (tempFrom && tempTo)) {
+    if (!tempFrom) {
       setTempFrom(iso);
       setTempTo("");
+      setError("");
+    } else if (tempTo) {
+      // Both dates already selected, start new selection
+      setTempFrom(iso);
+      setTempTo("");
+      setError("");
     } else {
+      // Selecting end date
       if (iso < tempFrom) {
         setTempTo(tempFrom);
         setTempFrom(iso);
       } else {
         setTempTo(iso);
       }
+      setError("");
     }
   }
 
