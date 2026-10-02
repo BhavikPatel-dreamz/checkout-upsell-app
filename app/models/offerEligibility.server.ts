@@ -4,6 +4,7 @@ import { getOfferTypeConfig } from "../config/offerTypes";
 import type { IdentityLookup } from "./browseActivity.server";
 import { MAX_UPSELL_PRODUCTS, type EligibleOfferPayload } from "./eligibleOffer";
 import { rankAiRecommendPool } from "./offerRanker.server";
+import { setHasShopifyId, shopifyIdAliases, shopifyIdSet } from "../lib/shopifyIds";
 
 export { MAX_UPSELL_PRODUCTS, type EligibleOfferPayload } from "./eligibleOffer";
 
@@ -59,18 +60,19 @@ export async function findEligibleCrossSellOffers(options: {
 
   let derivedProductIds: string[] = [];
   if (variantIds && variantIds.length > 0) {
+    const lookup = Array.from(shopifyIdSet(variantIds, "ProductVariant"));
     const rows = await db.productVariant.findMany({
-      where: { shop, variantId: { in: variantIds } },
+      where: { shop, variantId: { in: lookup } },
       select: { productId: true },
     });
     derivedProductIds = rows.map((r) => r.productId);
   }
 
   const cartProductIds = Array.from(new Set([...(productIds || []), ...derivedProductIds]));
-  const cartVariantIdSet = new Set(variantIds);
-  const cartProductIdSet = new Set(cartProductIds);
-  const excludedVariantIdSet = new Set(excludeVariantIds);
-  const excludedProductIdSet = new Set(excludeProductIds);
+  const cartVariantIdSet = shopifyIdSet(variantIds, "ProductVariant");
+  const cartProductIdSet = shopifyIdSet(cartProductIds, "Product");
+  const excludedVariantIdSet = shopifyIdSet(excludeVariantIds, "ProductVariant");
+  const excludedProductIdSet = shopifyIdSet(excludeProductIds, "Product");
 
   const results: EligibleOfferPayload[] = [];
   const seenVariantIds = new Set<string>();
@@ -78,7 +80,7 @@ export async function findEligibleCrossSellOffers(options: {
   for (const offer of offers) {
     const targets: string[] = Array.isArray(offer.targetProductIds) ? offer.targetProductIds : [];
     if (targets.length === 0) continue;
-    if (!cartProductIds.some((id) => targets.includes(id))) continue;
+    if (!targets.some((id) => setHasShopifyId(cartProductIdSet, id, "Product"))) continue;
 
     const triggerRules = (offer.triggerRules ?? {}) as Record<string, unknown>;
     if (displayLocation) {
@@ -106,14 +108,27 @@ export async function findEligibleCrossSellOffers(options: {
 
     for (const sel of selections) {
       if (!sel || typeof sel.variantId !== "string") continue;
-      if (cartVariantIdSet.has(sel.variantId) || excludedVariantIdSet.has(sel.variantId)) continue;
+      if (
+        setHasShopifyId(cartVariantIdSet, sel.variantId, "ProductVariant") ||
+        setHasShopifyId(excludedVariantIdSet, sel.variantId, "ProductVariant")
+      ) {
+        continue;
+      }
       if (seenVariantIds.has(sel.variantId)) continue;
 
       const pv = await db.productVariant.findFirst({
-        where: { shop, variantId: sel.variantId, availableForSale: true },
+        where: {
+          shop,
+          variantId: { in: shopifyIdAliases(sel.variantId, "ProductVariant") },
+        },
       });
       if (!pv) continue;
-      if (cartProductIdSet.has(pv.productId) || excludedProductIdSet.has(pv.productId)) continue;
+      if (
+        setHasShopifyId(cartProductIdSet, pv.productId, "Product") ||
+        setHasShopifyId(excludedProductIdSet, pv.productId, "Product")
+      ) {
+        continue;
+      }
 
       pool.push({
         offerId: offer.id,

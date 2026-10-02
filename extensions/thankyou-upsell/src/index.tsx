@@ -64,6 +64,7 @@ function ThankYouUpsellBlock() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [debugNote, setDebugNote] = useState("Loading thank-you upsell…");
 
   const getCustomerIdentity = useCallback(async (): Promise<{
     customerId: string | null;
@@ -189,12 +190,14 @@ function ThankYouUpsellBlock() {
 
         if (!shopDomain) {
           log("stop: no shop domain");
+          setDebugNote("No shop domain from Shopify.");
           setLoading(false);
           return;
         }
 
         if (lineIds.productIds.length === 0 && lineIds.variantIds.length === 0) {
           log("stop: order has no product/variant ids");
+          setDebugNote("Thank you has no line items. Complete a real order with the trigger product.");
           setLoading(false);
           return;
         }
@@ -218,6 +221,7 @@ function ThankYouUpsellBlock() {
         log("response", { status: res.status, ok: res.ok, body: bodyText.slice(0, 800) });
         if (!res.ok) {
           log("stop: API not ok");
+          setDebugNote(`API ${res.status}: ${bodyText.slice(0, 180)}`);
           setLoading(false);
           return;
         }
@@ -230,9 +234,13 @@ function ThankYouUpsellBlock() {
           for (const offer of data.offers) void trackEvent("viewed", offer);
         } else {
           log("stop: zero matching offers (need Active Cross-sell, Thank you display, trigger in the order)");
+          setDebugNote(
+            `API 200 but 0 offers. Shop ${shopDomain}. Need an Active Cross-sell with Display = Thank you and this order’s product as trigger.`,
+          );
         }
       } catch (err) {
         console.error("[DD Upsell thankyou] fetch error", err);
+        setDebugNote(`Fetch failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -245,7 +253,13 @@ function ThankYouUpsellBlock() {
   }, [shopDomain, lineIds, trackEvent, getCustomerIdentity, settings]);
 
   if (dismissed) return null;
-  if (loading || offers.length === 0) return null;
+  if (loading || offers.length === 0) {
+    return (
+      <s-banner heading="Dynamic Dreamz Upsell" tone="warning">
+        {debugNote}
+      </s-banner>
+    );
+  }
 
   return (
     <s-stack direction="block" gap="base">

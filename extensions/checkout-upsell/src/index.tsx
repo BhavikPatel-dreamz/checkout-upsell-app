@@ -44,6 +44,7 @@ function CheckoutUpsellBlock() {
   const [offers, setOffers] = useState<EligibleOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [debugNote, setDebugNote] = useState("Loading upsell…");
 
   const getCustomerIdentity = useCallback(async (): Promise<{
     customerId: string | null;
@@ -162,12 +163,14 @@ function CheckoutUpsellBlock() {
 
         if (!shopDomain) {
           log("stop: no shop domain");
+          setDebugNote("No shop domain from Shopify.");
           setLoading(false);
           return;
         }
 
         if (lineIds.productIds.length === 0 && lineIds.variantIds.length === 0) {
           log("stop: cart has no product/variant ids");
+          setDebugNote("Cart has no product IDs yet. Add a trigger product, then reload checkout.");
           setLoading(false);
           return;
         }
@@ -191,6 +194,7 @@ function CheckoutUpsellBlock() {
         log("response", { status: res.status, ok: res.ok, body: bodyText.slice(0, 800) });
         if (!res.ok) {
           log("stop: API not ok");
+          setDebugNote(`API ${res.status}: ${bodyText.slice(0, 180)}`);
           setLoading(false);
           return;
         }
@@ -203,9 +207,13 @@ function CheckoutUpsellBlock() {
           for (const offer of data.offers) void trackEvent("viewed", offer);
         } else {
           log("stop: zero matching offers (check trigger product, placement Checkout, offer Active)");
+          setDebugNote(
+            `API 200 but 0 offers. Shop ${shopDomain}. Products ${lineIds.productIds.length}. Need an Active Cross-sell with Display = Checkout and the cart product as trigger.`,
+          );
         }
       } catch (err) {
         console.error("[DD Upsell checkout] fetch error", err);
+        setDebugNote(`Fetch failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -217,15 +225,14 @@ function CheckoutUpsellBlock() {
     };
   }, [shopDomain, lineIds, trackEvent, getCustomerIdentity, settings]);
 
-  if (loading) return null;
+  if (loading) {
+    return <s-banner heading="Dynamic Dreamz Upsell">{debugNote}</s-banner>;
+  }
 
   if (offers.length === 0) {
-    if (!isEditor) return null;
     return (
-      <s-banner heading="Dynamic Dreamz Upsell" tone="info">
-        No matching checkout offer. On this store: open the app, sync products, create an
-        active Cross-sell with display Checkout, add a trigger product to this cart, and leave
-        App API URL blank.
+      <s-banner heading="Dynamic Dreamz Upsell" tone="warning">
+        {debugNote}
       </s-banner>
     );
   }
