@@ -1,19 +1,13 @@
+import "@shopify/ui-extensions/preact";
+import { render } from "preact";
+import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import {
-  reactExtension,
   useShop,
   useCartLines,
-  useCustomer,
   useStorage,
   useSettings,
-  Image,
-  Text,
-  View,
-  BlockStack,
-  InlineLayout,
-  ScrollView,
-  Button,
-} from "@shopify/ui-extensions-react/checkout";
-import { useState, useEffect, useCallback, useMemo } from "react";
+  useApi,
+} from "@shopify/ui-extensions/checkout/preact";
 import { offersApiUrl } from "./offersApi";
 
 interface EligibleOffer {
@@ -32,10 +26,9 @@ interface EligibleOffer {
 const GUEST_STORAGE_KEY = "checkout-upsell-guest-key";
 const DISMISS_STORAGE_KEY = "checkout-upsell-thankyou-dismissed";
 
-export default reactExtension(
-  "purchase.thank-you.block.render",
-  () => <ThankYouUpsellBlock />,
-);
+export default async () => {
+  render(<ThankYouUpsellBlock />, document.body);
+};
 
 function numericIdFromGid(gid: string): string | null {
   const match = gid.match(/(\d+)\s*$/);
@@ -45,18 +38,26 @@ function numericIdFromGid(gid: string): string | null {
 function ThankYouUpsellBlock() {
   const shop = useShop();
   const shopDomain = shop.myshopifyDomain;
-  const settings = useSettings() as { api_base?: string };
+  const settings = useSettings() as {
+    api_base?: string;
+    heading_text?: string;
+    button_label?: string;
+    use_secondary_button?: boolean;
+    price_standard_appearance?: boolean;
+    card_spacing?: string;
+    show_border?: boolean;
+  };
   const lines = useCartLines();
-  const customer = useCustomer();
+  const api = useApi();
+  const customer = api.buyerIdentity?.customer?.value;
   const storage = useStorage();
 
-  const headingText = (settings.heading_text as string) || "You may also like";
-  const buttonLabel = (settings.button_label as string) || "Order";
-  const buttonKind: "primary" | "secondary" = settings.use_secondary_button === true ? "secondary" : "primary";
-  const priceAppearance = settings.price_standard_appearance === true ? undefined : "subdued";
-  const rawSpacing = (settings.card_spacing as string | undefined)?.trim().toLowerCase();
-  const cardSpacing: "tight" | "base" | "loose" =
-    rawSpacing === "base" || rawSpacing === "loose" ? rawSpacing : "tight";
+  const headingText = settings.heading_text || "You may also like";
+  const buttonLabel = settings.button_label || "Order";
+  const buttonVariant = settings.use_secondary_button === true ? "secondary" : "primary";
+  const priceTone = settings.price_standard_appearance === true ? "auto" : "neutral";
+  const rawSpacing = settings.card_spacing?.trim().toLowerCase();
+  const cardGap = rawSpacing === "base" || rawSpacing === "loose" ? rawSpacing : "small";
   const showBorder = settings.show_border !== false;
 
   const [offers, setOffers] = useState<EligibleOffer[]>([]);
@@ -153,11 +154,6 @@ function ThankYouUpsellBlock() {
     [processing, shopDomain, buildAcceptUrl, trackEvent],
   );
 
-  const handleDismiss = useCallback(() => {
-    setDismissed(true);
-    void storage.write(DISMISS_STORAGE_KEY, true);
-  }, [storage]);
-
   useEffect(() => {
     let cancelled = false;
     void storage.read(DISMISS_STORAGE_KEY).then((value) => {
@@ -234,93 +230,47 @@ function ThankYouUpsellBlock() {
   if (loading || offers.length === 0) return null;
 
   return (
-    <BlockStack spacing="tight" padding={["base", "none"]}>
-      <Text emphasis="bold" size="medium">
-        {headingText}
-      </Text>
-
-      <ScrollView direction="inline">
-        <InlineLayout
-          spacing="base"
-          blockAlignment="start"
-          columns={offers.map(() => 180)}
-        >
+    <s-stack direction="block" gap="base">
+      <s-heading>{headingText}</s-heading>
+      <s-scroll-box>
+        <s-stack direction="inline" gap="base">
           {offers.map((o) => (
-            <View
+            <s-box
               key={`${o.offerId}-${o.variantId}`}
-              minBlockSize={330}
-              maxBlockSize={330}
-              overflow="hidden"
+              padding="base"
               border={showBorder ? "base" : "none"}
               borderRadius="base"
-              padding="base"
             >
-              <BlockStack spacing={cardSpacing}>
-                <View
-                  minInlineSize={136}
-                  maxInlineSize={136}
-                  minBlockSize={136}
-                  maxBlockSize={136}
-                  cornerRadius="base"
-                >
-                  {o.imageUrl ? (
-                    <Image
-                      source={o.imageUrl}
-                      accessibilityDescription={o.productTitle}
-                      fit="cover"
-                      cornerRadius="base"
-                    />
-                  ) : (
-                    <View
-                      minInlineSize={136}
-                      maxInlineSize={136}
-                      minBlockSize={136}
-                      maxBlockSize={136}
-                      background="subdued"
-                      cornerRadius="base"
-                    />
-                  )}
-                </View>
-
-                <View minBlockSize={96} maxBlockSize={96} overflow="hidden">
-                  <BlockStack spacing="extraTight" inlineAlignment="start">
-                    {o.promotionalTitle && (
-                      <Text emphasis="bold" size="small" appearance="subdued">
-                        {o.promotionalTitle}
-                      </Text>
-                    )}
-                    <Text emphasis="bold" size="small">
-                      {o.productTitle}
-                    </Text>
-                    {o.variantTitle && (
-                      <Text size="small" appearance="subdued">
-                        {o.variantTitle}
-                      </Text>
-                    )}
-                    {o.price && (
-                      <Text size="small" appearance={priceAppearance}>
-                        ${o.price}
-                      </Text>
-                    )}
-                  </BlockStack>
-                </View>
-
-                <View minBlockSize={84} maxBlockSize={84} overflow="hidden">
-                  <AcceptButton
-                    offer={o}
-                    processing={processing}
-                    buildAcceptUrl={buildAcceptUrl}
-                    onAccept={handleAccept}
-                    buttonLabel={buttonLabel}
-                    buttonKind={buttonKind}
-                  />
-                </View>
-              </BlockStack>
-            </View>
+              <s-stack direction="block" gap={cardGap}>
+                {o.imageUrl ? (
+                  <s-image src={o.imageUrl} alt={o.productTitle} />
+                ) : (
+                  <s-box padding="large" background="subdued" />
+                )}
+                <s-stack direction="block" gap="small">
+                  {o.promotionalTitle ? (
+                    <s-text tone="neutral">{o.promotionalTitle}</s-text>
+                  ) : null}
+                  <s-text>{o.productTitle}</s-text>
+                  {o.variantTitle ? (
+                    <s-text tone="neutral">{o.variantTitle}</s-text>
+                  ) : null}
+                  {o.price ? <s-text tone={priceTone}>${o.price}</s-text> : null}
+                </s-stack>
+                <AcceptButton
+                  offer={o}
+                  processing={processing}
+                  buildAcceptUrl={buildAcceptUrl}
+                  onAccept={handleAccept}
+                  buttonLabel={buttonLabel}
+                  buttonVariant={buttonVariant}
+                />
+              </s-stack>
+            </s-box>
           ))}
-        </InlineLayout>
-      </ScrollView>
-    </BlockStack>
+        </s-stack>
+      </s-scroll-box>
+    </s-stack>
   );
 }
 
@@ -330,14 +280,14 @@ function AcceptButton({
   buildAcceptUrl,
   onAccept,
   buttonLabel,
-  buttonKind,
+  buttonVariant,
 }: {
   offer: EligibleOffer;
   processing: boolean;
   buildAcceptUrl: (offer: EligibleOffer) => Promise<string | null>;
   onAccept: (offer: EligibleOffer) => void;
   buttonLabel: string;
-  buttonKind: "primary" | "secondary";
+  buttonVariant: "primary" | "secondary";
 }) {
   const [href, setHref] = useState<string | undefined>(undefined);
 
@@ -352,14 +302,13 @@ function AcceptButton({
   }, [offer, buildAcceptUrl]);
 
   return (
-    <Button
-      kind={buttonKind}
-      to={href}
-      onPress={() => onAccept(offer)}
+    <s-button
+      variant={buttonVariant}
+      href={href}
       disabled={processing || !href}
-      accessibilityLabel="Add this item to your order"
+      onClick={() => onAccept(offer)}
     >
       {buttonLabel}
-    </Button>
+    </s-button>
   );
-} 
+}

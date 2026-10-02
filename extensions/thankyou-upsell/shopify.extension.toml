@@ -1,5 +1,5 @@
 uid = "c8f1a4e2-7b93-4d16-a0e5-3f9c2b8d1a70e6c4b5d8"
-api_version = "2025-07"
+api_version = "2025-10"
 
 [[extensions]]
 name = "Thank You Upsell"

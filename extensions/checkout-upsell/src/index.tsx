@@ -1,22 +1,15 @@
+import "@shopify/ui-extensions/preact";
+import { render } from "preact";
+import { useState, useEffect, useCallback, useMemo } from "preact/hooks";
 import {
-  reactExtension,
   useShop,
   useCartLines,
-  useCustomer,
   useStorage,
   useApplyCartLinesChange,
-  Image,
-  Text,
-  View,
-  BlockStack,
-  InlineLayout,
-  ScrollView,
-  Button,
   useSettings,
+  useExtensionEditor,
   useApi,
-  Banner,
-} from "@shopify/ui-extensions-react/checkout";
-import { useState, useEffect, useCallback, useMemo } from "react";
+} from "@shopify/ui-extensions/checkout/preact";
 import { offersApiUrl } from "./offersApi";
 
 interface EligibleOffer {
@@ -34,19 +27,18 @@ interface EligibleOffer {
 
 const GUEST_STORAGE_KEY = "checkout-upsell-guest-key";
 
-export default reactExtension(
-  "purchase.checkout.block.render",
-  () => <CheckoutUpsellBlock />,
-);
+export default async () => {
+  render(<CheckoutUpsellBlock />, document.body);
+};
 
 function CheckoutUpsellBlock() {
   const shop = useShop();
   const shopDomain = shop.myshopifyDomain;
-  const { environment } = useApi();
-  const isEditor = Boolean(environment?.editor);
+  const isEditor = Boolean(useExtensionEditor());
   const settings = useSettings() as { api_base?: string };
   const lines = useCartLines();
-  const customer = useCustomer();
+  const api = useApi();
+  const customer = api.buyerIdentity?.customer?.value;
   const storage = useStorage();
   const applyCartLinesChange = useApplyCartLinesChange();
   const [offers, setOffers] = useState<EligibleOffer[]>([]);
@@ -211,101 +203,49 @@ function CheckoutUpsellBlock() {
   if (offers.length === 0) {
     if (!isEditor) return null;
     return (
-      <Banner status="info" title="Dynamic Dreamz Upsell">
+      <s-banner heading="Dynamic Dreamz Upsell" tone="info">
         No matching checkout offer. On this store: open the app, sync products, create an
         active Cross-sell with display Checkout, add a trigger product to this cart, and leave
         App API URL blank.
-      </Banner>
+      </s-banner>
     );
   }
 
   return (
-    <BlockStack spacing="tight" padding={["base", "none"]}>
-      <Text emphasis="bold" size="medium">
-        You may also like
-      </Text>
-
-      <ScrollView direction="inline">
-        <InlineLayout
-          spacing="base"
-          blockAlignment="start"
-          columns={offers.map(() => 180)}
-        >
+    <s-stack direction="block" gap="base">
+      <s-heading>You may also like</s-heading>
+      <s-scroll-box>
+        <s-stack direction="inline" gap="base">
           {offers.map((o) => (
-            <View
-              key={`${o.offerId}-${o.variantId}`}
-              minBlockSize={330}
-              maxBlockSize={330}
-              overflow="hidden"
-              border="base"
-              borderRadius="base"
-              padding="base"
-            >
-              <BlockStack spacing="tight">
-                <View
-                  minInlineSize={136}
-                  maxInlineSize={136}
-                  minBlockSize={136}
-                  maxBlockSize={136}
-                  cornerRadius="base"
+            <s-box key={`${o.offerId}-${o.variantId}`} padding="base" border="base" borderRadius="base">
+              <s-stack direction="block" gap="base">
+                {o.imageUrl ? (
+                  <s-image src={o.imageUrl} alt={o.productTitle} />
+                ) : (
+                  <s-box padding="large" background="subdued" />
+                )}
+                <s-stack direction="block" gap="small">
+                  {o.promotionalTitle ? (
+                    <s-text tone="neutral">{o.promotionalTitle}</s-text>
+                  ) : null}
+                  <s-text>{o.productTitle}</s-text>
+                  {o.variantTitle ? (
+                    <s-text tone="neutral">{o.variantTitle}</s-text>
+                  ) : null}
+                  {o.price ? <s-text tone="neutral">${o.price}</s-text> : null}
+                </s-stack>
+                <s-button
+                  variant="primary"
+                  disabled={processing}
+                  onClick={() => handleAccept(o)}
                 >
-                  {o.imageUrl ? (
-                    <Image
-                      source={o.imageUrl}
-                      accessibilityDescription={o.productTitle}
-                      fit="cover"
-                      cornerRadius="base"
-                    />
-                  ) : (
-                    <View
-                      minInlineSize={136}
-                      maxInlineSize={136}
-                      minBlockSize={136}
-                      maxBlockSize={136}
-                      background="subdued"
-                      cornerRadius="base"
-                    />
-                  )}
-                </View>
-
-                <View minBlockSize={96} maxBlockSize={96} overflow="hidden">
-                  <BlockStack spacing="extraTight" inlineAlignment="start">
-                    {o.promotionalTitle && (
-                      <Text emphasis="bold" size="small" appearance="subdued">
-                        {o.promotionalTitle}
-                      </Text>
-                    )}
-                    <Text emphasis="bold" size="small">
-                      {o.productTitle}
-                    </Text>
-                    {o.variantTitle && (
-                      <Text size="small" appearance="subdued">
-                        {o.variantTitle}
-                      </Text>
-                    )}
-                    {o.price && (
-                      <Text size="small" appearance="subdued">
-                        ${o.price}
-                      </Text>
-                    )}
-                  </BlockStack>
-                </View>
-
-                <View minBlockSize={84} maxBlockSize={84} overflow="hidden">
-                  <Button
-                    kind="primary"
-                    onPress={() => handleAccept(o)}
-                    disabled={processing}
-                    accessibilityLabel="Add this item to checkout"
-                  >
-                    Add
-                  </Button>
-                </View>
-              </BlockStack>
-            </View>
+                  Add
+                </s-button>
+              </s-stack>
+            </s-box>
           ))}
-        </InlineLayout>
-      </ScrollView>
-    </BlockStack>
+        </s-stack>
+      </s-scroll-box>
+    </s-stack>
   );
 }
