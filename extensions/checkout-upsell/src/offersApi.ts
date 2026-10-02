@@ -124,11 +124,9 @@ export async function postOfferEvent(
 ) {
   const settings = (shopify.settings.value ?? {}) as { api_base?: string };
   try {
-    const token = await shopify.sessionToken.get();
     await fetch(offersApiUrl(path, settings), {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

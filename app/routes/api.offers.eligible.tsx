@@ -16,12 +16,12 @@ function parseCsvParam(value: string | null): string[] {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  if (request.method === "OPTIONS") return corsPreflight();
-  return jsonWithCors({ error: "Method not allowed" }, { status: 405 });
+  if (request.method === "OPTIONS") return corsPreflight(request);
+  return jsonWithCors({ error: "Method not allowed" }, { status: 405 }, request);
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  if (request.method === "OPTIONS") return corsPreflight();
+  if (request.method === "OPTIONS") return corsPreflight(request);
 
   let shop: string | null = shopFromCheckoutSessionToken(request);
   const url = new URL(request.url);
@@ -50,7 +50,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   if (!shop) {
-    return jsonWithCors({ errors: { shop: "Shop domain is required." } }, { status: 400 });
+    return jsonWithCors({ errors: { shop: "Shop domain is required." } }, { status: 400 }, request);
   }
 
   const placementParam = url.searchParams.get("placement");
@@ -58,6 +58,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return jsonWithCors(
       { errors: { placement: "placement is required (checkout | cart_drawer | product_page | post_purchase)." } },
       { status: 400 },
+      request,
     );
   }
 
@@ -75,6 +76,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return jsonWithCors(
       { errors: { placement: "placement must be one of: checkout, cart_drawer, product_page, post_purchase" } },
       { status: 400 },
+      request,
     );
   }
 
@@ -87,6 +89,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return jsonWithCors(
       { errors: { cart: "At least one of productIds or variantIds is required (comma-separated)." } },
       { status: 400 },
+      request,
     );
   }
 
@@ -126,5 +129,5 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     names: offers.map((row) => row.offerName ?? row.offerId),
   });
 
-  return jsonWithCors({ offers });
+  return jsonWithCors({ offers }, undefined, request);
 };
