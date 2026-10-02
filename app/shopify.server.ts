@@ -9,6 +9,7 @@ import prisma from "./db.server";
 import { env } from "./env.server";
 import { ensureWebPixel } from "./lib/ensureWebPixel.server";
 import { allowShopDataStorage } from "./models/gdpr.server";
+import { syncBillingFromShopify } from "./models/billing.server";
 
 const shopify = shopifyApp({
   apiKey: env.shopifyApiKey,
@@ -26,6 +27,7 @@ const shopify = shopifyApp({
     afterAuth: async ({ admin, session }) => {
       await allowShopDataStorage(session.shop);
       await ensureWebPixel(admin, session.shop);
+      await syncBillingFromShopify(session.shop, admin);
     },
   },
   ...(env.shopCustomDomain

@@ -10,12 +10,12 @@ import {
   planSelectionUrl,
   subscriptionManageUrl,
 } from "../config/billingPlan";
-import { ensureCurrentPlanHistory, ensureStoreBillingOffer, listSubscriptionHistory, setStorePlan } from "../models/billing.server";
+import { ensureCurrentPlanHistory, listSubscriptionHistory, setStorePlan, syncBillingFromShopify } from "../models/billing.server";
 import "../styles/billing.css";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
-  const offer = await ensureStoreBillingOffer(session.shop);
+  const { admin, session } = await authenticate.admin(request);
+  const offer = await syncBillingFromShopify(session.shop, admin);
   await ensureCurrentPlanHistory(session.shop);
   const history = await listSubscriptionHistory(session.shop);
   const appHandle = process.env.SHOPIFY_APP_HANDLE?.trim() || "";

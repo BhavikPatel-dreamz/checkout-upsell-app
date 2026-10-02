@@ -6,11 +6,13 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
 import { ensureWebPixel } from "../lib/ensureWebPixel.server";
 import { ensureShopDataPolicy } from "../models/gdpr.server";
+import { syncBillingFromShopify } from "../models/billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   await ensureShopDataPolicy(session.shop);
   await ensureWebPixel(admin, session.shop);
+  await syncBillingFromShopify(session.shop, admin);
 
   return {
     // eslint-disable-next-line no-undef
