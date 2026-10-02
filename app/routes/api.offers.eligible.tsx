@@ -112,5 +112,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     max: placement === OfferPlacement.product_page ? eligible.length : undefined,
   });
 
+  console.info("[DD Upsell eligible]", {
+    shop,
+    placement,
+    displayLocation,
+    productIds,
+    variantIds,
+    eligible: eligible.length,
+    ranked: offers.length,
+    names: offers.map((row) => row.offerName ?? row.offerId),
+  });
+
   return jsonWithCors({ offers });
 };

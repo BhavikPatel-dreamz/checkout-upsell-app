@@ -150,13 +150,24 @@ function CheckoutUpsellBlock() {
     let cancelled = false;
 
     async function fetchOffer() {
+      const log = (...args: unknown[]) => console.info("[DD Upsell checkout]", ...args);
       try {
+        log("start", {
+          shopDomain,
+          apiBaseSetting: settings.api_base || "(blank → production)",
+          editor: isEditor,
+          productIds: lineIds.productIds,
+          variantIds: lineIds.variantIds,
+        });
+
         if (!shopDomain) {
+          log("stop: no shop domain");
           setLoading(false);
           return;
         }
 
         if (lineIds.productIds.length === 0 && lineIds.variantIds.length === 0) {
+          log("stop: cart has no product/variant ids");
           setLoading(false);
           return;
         }
@@ -172,21 +183,29 @@ function CheckoutUpsellBlock() {
         if (customerId) params.set("customerId", customerId);
         if (guestKey) params.set("guestKey", guestKey);
 
-        const res = await fetch(
-          `${offersApiUrl("eligible", settings)}?${params.toString()}`,
-        );
+        const url = `${offersApiUrl("eligible", settings)}?${params.toString()}`;
+        log("fetch", url);
+
+        const res = await fetch(url);
+        const bodyText = await res.text();
+        log("response", { status: res.status, ok: res.ok, body: bodyText.slice(0, 800) });
         if (!res.ok) {
+          log("stop: API not ok");
           setLoading(false);
           return;
         }
 
-        const data = (await res.json()) as { offers?: EligibleOffer[] };
+        const data = JSON.parse(bodyText) as { offers?: EligibleOffer[] };
+        const count = data?.offers?.length ?? 0;
+        log("offers", count, data?.offers?.map((o) => o.offerName) ?? []);
         if (!cancelled && data?.offers && data.offers.length > 0) {
           setOffers(data.offers);
           for (const offer of data.offers) void trackEvent("viewed", offer);
+        } else {
+          log("stop: zero matching offers (check trigger product, placement Checkout, offer Active)");
         }
       } catch (err) {
-        console.error("Checkout upsell fetch error:", err);
+        console.error("[DD Upsell checkout] fetch error", err);
       } finally {
         if (!cancelled) setLoading(false);
       }
