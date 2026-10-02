@@ -4,6 +4,7 @@ import { OfferPlacement } from "@prisma/client";
 import { authenticate } from "../shopify.server";
 import { findEligibleCrossSellOffers } from "../models/offerEligibility.server";
 import { rankEligibleOffers } from "../models/offerRanker.server";
+import { shopFromCheckoutSessionToken } from "../lib/checkoutSessionToken.server";
 
 function isValidShopDomain(value: unknown): value is string {
   return typeof value === "string" && /^[a-z0-9-]+\.myshopify\.com$/.test(value);
@@ -22,12 +23,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (request.method === "OPTIONS") return corsPreflight();
 
-  let shop: string | null = null;
+  let shop: string | null = shopFromCheckoutSessionToken(request);
   const url = new URL(request.url);
 
-  const proxyShop = request.headers.get("x-shopify-shop-domain");
-  if (proxyShop && isValidShopDomain(proxyShop)) {
-    shop = proxyShop;
+  if (!shop) {
+    const proxyShop = request.headers.get("x-shopify-shop-domain");
+    if (proxyShop && isValidShopDomain(proxyShop)) {
+      shop = proxyShop;
+    }
   }
 
   if (!shop) {
