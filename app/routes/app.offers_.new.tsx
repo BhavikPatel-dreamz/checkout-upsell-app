@@ -14,6 +14,7 @@
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useFetcher, useLoaderData, redirect } from "react-router";
+import { useRef, useEffect } from "react";
 import type { OfferPlacement, OfferType } from "@prisma/client";
 
 import { authenticate } from "../shopify.server";
@@ -296,6 +297,33 @@ export default function CreateOfferPage() {
 
   const errors = fetcher.data?.errors || {};
   const submitting = fetcher.state === "submitting";
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (Object.keys(errors).length > 0 && formRef.current) {
+      setTimeout(() => {
+        const firstErrorKey = Object.keys(errors)[0];
+        const form = formRef.current;
+        if (!form) return;
+        // Try to find visible element first (for radio groups, selects, etc.)
+        let errorElement = form.querySelector(`[name="${firstErrorKey}"]:not([type="hidden"])`) ||
+          form.querySelector(`[data-error="${firstErrorKey}"]`);
+        // Fallback to hidden input and find its visible parent (Field container)
+        if (!errorElement) {
+          const hiddenInput = form.querySelector(`[name="${firstErrorKey}"][type="hidden"]`);
+          if (hiddenInput) {
+            // Field component wraps in div with marginBottom style
+            errorElement = hiddenInput.closest('[style*="marginBottom"]') || 
+              hiddenInput.closest('div') || hiddenInput.parentElement;
+          }
+        }
+        if (errorElement) {
+          errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
+          (errorElement as HTMLElement).focus({ preventScroll: true });
+        }
+      }, 0);
+    }
+  }, [errors]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -306,7 +334,7 @@ export default function CreateOfferPage() {
     return (
       <div className="analytics-locked">
         <div className="analytics-locked-blur" aria-hidden="true">
-          <OfferFormPage mode="create" offerType={offerType} placement={placement}>
+          <OfferFormPage mode="create" offerType={offerType} placement={placement} isSelecting>
             <OfferTypeSelector />
           </OfferFormPage>
         </div>
@@ -328,7 +356,7 @@ export default function CreateOfferPage() {
 
   if (isSelecting) {
     return (
-      <OfferFormPage mode="create" offerType={offerType} placement={placement}>
+      <OfferFormPage mode="create" offerType={offerType} placement={placement} isSelecting>
         <OfferTypeSelector />
       </OfferFormPage>
     );
@@ -339,7 +367,8 @@ export default function CreateOfferPage() {
       <fetcher.Form
         method="post"
         onSubmit={handleSubmit}
-        style={{ padding: "24px 0 40px", maxWidth: 900 }}
+        ref={formRef}
+        style={{ padding: "0 0 40px", width: "100%", margin: "0 auto" }}
       >
         {offer?.id ? (
           <input type="hidden" name="offerId" value={offer.id} />
@@ -355,7 +384,7 @@ export default function CreateOfferPage() {
           allowPaidDealTypes={allowPaidDealTypes}
         />
 
-        <OfferActions mode={mode} submitting={submitting} cancelUrl="/app" />
+        <OfferActions mode={mode} submitting={submitting} />
       </fetcher.Form>
     </OfferFormPage>
   );

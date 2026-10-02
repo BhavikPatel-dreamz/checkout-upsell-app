@@ -202,11 +202,7 @@ export default function OfferTypeSelector() {
         </AdminAppLink>
       </div>
 
-      <p style={styles.typeHint}>
-        Selected type: <strong style={styles.typeHintStrong}>{OFFER_TYPE_CONFIG[selectedType].label}</strong>
-        {" · "}
-        {PLACEMENT_LABELS[placement]}
-      </p>
+
     </div>
   );
 }

@@ -23,7 +23,8 @@
  *   submission payload, validation) is unchanged.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import type { OfferPlacement, OfferType } from "@prisma/client";
 import {
   placementHeaderLabel,
@@ -140,6 +141,60 @@ function formatPrice(price: number | string | null | undefined): string | null {
   return `₹${num.toFixed(2)}`;
 }
 
+function locationSubtitle(value: string, label: string): string {
+  switch (value) {
+    case "product_page":
+      return "Show on the product page";
+    case "cart_drawer":
+      return "Show on the cart page";
+    case "checkout_page":
+      return "Show on the checkout page";
+    case "cart_drawer_upsell":
+      return "Show on the cart drawer";
+    case "thank_you_page":
+      return "Show on the thank you page";
+    default:
+      return `Show on the ${label.toLowerCase()}`;
+  }
+}
+
+const basicInfoIcon = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#008060" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+    <polyline points="10 9 9 9 8 9" />
+  </svg>
+);
+
+const triggerIcon = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#008060" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+    <line x1="7" y1="7" x2="7.01" y2="7" />
+  </svg>
+);
+
+const configIcon = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#008060" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M6 3h12l4 6-10 12L2 9l4-6z" />
+    <path d="M2 9h20" />
+    <path d="M10 21l-3-12" />
+    <path d="M14 21l3-12" />
+    <path d="M6 3l4 6" />
+    <path d="M18 3l-4 6" />
+  </svg>
+);
+
+const scheduleIcon = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#008060" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
+
 // ── Shared form state ─────────────────────────────────────────────────
 
 interface OfferFormState {
@@ -173,6 +228,9 @@ interface OfferFormState {
   setActiveTo: (value: string) => void;
   promotionalTitle: string;
   setPromotionalTitle: (value: string) => void;
+  updateFieldValue: (field: string, value: string) => void;
+  conditionError: string;
+  setConditionError: (value: string) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────
@@ -197,6 +255,7 @@ export default function OfferForm({
   const [showUpsell, setShowUpsell] = useState<"always" | "condition" | "">(
     (initialData?.showUpsell as any) ?? ""
   );
+  const [conditionError, setConditionError] = useState("");
   const [conditions, setConditions] = useState<ConditionRow[]>(
     initialData?.conditions?.length
       ? initialData.conditions.map((row) => ({
@@ -299,11 +358,36 @@ export default function OfferForm({
     initialData?.promotionalTitle ?? ""
   );
 
-  const errors = fetcherErrors;
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+
+  const errors = useMemo(() => {
+    const merged = { ...fetcherErrors };
+    Object.keys(fieldValues).forEach((field) => {
+      if (fieldValues[field] && fieldValues[field].trim()) {
+        // Don't clear upsellProduct error if it's about empty manualSelections
+        if (field === "upsellProduct" && manualSelections.length === 0 && merged.upsellProduct) {
+          // Keep the error
+        } else {
+          delete merged[field];
+        }
+      }
+    });
+    return merged;
+  }, [fetcherErrors, fieldValues, manualSelections.length]);
+
+  function updateFieldValue(field: string, value: string) {
+    setFieldValues((prev) => ({ ...prev, [field]: value }));
+  }
 
   // ── Handlers ────────────────────────────────────────────────────────
 
   function addConditionRow() {
+    const lastRow = conditions[conditions.length - 1];
+    if (!lastRow.field || !lastRow.operator || !lastRow.value.trim()) {
+      setConditionError("Please fill all fields before adding another condition");
+      return;
+    }
+    setConditionError("");
     setConditions((prev) => [
       ...prev,
       { id: nextRowId(), field: "", operator: "", value: "" },
@@ -345,10 +429,19 @@ export default function OfferForm({
       });
     });
     setShowTriggerPicker(false);
+    if (selectedProductIds.length > 0) {
+      setFieldValues((prev) => ({ ...prev, targetProductIds: selectedProductIds.join(",") }));
+    }
   }
 
   function removeTriggerSelection(id: string) {
-    setTriggerSelections((prev) => prev.filter((item) => item.id !== id));
+    setTriggerSelections((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      if (next.length === 0) {
+        setFieldValues((p) => { const n = { ...p }; delete n.targetProductIds; return n; });
+      }
+      return next;
+    });
   }
 
   // Applies the exact set of selected variants (one row per checked
@@ -367,10 +460,19 @@ export default function OfferForm({
     });
     setUpsellProduct((prev) => (prev === "" ? "manual" : prev));
     setShowProductPicker(false);
+    if (selections.length > 0) {
+      setFieldValues((prev) => ({ ...prev, manualSelections: selections.map(s => s.variantId).join(",") }));
+    }
   }
 
   function removeManualSelection(id: string) {
-    setManualSelections((prev) => prev.filter((r) => r.id !== id));
+    setManualSelections((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      if (next.length === 0) {
+        setFieldValues((p) => { const n = { ...p }; delete n.manualSelections; return n; });
+      }
+      return next;
+    });
   }
 
   const state: OfferFormState = {
@@ -404,6 +506,9 @@ export default function OfferForm({
     setActiveTo,
     promotionalTitle,
     setPromotionalTitle,
+    updateFieldValue,
+    conditionError,
+    setConditionError,
   };
 
   // ── Render ──────────────────────────────────────────────────────────
@@ -418,88 +523,122 @@ export default function OfferForm({
       <input type="hidden" name="targetProductIds" value={JSON.stringify(triggerSelections.map((item) => item.productId))} />
       <input type="hidden" name="manualSelections" value={JSON.stringify(manualSelections)} />
 
-      <div style={styles.typeBadgeWrap}>
-        <span style={styles.typeBadge}>{OFFER_TYPE_CONFIG[offerType].label}</span>
-        <span style={styles.typeBadgeDivider} />
-        <span style={styles.typeBadgeSecondary}>{placementHeaderLabel(resolvedPlacement)}</span>
-      </div>
+      <div className="of-form-grid" style={styles.formGrid}>
+        {/* Left Column: Basic Information and Trigger Products */}
+        <div className="of-form-col" style={styles.formCol}>
+          <SectionCard
+            icon={basicInfoIcon}
+            title="Basic Information"
+            description="Name this offer internally and choose the message and placement shoppers will see."
+          >
+            <CommonOfferFields state={state} errors={errors} locationOptions={locationOptions} />
+          </SectionCard>
 
-      <SectionRow
-        title="Basic Information"
-        description="Name this offer internally and choose the message and placement shoppers will see."
-      >
-        <CommonOfferFields state={state} errors={errors} locationOptions={locationOptions} />
-      </SectionRow>
-
-      {getOfferTypeConfig(offerType).requiresTriggerProducts && (
-        <SectionRow
-          title="Trigger Products"
-          description="Pick which products in the cart cause this upsell to appear."
-        >
-          <TriggerProductField
-            products={products}
-            selected={triggerSelections}
-            showPicker={showTriggerPicker}
-            onOpenPicker={() => setShowTriggerPicker(true)}
-            onClosePicker={() => setShowTriggerPicker(false)}
-            onApplyPicker={applyTriggerPicker}
-            onRemove={removeTriggerSelection}
-            error={errors.targetProductIds}
-          />
-        </SectionRow>
-      )}
-
-      {typeSpecificFieldIds.length > 0 && (
-        <SectionRow
-          title="Offer Configuration"
-          description="Choose what shoppers are offered and, if applicable, the discount to apply."
-        >
-          {getOfferTypeConfig(offerType).poolOnly && (
-            <div style={styles.noticeBox}>
-              <span style={styles.noticeIcon}>i</span>
-              <span>
-                This type uses browse activity to choose which pool product to show. It
-                does not create new offers by itself.
-              </span>
-            </div>
+          {getOfferTypeConfig(offerType).requiresTriggerProducts && (
+            <SectionCard
+              icon={triggerIcon}
+              title="Trigger Products"
+              description="Pick which products in the cart cause this upsell to appear."
+            >
+              <TriggerProductField
+                products={products}
+                selected={triggerSelections}
+                showPicker={showTriggerPicker}
+                onOpenPicker={() => setShowTriggerPicker(true)}
+                onClosePicker={() => setShowTriggerPicker(false)}
+                onApplyPicker={applyTriggerPicker}
+                onRemove={removeTriggerSelection}
+                error={errors.targetProductIds}
+              />
+            </SectionCard>
           )}
-          <TypeSpecificFields
-            state={state}
-            errors={errors}
-            products={products}
-            hasSyncedProducts={hasSyncedProducts}
-            fieldIds={typeSpecificFieldIds}
-            poolOnly={Boolean(typeConfig.poolOnly)}
-            allowPaidDealTypes={allowPaidDealTypes}
-          />
-        </SectionRow>
-      )}
+        </div>
 
-      <SectionRow
-        title="Schedule"
-        description="Set the window this offer should run in. Leave blank to run indefinitely."
-      >
-        <DateRangePicker
-          activeFrom={state.activeFrom}
-          activeTo={state.activeTo}
-          open={state.showDateRange}
-          onOpen={() => state.setShowDateRange(true)}
-          onClose={() => state.setShowDateRange(false)}
-          onApply={(from, to) => {
-            state.setActiveFrom(from);
-            state.setActiveTo(to);
-            state.setShowDateRange(false);
-          }}
-        />
-        <input type="hidden" name="activeFrom" value={state.activeFrom} />
-        <input type="hidden" name="activeTo" value={state.activeTo} />
-      </SectionRow>
+        {/* Right Column: Offer Configuration, Schedule */}
+        <div className="of-form-col" style={styles.formCol}>
+          {typeSpecificFieldIds.length > 0 && (
+            <SectionCard
+              icon={configIcon}
+              title="Offer Configuration"
+              description="Choose what shoppers are offered and, if applicable, the discount to apply."
+            >
+              {getOfferTypeConfig(offerType).poolOnly && (
+                <div style={styles.noticeBox}>
+                  <span style={styles.noticeIcon}>i</span>
+                  <span>
+                    This type uses browse activity to choose which pool product to show. It
+                    does not create new offers by itself.
+                  </span>
+                </div>
+              )}
+              <TypeSpecificFields
+                state={state}
+                errors={errors}
+                products={products}
+                hasSyncedProducts={hasSyncedProducts}
+                fieldIds={typeSpecificFieldIds}
+                poolOnly={Boolean(typeConfig.poolOnly)}
+                allowPaidDealTypes={allowPaidDealTypes}
+              />
+            </SectionCard>
+          )}
+
+          <SectionCard
+            icon={scheduleIcon}
+            title="Schedule"
+            description="Set the window this offer should run in. Leave blank to run indefinitely."
+          >
+            <DateRangePicker
+              activeFrom={state.activeFrom}
+              activeTo={state.activeTo}
+              open={state.showDateRange}
+              onOpen={() => state.setShowDateRange(true)}
+              onClose={() => state.setShowDateRange(false)}
+              onApply={(from, to) => {
+                state.setActiveFrom(from);
+                state.setActiveTo(to);
+                state.setShowDateRange(false);
+                state.updateFieldValue("activeFrom", from);
+                state.updateFieldValue("activeTo", to);
+              }}
+            />
+            <input type="hidden" name="activeFrom" value={state.activeFrom} />
+            <input type="hidden" name="activeTo" value={state.activeTo} />
+          </SectionCard>
+        </div>
+      </div>
     </>
   );
 }
 
-// ── Section row (left description, right card — Shopify settings pattern) ──
+// ── Card container for 2-column layout ──────────────────────────────
 
+function SectionCard({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon?: React.ReactNode;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="of-card" style={styles.card}>
+      <div style={styles.cardHeader}>
+        {icon && <div style={styles.cardHeaderIcon}>{icon}</div>}
+        <div style={styles.cardHeaderText}>
+          <div style={styles.cardTitle}>{title}</div>
+          {description && <div style={styles.cardDesc}>{description}</div>}
+        </div>
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+// Kept for backward compatibility
 function SectionRow({
   title,
   description,
@@ -510,15 +649,9 @@ function SectionRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="of-section-row">
-      <div className="of-section-row-left">
-        <div style={styles.sectionRowTitle}>{title}</div>
-        {description && <div style={styles.sectionRowDesc}>{description}</div>}
-      </div>
-      <div className="of-section-row-right">
-        <div style={styles.card}>{children}</div>
-      </div>
-    </div>
+    <SectionCard title={title} description={description}>
+      {children}
+    </SectionCard>
   );
 }
 
@@ -543,7 +676,7 @@ function CommonOfferFields({
           style={styles.input}
           placeholder="e.g. Add a matching case"
           value={state.title}
-          onChange={(e) => state.setTitle(e.target.value)}
+          onChange={(e) => { state.setTitle(e.target.value); state.updateFieldValue("title", e.target.value); }}
         />
       </Field>
 
@@ -555,28 +688,33 @@ function CommonOfferFields({
           style={styles.input}
           placeholder="What shoppers will see, e.g. Complete the look"
           value={state.promotionalTitle}
-          onChange={(e) => state.setPromotionalTitle(e.target.value)}
+          onChange={(e) => { state.setPromotionalTitle(e.target.value); state.updateFieldValue("promotionalTitle", e.target.value); }}
         />
       </Field>
 
       {/* Show Upsell */}
       <Field label="Show Upsell" required error={errors.showUpsell}>
-        <div style={styles.checkRow}>
-          <Checkbox
-            label="Always"
+        <div className="of-option-grid-2" style={styles.optionGrid2}>
+          <OptionCard
+            type="radio"
+            title="Always"
+            subtitle="Show upsell all the time"
             checked={state.showUpsell === "always"}
-            onClick={() => state.setShowUpsell("always")}
+            onClick={() => { state.setShowUpsell("always"); state.updateFieldValue("showUpsell", "always"); }}
           />
-          <Checkbox
-            label="Based on Condition"
+          <OptionCard
+            type="radio"
+            title="Based on Condition"
+            subtitle="Show upsell based on rules"
             checked={state.showUpsell === "condition"}
-            onClick={() => state.setShowUpsell("condition")}
+            onClick={() => { state.setShowUpsell("condition"); state.updateFieldValue("showUpsell", "condition"); }}
           />
         </div>
         <input type="hidden" name="showUpsell" value={state.showUpsell} />
 
-        {state.showUpsell === "condition" && (
+{state.showUpsell === "condition" && (
           <div style={styles.conditionBox}>
+            {state.conditionError && <div style={styles.conditionError}>{state.conditionError}</div>}
             {state.conditions.map((row, idx) => (
               <div key={row.id} className="of-condition-row" style={styles.conditionRow}>
                 <span style={styles.rowBadge}>{idx + 1}</span>
@@ -584,7 +722,7 @@ function CommonOfferFields({
                   className="of-select"
                   style={styles.select}
                   value={row.field}
-                  onChange={(e) => state.updateConditionRow(row.id, { field: e.target.value })}
+                  onChange={(e) => { state.updateConditionRow(row.id, { field: e.target.value }); state.updateFieldValue("conditions", e.target.value); state.setConditionError(""); }}
                 >
                   <option value="">Field</option>
                   {FIELD_OPTIONS.map((f) => (
@@ -595,7 +733,7 @@ function CommonOfferFields({
                   className="of-select"
                   style={styles.select}
                   value={row.operator}
-                  onChange={(e) => state.updateConditionRow(row.id, { operator: e.target.value })}
+                  onChange={(e) => { state.updateConditionRow(row.id, { operator: e.target.value }); state.updateFieldValue("conditions", e.target.value); state.setConditionError(""); }}
                 >
                   <option value="">Operator</option>
                   {OPERATOR_OPTIONS.map((o) => (
@@ -607,17 +745,19 @@ function CommonOfferFields({
                   style={styles.conditionValueInput}
                   placeholder="Value"
                   value={row.value}
-                  onChange={(e) => state.updateConditionRow(row.id, { value: e.target.value })}
+                  onChange={(e) => { state.updateConditionRow(row.id, { value: e.target.value }); state.updateFieldValue("conditions", e.target.value); state.setConditionError(""); }}
                 />
-                <button
-                  type="button"
-                  className="of-round-btn of-round-remove"
-                  style={styles.roundButtonRemove}
-                  onClick={() => state.removeConditionRow(row.id)}
-                  aria-label="Remove condition"
-                >
-                  −
-                </button>
+                {state.conditions.length > 1 && (
+                  <button
+                    type="button"
+                    className="of-round-btn of-round-remove"
+                    style={styles.roundButtonRemove}
+                    onClick={() => state.removeConditionRow(row.id)}
+                    aria-label="Remove condition"
+                  >
+                    −
+                  </button>
+                )}
                 {idx === state.conditions.length - 1 && (
                   <button
                     type="button"
@@ -637,7 +777,7 @@ function CommonOfferFields({
 
       {/* Display Upsell on */}
       <Field label="Display Upsell on" required error={errors.displayLocation} last>
-        <div style={styles.checkRow}>
+        <div className="of-option-grid-2" style={styles.optionGrid2}>
           {locationOptions.map((opt) => {
             const selected = state.displayLocation === opt.value;
             return (
@@ -654,7 +794,7 @@ function CommonOfferFields({
                   name="displayLocation"
                   value={opt.value}
                   checked={selected}
-                  onChange={() => state.setDisplayLocation(opt.value)}
+                  onChange={() => { state.setDisplayLocation(opt.value); state.updateFieldValue("displayLocation", opt.value); }}
                   className="of-visually-hidden-input"
                   style={styles.visuallyHiddenInput}
                 />
@@ -670,7 +810,12 @@ function CommonOfferFields({
                 >
                   {selected && <span style={styles.optionRadioDot} />}
                 </span>
-                <span style={styles.optionCardLabel}>{opt.label}</span>
+                <div style={styles.optionCardContent}>
+                  <div style={styles.optionCardTitle}>{opt.label}</div>
+                  <div style={styles.optionCardSubtitle}>
+                    {locationSubtitle(opt.value, opt.label)}
+                  </div>
+                </div>
               </label>
             );
           })}
@@ -732,80 +877,99 @@ function UpsellProductField({
 }) {
   return (
     <Field label={poolOnly ? "Upsell product pool" : "Upsell Product"} required error={errors.upsellProduct}>
-      <div style={styles.checkCol}>
-        <Checkbox
-          label={poolOnly ? "Products AI may recommend (manual pool)" : "Manual selection"}
+      <div style={styles.optionStackCol}>
+        <OptionCard
+          type="radio"
+          title={poolOnly ? "Products AI may recommend (manual pool)" : "Manual selection"}
+          subtitle="Select specific products to offer"
           checked={state.upsellProduct === "manual"}
-          onClick={() => state.setUpsellProduct("manual")}
+          onClick={() => { state.setUpsellProduct("manual"); state.updateFieldValue("upsellProduct", "manual"); }}
         />
 
-        {state.upsellProduct === "manual" && (
-          <div style={{ marginLeft: 28, marginTop: 4 }}>
-            {!hasSyncedProducts ? (
-              <div style={styles.emptyNotice}>
-                No synced products found. Please sync products first.
+        {!poolOnly && (
+          <OptionCard
+            type="radio"
+            title="Related item form shopify based on items in order"
+            subtitle="Offer related items automatically"
+            checked={state.upsellProduct === "related"}
+            onClick={() => { state.setUpsellProduct("related"); state.updateFieldValue("upsellProduct", "related"); }}
+          />
+        )}
+      </div>
+
+      {state.upsellProduct === "manual" && (
+        <div style={{ marginTop: 14 }}>
+          {!hasSyncedProducts ? (
+            <div style={styles.emptyNotice}>
+              No synced products found. Please sync products first.
+            </div>
+          ) : (
+            <div style={styles.productSelectBar}>
+              <div style={styles.productSelectBarLeft}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="9" cy="21" r="1" />
+                  <circle cx="20" cy="21" r="1" />
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                </svg>
+                <span style={styles.productSelectBarText}>
+                  {state.manualSelections.length === 0
+                    ? "No products selected"
+                    : `${state.manualSelections.length} product${state.manualSelections.length > 1 ? "s" : ""} selected`}
+                </span>
               </div>
-            ) : (
               <button
                 type="button"
                 className="of-btn of-btn-secondary"
-                style={styles.editProductsButton}
+                style={styles.selectProductsButton}
                 onClick={state.openProductPicker}
               >
                 {state.manualSelections.length > 0 ? "Edit products" : "Select products"}
               </button>
-            )}
+            </div>
+          )}
 
-            {state.manualSelections.length > 0 && (
-              <div style={{ ...styles.selectionList, marginLeft: 0 }}>
-                {state.manualSelections.map((sel) => {
-                  const product = products.find((p) => p.id === sel.productId);
-                  return (
-                    <div key={sel.id} style={styles.selectionItem}>
-                      <span style={styles.selectionItemInner}>
-                        <ProductThumb image={product?.image ?? null} size={28} />
-                        <span style={styles.selectionItemText}>
-                          {sel.productTitle}
-                          {sel.variantTitle && sel.variantTitle !== "Default Title"
-                            ? ` — ${sel.variantTitle}`
-                            : ""}
-                        </span>
+          {state.manualSelections.length > 0 && (
+            <div style={{ ...styles.selectionList, marginLeft: 0 }}>
+              {state.manualSelections.map((sel) => {
+                const product = products.find((p) => p.id === sel.productId);
+                return (
+                  <div key={sel.id} style={styles.selectionItem}>
+                    <span style={styles.selectionItemInner}>
+                      <ProductThumb image={product?.image ?? null} size={32} />
+                      <span style={styles.selectionItemText}>
+                        {sel.productTitle}
+                        {sel.variantTitle && sel.variantTitle !== "Default Title"
+                          ? ` — ${sel.variantTitle}`
+                          : ""}
                       </span>
-                      <button
-                        type="button"
-                        className="of-round-btn of-round-remove"
-                        style={styles.roundButtonRemove}
-                        onClick={() => state.removeManualSelection(sel.id)}
-                        aria-label="Remove product"
-                      >
-                        −
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    </span>
+                    <button
+                      type="button"
+                      className="of-round-btn of-round-remove"
+                      style={styles.roundButtonRemove}
+                      onClick={() => state.removeManualSelection(sel.id)}
+                      aria-label="Remove product"
+                    >
+                      −
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-            {state.showProductPicker && (
-              <ProductPickerModal
-                mode="variants"
-                products={products}
-                initialSelectedVariantIds={state.manualSelections.map((s) => s.variantId)}
-                onClose={state.closeProductPicker}
-                onDoneVariants={state.applyProductPicker}
-              />
-            )}
-          </div>
-        )}
+          {state.showProductPicker && (
+            <ProductPickerModal
+              mode="variants"
+              products={products}
+              initialSelectedVariantIds={state.manualSelections.map((s) => s.variantId)}
+              onClose={state.closeProductPicker}
+              onDoneVariants={state.applyProductPicker}
+            />
+          )}
+        </div>
+      )}
 
-        {!poolOnly && (
-        <Checkbox
-          label="Related Item form shopify based on items in order"
-          checked={state.upsellProduct === "related"}
-          onClick={() => state.setUpsellProduct("related")}
-        />
-        )}
-      </div>
       <input type="hidden" name="upsellProduct" value={state.upsellProduct} />
     </Field>
   );
@@ -832,14 +996,28 @@ function TriggerProductField({
 }) {
   return (
     <Field label="Main Products" required error={error} last>
-      <button
-        type="button"
-        className="of-btn of-btn-secondary"
-        style={{ ...styles.editProductsButton, marginLeft: 0 }}
-        onClick={onOpenPicker}
-      >
-        {selected.length > 0 ? "Edit products" : "Select products"}
-      </button>
+      <div style={styles.productSelectBar}>
+        <div style={styles.productSelectBarLeft}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="9" cy="21" r="1" />
+            <circle cx="20" cy="21" r="1" />
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+          </svg>
+          <span style={styles.productSelectBarText}>
+            {selected.length === 0
+              ? "No products selected"
+              : `${selected.length} product${selected.length > 1 ? "s" : ""} selected`}
+          </span>
+        </div>
+        <button
+          type="button"
+          className="of-btn of-btn-secondary"
+          style={styles.selectProductsButton}
+          onClick={onOpenPicker}
+        >
+          {selected.length > 0 ? "Edit products" : "Select products"}
+        </button>
+      </div>
 
       {selected.length > 0 && (
         <div style={{ ...styles.selectionList, marginLeft: 0 }}>
@@ -848,7 +1026,7 @@ function TriggerProductField({
             return (
               <div key={item.id} style={styles.selectionItem}>
                 <span style={styles.selectionItemInner}>
-                  <ProductThumb image={product?.image ?? null} size={28} />
+                  <ProductThumb image={product?.image ?? null} size={32} />
                   <span style={styles.selectionItemText}>{item.productTitle}</span>
                 </span>
                 <button
@@ -890,44 +1068,77 @@ function DealTypeField({
 }) {
   return (
     <Field label="Offer on Upsell" required error={errors.offerType} last>
-      <div style={styles.checkCol}>
+      <div className="of-option-grid-3" style={styles.optionGrid3}>
         {DEAL_TYPE_OPTIONS.map((option) => {
           const locked = !allowPaidDealTypes && option.value !== "as-is";
+          const checked = state.dealType === option.value;
+          const title = locked ? `${option.label} (Gold)` : option.label;
+          const subtitle =
+            option.value === "free"
+              ? "Offer the upsell for free"
+              : option.value === "discount"
+              ? "Offer the upsell with a discount"
+              : "Offer at the original price";
+
           return (
-            <div key={option.value}>
-              <Checkbox
-                label={locked ? `${option.label} (Gold)` : option.label}
-                checked={state.dealType === option.value}
-                disabled={locked}
-                onClick={() => state.setDealType(option.value)}
-                noBorder
-              />
-              {option.value === "discount" && state.dealType === "discount" && allowPaidDealTypes && (
-                <input
-                  name="discountValue"
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="e.g. 15"
-                  className="of-input"
-                  style={{ ...styles.input, width: 140, marginLeft: 28, marginTop: 8 }}
-                  value={state.discountValue}
-                  onChange={(e) => state.setDiscountValue(e.target.value)}
-                />
-              )}
-            </div>
+            <OptionCard
+              key={option.value}
+              type="radio"
+              title={title}
+              subtitle={subtitle}
+              checked={checked}
+              disabled={locked}
+              onClick={() => {
+                if (!locked) { state.setDealType(option.value as any); state.updateFieldValue("offerType", option.value); }
+              }}
+            />
           );
         })}
       </div>
+
+      {optionDiscountInput(state, allowPaidDealTypes)}
+
       {!allowPaidDealTypes ? (
-        <div style={{ ...styles.emptyNotice, marginTop: 10 }}>
-          Free and Discount are not on the Free or Silver plan. This offer uses{" "}
-          <strong>As it is</strong> (full price).{" "}
-          <AdminAppLink to="/app/billing">View plans</AdminAppLink>
+        <div style={styles.planNoticeBox}>
+          <div style={styles.planNoticeLeft}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <div style={styles.planNoticeText}>
+              <div>Free and Discount are not on the Free or Silver plan.</div>
+              <div>
+                This offer uses <strong>As it is</strong> (full price).
+              </div>
+            </div>
+          </div>
+          <AdminAppLink to="/app/billing" className="of-btn-secondary" style={styles.viewPlansButton}>
+            View plans
+          </AdminAppLink>
         </div>
       ) : null}
       <input type="hidden" name="offerType" value={state.dealType} />
     </Field>
+  );
+}
+
+function optionDiscountInput(state: OfferFormState, allowPaidDealTypes: boolean) {
+  if (state.dealType !== "discount" || !allowPaidDealTypes) return null;
+  return (
+    <div style={{ marginTop: 12 }}>
+      <input
+        name="discountValue"
+        type="number"
+        min={0}
+        max={100}
+        placeholder="Discount % value, e.g. 15"
+        className="of-input"
+        style={{ ...styles.input, maxWidth: 220 }}
+        value={state.discountValue}
+        onChange={(e) => { state.setDiscountValue(e.target.value); state.updateFieldValue("discountValue", e.target.value); }}
+      />
+    </div>
   );
 }
 
@@ -1281,34 +1492,29 @@ function TriStateBox({
 export function OfferActions({
   mode,
   submitting,
-  cancelUrl,
+  cancelUrl = "/app/upsells",
 }: {
   mode: "create" | "edit";
   submitting: boolean;
-  cancelUrl: string;
+  cancelUrl?: string;
 }) {
   return (
-    <div className="of-section-row">
-      <div className="of-section-row-left" />
-      <div className="of-section-row-right">
-        <div style={styles.actionsRow}>
-          <button
-            type="submit"
-            className="of-btn of-btn-primary of-btn-lg"
-            style={styles.submitButton}
-            disabled={submitting}
-          >
-            {submitting ? "Saving\u2026" : mode === "edit" ? "Save Changes" : "Save Offer"}
-          </button>
-          <AdminAppLink
-            to={cancelUrl}
-            className="of-btn of-btn-secondary of-btn-lg"
-            style={{ ...styles.cancelButton, textDecoration: "none", color: "inherit" }}
-          >
-            Cancel
-          </AdminAppLink>
-        </div>
-      </div>
+    <div style={styles.actionsContainer}>
+      <AdminAppLink
+        to={cancelUrl}
+        className="of-btn of-btn-secondary"
+        style={styles.cancelButton}
+      >
+        Cancel
+      </AdminAppLink>
+      <button
+        type="submit"
+        className="of-btn of-btn-primary"
+        style={styles.submitButton}
+        disabled={submitting}
+      >
+        {submitting ? "Saving\u2026" : "Save offer"}
+      </button>
     </div>
   );
 }
@@ -1319,13 +1525,49 @@ export function OfferFormPage({
   mode,
   offerType,
   placement,
+  isSelecting,
   children,
 }: {
   mode: "create" | "edit";
   offerType: OfferType;
   placement: OfferPlacement;
+  isSelecting?: boolean;
   children: React.ReactNode;
 }) {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isOfferTypePage =
+    typeof isSelecting === "boolean"
+      ? isSelecting
+      : mode === "create" &&
+        !searchParams.get("id") &&
+        !searchParams.get("type") &&
+        !searchParams.get("offerType") &&
+        !searchParams.get("placement");
+  const [showHelp, setShowHelp] = useState(false);
+  const helpRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
+        setShowHelp(false);
+      }
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setShowHelp(false);
+      }
+    }
+    if (showHelp) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showHelp]);
+
   const heading =
     mode === "edit" ? "Edit Offer" : "Create New Offer";
   const subtitle = `${OFFER_TYPE_CONFIG[offerType].label} · ${placementHeaderLabel(placement)}`;
@@ -1334,8 +1576,182 @@ export function OfferFormPage({
       <style>{globalCss}</style>
       <div className="appPageContent" style={styles.pageContent}>
         <div style={styles.headerBar}>
-          <h2 style={styles.headerText}>{heading}</h2>
-          <div style={styles.headerSubtitle}>{subtitle}</div>
+          <div style={styles.headerLeftGroup}>
+            <button
+              type="button"
+              style={styles.backButton}
+              onClick={() => navigate(-1)}
+              aria-label="Back"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+            </button>
+            <div style={styles.headerDivider} />
+            <div>
+              <h1 style={styles.headerText}>{heading}</h1>
+              <div style={styles.headerSubtitle}>{subtitle}</div>
+            </div>
+          </div>
+
+          <div ref={helpRef} style={{ position: "relative" }}>
+            <button
+              type="button"
+              style={styles.helpButton}
+              onClick={() => setShowHelp((prev) => !prev)}
+              aria-expanded={showHelp}
+              aria-label="Toggle Field Help"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <span>Guide</span>
+            </button>
+
+            {showHelp && (
+              <div className="of-help-popover" style={styles.helpPopover}>
+                <div style={styles.helpPopoverArrow} />
+                <div style={styles.helpHeader}>
+                  <div style={styles.helpTitle}>Field Help</div>
+                  <button
+                    type="button"
+                    className="of-help-close"
+                    style={styles.helpCloseButton}
+                    onClick={() => setShowHelp(false)}
+                    aria-label="Close field help"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+
+                {isOfferTypePage ? (
+                  <div style={styles.helpContent}>
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Offer Type</div>
+                      <div style={styles.helpItemDesc}>
+                        Choose the upsell type you want to create. Each type uses a different mechanism to show offers.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Cross-Sell</div>
+                      <div style={styles.helpItemDesc}>
+                        Suggest a related product when an item is added to the cart.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Bundle</div>
+                      <div style={styles.helpItemDesc}>
+                        Offer a discounted bundle of products.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Quantity Discount</div>
+                      <div style={styles.helpItemDesc}>
+                        Reward larger quantities with a discount.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Free Gift</div>
+                      <div style={styles.helpItemDesc}>
+                        Give away a free product with a qualifying order.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Subscription</div>
+                      <div style={styles.helpItemDesc}>
+                        Offer a subscription upsell.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>AI Recommend Upsell</div>
+                      <div style={styles.helpItemDesc}>
+                        Uses browse activity to choose which product from your pool to show. It does not create new offers by itself.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItemLast}>
+                      <div style={styles.helpItemTitle}>Placement</div>
+                      <div style={styles.helpItemDesc}>
+                        Choose where shoppers will see this offer.
+                        <br />
+                        Pre-Purchase shows the offer on the checkout page, Product Page shows it on the product page, and Post-Purchase shows it on the thank you page after order completion.
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={styles.helpContent}>
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Title</div>
+                      <div style={styles.helpItemDesc}>
+                        You have to enter upsell name. This is for your internal reference.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Promotional Title</div>
+                      <div style={styles.helpItemDesc}>
+                        This is the message that shoppers will see on the product page.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Show Upsell</div>
+                      <div style={styles.helpItemDesc}>
+                        Choose when to show this upsell. Always shows it or show based on conditions.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Display Upsell on</div>
+                      <div style={styles.helpItemDesc}>
+                        Select where this upsell will be displayed (e.g. Product Page).
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Upsell Product</div>
+                      <div style={styles.helpItemDesc}>
+                        Choose how to select the products to offer in the upsell.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Offer on Upsell</div>
+                      <div style={styles.helpItemDesc}>
+                        Select the offer type for the upsell product (Free, Discount or As it is).
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItem}>
+                      <div style={styles.helpItemTitle}>Trigger Products</div>
+                      <div style={styles.helpItemDesc}>
+                        Pick which products in the cart will cause this upsell to appear.
+                      </div>
+                    </div>
+
+                    <div style={styles.helpItemLast}>
+                      <div style={styles.helpItemTitle}>Schedule</div>
+                      <div style={styles.helpItemDesc}>
+                        Select your start date to stop date for when this offer should run.
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         {children}
       </div>
@@ -1370,36 +1786,31 @@ function Field({
 }
 
 // ── Option card (replaces the old plain native checkbox row) ─────────
-//
-// Visually presented as a selectable "card" — bordered box with a check
-// indicator and label — instead of a bare checkbox input. Purely a
-// presentational change: selection is still driven by `checked` /
-// `onClick` exactly as before, and every existing hidden <input> that
-// carries the actual submitted value is untouched.
 
-function Checkbox({
-  label,
+function OptionCard({
+  type = "checkbox",
+  title,
+  subtitle,
   checked,
   onClick,
-  noBorder,
   disabled,
 }: {
-  label: string;
+  type?: "checkbox" | "radio";
+  title: string;
+  subtitle?: string;
   checked: boolean;
   onClick: () => void;
-  noBorder?: boolean;
   disabled?: boolean;
 }) {
   return (
     <div
-      role="checkbox"
+      role={type}
       aria-checked={checked}
       aria-disabled={disabled || undefined}
       tabIndex={disabled ? -1 : 0}
       className={`of-option-card${checked ? " of-option-card-selected" : ""}`}
       style={{
         ...styles.optionCard,
-        ...(noBorder ? { border: "none", padding: "10px 0" } : {}),
         ...(checked ? styles.optionCardSelected : {}),
         ...(disabled ? { opacity: 0.45, cursor: "not-allowed" } : {}),
       }}
@@ -1415,27 +1826,61 @@ function Checkbox({
       }}
     >
       <span
-        className={`of-option-check${checked ? " of-option-check-selected" : ""}`}
+        className={`of-option-check${type === "radio" ? " of-option-check-radio" : ""}${
+          checked ? " of-option-check-selected" : ""
+        }`}
         style={{
-          ...styles.optionCheck,
-          ...(checked ? styles.optionCheckSelected : {}),
+          ...(type === "radio" ? styles.optionCheckRadio : styles.optionCheck),
+          ...(checked
+            ? type === "radio"
+              ? styles.optionCheckRadioSelected
+              : styles.optionCheckSelected
+            : {}),
         }}
         aria-hidden="true"
       >
-        {checked && (
-          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+        {type === "checkbox" && checked && (
+          <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
             <path
-              d="M1 4L3.5 6.5L9 1"
+              d="M1.5 5L4.5 8L10.5 1.5"
               stroke="#fff"
-              strokeWidth="1.6"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
         )}
+        {type === "radio" && checked && <span style={styles.optionRadioDot} />}
       </span>
-      <span style={styles.optionCardLabel}>{label}</span>
+      <div style={styles.optionCardContent}>
+        <div style={styles.optionCardTitle}>{title}</div>
+        {subtitle && <div style={styles.optionCardSubtitle}>{subtitle}</div>}
+      </div>
     </div>
+  );
+}
+
+function Checkbox({
+  label,
+  checked,
+  onClick,
+  noBorder,
+  disabled,
+}: {
+  label: string;
+  checked: boolean;
+  onClick: () => void;
+  noBorder?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <OptionCard
+      type="checkbox"
+      title={label}
+      checked={checked}
+      onClick={onClick}
+      disabled={disabled}
+    />
   );
 }
 
@@ -1488,12 +1933,27 @@ function DateRangePicker({
   );
   const [tempFrom, setTempFrom] = useState(activeFrom);
   const [tempTo, setTempTo] = useState(activeTo);
+  const [error, setError] = useState("");
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   function openPicker() {
     setTempFrom(activeFrom);
     setTempTo(activeTo);
+    setError("");
     onOpen();
   }
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setError("");
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open, onClose]);
 
   function handleDayClick(date: Date) {
     const iso = toISO(date);
@@ -1534,7 +1994,7 @@ function DateRangePicker({
   );
 
   return (
-    <div style={{ position: "relative", maxWidth: 480 }}>
+    <div style={{ position: "relative", width: "100%" }}>
       <div style={styles.dateInputWrap} onClick={openPicker}>
         <input
           readOnly
@@ -1544,10 +2004,17 @@ function DateRangePicker({
           placeholder="Select date range"
           onClick={openPicker}
         />
-        <span style={styles.dateInputIcon}>📅</span>
+        <span style={styles.dateInputIcon}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        </span>
       </div>
       {open && (
-        <div style={styles.calendarPopover}>
+        <div ref={popoverRef} style={styles.calendarPopover}>
           <div style={styles.calendarMonths}>
             <CalendarMonth
               date={leftMonth}
@@ -1575,19 +2042,22 @@ function DateRangePicker({
             />
           </div>
           <div style={styles.calendarFooter}>
-            <span style={styles.calendarFooterText}>
-              {tempFrom && tempTo
-                ? `${formatLong(tempFrom)} - ${formatLong(tempTo)}`
-                : tempFrom
-                ? formatLong(tempFrom)
-                : "Select a date range"}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+              <span style={styles.calendarFooterText}>
+                {tempFrom && tempTo
+                  ? `${formatLong(tempFrom)} - ${formatLong(tempTo)}`
+                  : tempFrom
+                  ? formatLong(tempFrom)
+                  : "Select a date range"}
+              </span>
+              {error && <span style={styles.calendarError}>{error}</span>}
+            </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="button"
                 className="of-btn of-btn-secondary"
                 style={styles.cancelButton}
-                onClick={onClose}
+                onClick={() => { setError(""); onClose(); }}
               >
                 Cancel
               </button>
@@ -1595,8 +2065,19 @@ function DateRangePicker({
                 type="button"
                 className="of-btn of-btn-primary"
                 style={styles.submitButton}
-                disabled={!tempFrom || !tempTo}
-                onClick={() => onApply(tempFrom, tempTo || tempFrom)}
+                disabled={!tempFrom}
+                onClick={() => {
+                  if (!tempTo) {
+                    setError("Select an end date");
+                    return;
+                  }
+                  if (tempFrom && tempTo && tempFrom === tempTo) {
+                    setError("Start and end date should not be the same");
+                    return;
+                  }
+                  setError("");
+                  onApply(tempFrom, tempTo);
+                }}
               >
                 Apply
               </button>
@@ -1695,6 +2176,48 @@ function CalendarMonth({
 // ── Global stylesheet (hover / focus / responsive states inline styles can't express) ──
 
 const globalCss = `
+  .of-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+    width: 100%;
+  }
+  @media (max-width: 960px) {
+    .of-form-grid {
+      grid-template-columns: 1fr !important;
+    }
+  }
+  .of-option-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+  }
+  @media (max-width: 640px) {
+    .of-option-grid-2 {
+      grid-template-columns: 1fr !important;
+    }
+  }
+  .of-option-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+  }
+  @media (max-width: 768px) {
+    .of-option-grid-3 {
+      grid-template-columns: 1fr !important;
+    }
+  }
+  .of-card {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    padding: 26px 28px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    box-sizing: border-box;
+  }
   .of-section-row {
     display: flex;
     align-items: flex-start;
@@ -1824,6 +2347,25 @@ const globalCss = `
   .of-picker-row:hover {
     background: #FAFAFB;
   }
+
+  /* ── Field Help popover ──────────────────────────────────────────── */
+  .of-help-popover {
+    animation: of-popover-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes of-popover-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .of-help-close:hover {
+    background: #F3F4F6 !important;
+    color: #111827 !important;
+  }
 `;
 
 // ── Styles (single source of truth for the form) ─────────────────────
@@ -1833,28 +2375,208 @@ export const styles: Record<string, React.CSSProperties> = {
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     color: "#1C1E21",
-    background: "#F6F6F8",
+    background: "#F7F8F9",
     minHeight: "100%",
   },
   pageContent: {
-    maxWidth: 1040,
+    width: "100%",
+    maxWidth: 1440,
     margin: "0 auto",
-    padding: "32px 24px 64px",
+    padding: "24px 32px 64px",
+    boxSizing: "border-box",
   },
   headerBar: {
-    padding: "0 2px 22px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0 0 24px",
+    width: "100%",
   },
-  headerText: { margin: 0, fontSize: 20, fontWeight: 650, letterSpacing: "-0.01em" },
-  headerSubtitle: { marginTop: 4, fontSize: 13, color: "#6B7280" },
-  form: { padding: "24px 24px 40px", maxWidth: 900 },
+  headerLeftGroup: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+  },
+  headerDivider: {
+    width: 1,
+    height: 38,
+    background: "#E5E7EB",
+  },
+  backButton: {
+    background: "#fff",
+    border: "1px solid #D1D5DB",
+    borderRadius: 8,
+    padding: "8px 16px",
+    fontSize: 14,
+    fontWeight: 500,
+    color: "#374151",
+    textDecoration: "none",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+  },
+  helpButton: {
+    background: "#fff",
+    border: "1px solid #D1D5DB",
+    borderRadius: 8,
+    padding: "8px 14px",
+    fontSize: 14,
+    fontWeight: 500,
+    color: "#374151",
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+  },
+  helpPopover: {
+    position: "absolute",
+    top: "calc(100% + 10px)",
+    right: 0,
+    width: 330,
+    backgroundColor: "#FFFFFF",
+    border: "1px solid #E5E7EB",
+    borderRadius: 12,
+    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
+    padding: "20px 22px",
+    zIndex: 1100,
+    boxSizing: "border-box",
+    textAlign: "left",
+  },
+  helpPopoverArrow: {
+    position: "absolute",
+    top: -6,
+    right: 32,
+    width: 12,
+    height: 12,
+    backgroundColor: "#FFFFFF",
+    borderLeft: "1px solid #E5E7EB",
+    borderTop: "1px solid #E5E7EB",
+    transform: "rotate(45deg)",
+    zIndex: 1101,
+  },
+  helpHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  helpTitle: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: "#111827",
+    lineHeight: 1.2,
+  },
+  helpCloseButton: {
+    border: "none",
+    background: "transparent",
+    cursor: "pointer",
+    padding: 4,
+    color: "#6B7280",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 6,
+  },
+  helpContent: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+    maxHeight: "calc(100vh - 160px)",
+    overflowY: "auto",
+  },
+  helpItem: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 3,
+  },
+  helpItemLast: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 3,
+  },
+  helpItemTitle: {
+    fontSize: 13.5,
+    fontWeight: 700,
+    color: "#111827",
+    lineHeight: 1.3,
+  },
+  helpItemDesc: {
+    fontSize: 12.5,
+    color: "#6B7280",
+    lineHeight: 1.45,
+  },
+  headerText: {
+    margin: 0,
+    fontSize: 26,
+    fontWeight: 700,
+    color: "#111827",
+    letterSpacing: "-0.02em",
+  },
+  headerSubtitle: {
+    marginTop: 4,
+    fontSize: 14,
+    color: "#6B7280",
+    fontWeight: 400,
+  },
+  form: { padding: "0 0 40px", width: "100%", margin: "0 auto" },
+
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 24,
+    alignItems: "start",
+    width: "100%",
+  },
+  formCol: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 24,
+    minWidth: 0,
+  },
 
   // card / section shell
   card: {
     background: "#FFFFFF",
-    border: "1px solid #E4E5E9",
+    border: "1px solid #E5E7EB",
     borderRadius: 12,
-    padding: "24px 26px",
-    boxShadow: "0 1px 2px rgba(16, 24, 40, 0.03)",
+    padding: "26px 28px",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.02)",
+    boxSizing: "border-box",
+  },
+  cardHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 14,
+    marginBottom: 24,
+  },
+  cardHeaderIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    background: "#E8F5E9",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#008060",
+    flexShrink: 0,
+  },
+  cardHeaderText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cardTitle: {
+    fontWeight: 700,
+    fontSize: 17,
+    color: "#111827",
+    lineHeight: 1.3,
+  },
+  cardDesc: {
+    marginTop: 4,
+    fontSize: 13.5,
+    color: "#6B7280",
+    lineHeight: 1.45,
   },
   section: { marginBottom: 8 },
   sectionHeading: {
@@ -1868,31 +2590,31 @@ export const styles: Record<string, React.CSSProperties> = {
   sectionRowTitle: { fontWeight: 650, fontSize: 15, color: "#1C1E21" },
   sectionRowDesc: { marginTop: 6, fontSize: 13, color: "#6B7280", lineHeight: 1.5 },
 
-  field: { marginBottom: 26 },
+  field: { marginBottom: 22 },
   fieldLast: { marginBottom: 0 },
-  fieldLabel: { fontWeight: 600, fontSize: 13.5, marginBottom: 9, color: "#33363B" },
-  asterisk: { color: "#D0364A" },
+  fieldLabel: { fontWeight: 650, fontSize: 14, marginBottom: 8, color: "#111827" },
+  asterisk: { color: "#E02424", marginLeft: 3 },
   input: {
     width: "100%",
-    maxWidth: 480,
-    border: "1px solid #D4D6DC",
+    maxWidth: "100%",
+    border: "1px solid #D1D5DB",
     borderRadius: 8,
-    padding: "10px 12px",
-    fontSize: 14,
-    color: "#1C1E21",
+    padding: "12px 16px",
+    fontSize: 15,
+    color: "#111827",
     background: "#fff",
     boxSizing: "border-box",
   },
   select: {
-    border: "1px solid #D4D6DC",
+    border: "1px solid #D1D5DB",
     borderRadius: 8,
-    padding: "9px 10px",
+    padding: "10px 12px",
     fontSize: 14,
     background: "#fff",
     cursor: "pointer",
     minWidth: 140,
     flex: "1 1 140px",
-    color: "#1C1E21",
+    color: "#111827",
   },
 
   typeBadgeWrap: {
@@ -1949,62 +2671,103 @@ export const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
   },
 
-  // ── Option card (new checkbox / radio presentation) ─────────────────
+  // ── Option card grids & cards ───────────────────────────────────────
+  optionGrid2: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 12,
+    width: "100%",
+  },
+  optionGrid3: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 12,
+    width: "100%",
+  },
+  optionStackCol: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    width: "100%",
+  },
   optionCard: {
     position: "relative",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 10,
-    border: "1px solid #D4D6DC",
-    borderRadius: 10,
-    padding: "10px 14px",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 12,
+    border: "1px solid #D1D5DB",
+    borderRadius: 8,
+    padding: "16px 18px",
     cursor: "pointer",
     background: "#fff",
     userSelect: "none",
     boxSizing: "border-box",
+    transition: "border-color 120ms ease, box-shadow 120ms ease",
+    minWidth: 0,
   },
   optionCardSelected: {
     borderColor: "#008060",
-    background: "#F0FAF6",
+    background: "#fff",
     boxShadow: "0 0 0 1px #008060 inset",
   },
+  optionCardContent: {
+    display: "flex",
+    flexDirection: "column",
+    minWidth: 0,
+    flex: 1,
+  },
+  optionCardTitle: {
+    fontSize: 15,
+    color: "#111827",
+    fontWeight: 650,
+    lineHeight: 1.3,
+  },
+  optionCardSubtitle: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginTop: 4,
+    lineHeight: 1.35,
+  },
   optionCardLabel: {
-    fontSize: 14,
-    color: "#1C1E21",
+    fontSize: 14.5,
+    color: "#111827",
     fontWeight: 500,
   },
   optionCheck: {
-    width: 18,
-    height: 18,
-    borderRadius: 5,
-    border: "1.5px solid #C7CBD1",
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    border: "1.5px solid #D1D5DB",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
     background: "#fff",
+    marginTop: 1,
   },
   optionCheckSelected: {
     background: "#008060",
     borderColor: "#008060",
   },
   optionCheckRadio: {
-    width: 18,
-    height: 18,
+    width: 20,
+    height: 20,
     borderRadius: "50%",
-    border: "1.5px solid #C7CBD1",
+    border: "1.5px solid #D1D5DB",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
     background: "#fff",
+    marginTop: 1,
   },
   optionCheckRadioSelected: {
     borderColor: "#008060",
+    borderWidth: 2,
   },
   optionRadioDot: {
-    width: 8,
-    height: 8,
+    width: 9,
+    height: 9,
     borderRadius: "50%",
     background: "#008060",
   },
@@ -2020,15 +2783,16 @@ export const styles: Record<string, React.CSSProperties> = {
     border: 0,
   },
 
-  errorText: { color: "#D0364A", fontSize: 12.5, marginTop: 7 },
+  errorText: { color: "#D0364A", fontSize: 13, marginTop: 7 },
+  fieldError: { color: "#D0364A", fontSize: 13, marginTop: 4, marginBottom: 8 },
   emptyNotice: {
     marginTop: 8,
-    fontSize: 13,
+    fontSize: 13.5,
     color: "#6B7280",
     background: "#F6F6F8",
     border: "1px dashed #D4D6DC",
     borderRadius: 8,
-    padding: "10px 12px",
+    padding: "12px 14px",
   },
   noticeBox: {
     display: "flex",
@@ -2037,18 +2801,18 @@ export const styles: Record<string, React.CSSProperties> = {
     background: "#F3F6FF",
     border: "1px solid #DCE5FD",
     borderRadius: 10,
-    padding: "12px 14px",
-    fontSize: 13,
+    padding: "14px 16px",
+    fontSize: 13.5,
     color: "#3B4A66",
     marginBottom: 18,
   },
   noticeIcon: {
-    width: 18,
-    height: 18,
+    width: 20,
+    height: 20,
     borderRadius: "50%",
     background: "#5B7CFA",
     color: "#fff",
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 700,
     fontStyle: "italic",
     display: "flex",
@@ -2066,6 +2830,7 @@ export const styles: Record<string, React.CSSProperties> = {
     marginTop: 12,
     background: "#FCFCFD",
   },
+  conditionError: { color: "#D0364A", fontSize: 13, marginBottom: 12 },
   conditionRow: {
     display: "flex",
     alignItems: "center",
@@ -2091,35 +2856,73 @@ export const styles: Record<string, React.CSSProperties> = {
     minWidth: 0,
     border: "1px solid #D4D6DC",
     borderRadius: 8,
-    padding: "9px 10px",
+    padding: "10px 12px",
     fontSize: 14,
   },
   roundButtonRemove: {
-    width: 24,
-    height: 24,
+    width: 26,
+    height: 26,
     borderRadius: "50%",
     border: "none",
     background: "#FCE4E1",
     color: "#D0364A",
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 1,
     cursor: "pointer",
     flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   roundButtonAdd: {
-    width: 24,
-    height: 24,
+    width: 26,
+    height: 26,
     borderRadius: "50%",
     border: "none",
     background: "#DBF6DF",
     color: "#1A8A3D",
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 1,
     cursor: "pointer",
     flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // manual product picker — trigger button + selection list
+  productSelectBar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    border: "1px solid #D1D5DB",
+    borderRadius: 8,
+    padding: "10px 14px",
+    background: "#fff",
+    boxSizing: "border-box",
+    width: "100%",
+  },
+  productSelectBarLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    color: "#6B7280",
+  },
+  productSelectBarText: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  selectProductsButton: {
+    background: "#fff",
+    color: "#111827",
+    border: "1px solid #D1D5DB",
+    borderRadius: 6,
+    padding: "8px 16px",
+    fontSize: 13.5,
+    fontWeight: 500,
+    cursor: "pointer",
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+  },
   editProductsButton: {
     marginLeft: 0,
     background: "#fff",
@@ -2130,6 +2933,71 @@ export const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 600,
     cursor: "pointer",
+  },
+  dealTypeCol: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+  },
+  dealTypeRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    userSelect: "none",
+  },
+  dealTypeCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    border: "1.5px solid #D1D5DB",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    background: "#fff",
+  },
+  dealTypeCheckSelected: {
+    background: "#008060",
+    borderColor: "#008060",
+  },
+  dealTypeLabel: {
+    fontSize: 14,
+    color: "#111827",
+    fontWeight: 450,
+  },
+  planNoticeBox: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+    background: "#F4F7FA",
+    border: "1px solid #E2E8F0",
+    borderRadius: 8,
+    padding: "14px 18px",
+    marginTop: 16,
+  },
+  planNoticeLeft: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  planNoticeText: {
+    fontSize: 13.5,
+    color: "#374151",
+    lineHeight: 1.45,
+  },
+  viewPlansButton: {
+    background: "#fff",
+    color: "#111827",
+    border: "1px solid #D1D5DB",
+    borderRadius: 6,
+    padding: "8px 16px",
+    fontSize: 13.5,
+    fontWeight: 500,
+    textDecoration: "none",
+    flexShrink: 0,
+    cursor: "pointer",
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
   },
   pickerRow: {
     display: "flex",
@@ -2150,7 +3018,6 @@ export const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
   },
   selectionList: {
-    marginLeft: 27,
     marginTop: 10,
     display: "flex",
     flexDirection: "column",
@@ -2163,9 +3030,9 @@ export const styles: Record<string, React.CSSProperties> = {
     background: "#F6F6F8",
     border: "1px solid #EEEFF2",
     borderRadius: 8,
-    padding: "7px 10px 7px 8px",
-    fontSize: 13,
-    maxWidth: 460,
+    padding: "8px 12px",
+    fontSize: 13.5,
+    maxWidth: "100%",
   },
   selectionItemInner: {
     display: "flex",
@@ -2198,39 +3065,51 @@ export const styles: Record<string, React.CSSProperties> = {
     display: "block",
   },
 
+  actionsContainer: {
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 14,
+    marginTop: 28,
+  },
   actionsRow: { display: "flex", gap: 12 },
   submitButton: {
-    background: "#008060",
+    background: "#1E7E59",
     color: "#fff",
     border: "none",
     borderRadius: 8,
-    padding: "11px 24px",
-    fontSize: 14,
+    padding: "11px 28px",
+    fontSize: 14.5,
     fontWeight: 600,
     cursor: "pointer",
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
   },
   cancelButton: {
     background: "#fff",
-    color: "#1C1E21",
-    border: "1px solid #D4D6DC",
+    color: "#111827",
+    border: "1px solid #D1D5DB",
     borderRadius: 8,
-    padding: "11px 24px",
-    fontSize: 14,
+    padding: "11px 26px",
+    fontSize: 14.5,
     fontWeight: 600,
     cursor: "pointer",
     display: "inline-flex",
     alignItems: "center",
+    textDecoration: "none",
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
   },
 
   // date input
   dateInputWrap: { position: "relative" },
   dateInputIcon: {
     position: "absolute",
-    right: 12,
+    right: 14,
     top: "50%",
     transform: "translateY(-50%)",
     fontSize: 14,
     pointerEvents: "none",
+    display: "flex",
+    alignItems: "center",
   },
 
   // calendar
@@ -2295,6 +3174,7 @@ export const styles: Record<string, React.CSSProperties> = {
     gap: 12,
   },
   calendarFooterText: { fontSize: 13, color: "#6B7280" },
+  calendarError: { fontSize: 13, color: "#DC2626", marginRight: 8 },
 
   // ── "Edit products" modal ────────────────────────────────────────────
   modalOverlay: {
