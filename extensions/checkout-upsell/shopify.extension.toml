@@ -20,3 +20,4 @@ type = "single_line_text_field"
 [[extensions.targeting]]
 target = "purchase.checkout.block.render"
 module = "./src/index.tsx"
+default_placement = "ORDER_SUMMARY1"

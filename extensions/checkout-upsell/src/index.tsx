@@ -4,10 +4,16 @@ import { useState } from "preact/hooks";
 import { type EligibleOffer, loadEligibleOffers, postOfferEvent } from "./offersApi";
 
 export default async function extension() {
-  const result = await loadEligibleOffers({
+  let result = await loadEligibleOffers({
     placement: "checkout",
     displayLocation: "checkout_page",
   });
+  if (result.offers.length === 0) {
+    result = await loadEligibleOffers({
+      placement: "post_purchase",
+      displayLocation: "thank_you_page",
+    });
+  }
   for (const offer of result.offers) {
     void postOfferEvent("viewed", offer, { placement: "checkout" });
   }
