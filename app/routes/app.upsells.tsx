@@ -113,7 +113,7 @@ export default function AllUpsellsPage() {
             <p>{visibleOffers.length} offer{visibleOffers.length === 1 ? "" : "s"} configured</p>
           </div>
           <AdminAppLink to="/app/offers/new" className="allUpsellsNewButton" style={{ textDecoration: "none" }}>
-            <span aria-hidden="true">⊕</span> New Upsell
+            <PlusIcon /> New Upsell
           </AdminAppLink>
         </header>
 
@@ -169,5 +169,25 @@ export default function AllUpsellsPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M8 2.5V13.5M2.5 8H13.5"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }

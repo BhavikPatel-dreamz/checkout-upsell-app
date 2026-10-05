@@ -1,7 +1,8 @@
 import { useAppBridge } from "@shopify/app-bridge-react";
+import { useState, useMemo } from "react";
 import type { Offer as OfferRecord } from "@prisma/client";
 
-import { PLACEMENT_LABELS, getOfferTypeConfig } from "../types/offer";
+import { PLACEMENT_LABELS, getOfferTypeConfig, placementHeaderLabel } from "../types/offer";
 import { AdminAppLink } from "./AdminAppLink";
 
 type DashboardProps = {
@@ -106,6 +107,59 @@ export default function Dashboard({
     if (titles.length <= 2) return `for ${titles.join(", ")}`;
     return `for ${titles[0]} + ${titles.length - 1}`;
   }
+
+  function getPlacementBadgeInfo(offer: OfferRecord): { label: string; className: string } {
+    const rules = (offer.triggerRules as Record<string, unknown> | null) ?? {};
+    const displayLocation = typeof rules.displayLocation === "string" ? rules.displayLocation : undefined;
+
+    if (displayLocation === "cart_drawer") {
+      return { label: "Cart", className: "placementPillCart" };
+    }
+    if (displayLocation === "cart_drawer_upsell" || offer.placement === "cart_drawer") {
+      return { label: "Cart Drawer", className: "placementPillCartDrawer" };
+    }
+    if (offer.placement === "product_page") {
+      return { label: "Product Page", className: "placementPillProductPage" };
+    }
+    if (offer.placement === "post_purchase") {
+      return { label: "Post-Purchase", className: "placementPillPostPurchase" };
+    }
+    if (offer.placement === "checkout") {
+      return { label: "Checkout", className: "placementPillCheckout" };
+    }
+    if (offer.placement === "order_status") {
+      return { label: "Order Status", className: "placementPillDefault" };
+    }
+    return { label: "Checkout", className: "placementPillCheckout" };
+  }
+
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft">("all");
+  const [placementFilter, setPlacementFilter] = useState<string>("all");
+  const [expandedTriggerOfferIds, setExpandedTriggerOfferIds] = useState<Record<string, boolean>>({});
+
+  function toggleTriggerExpand(offerId: string) {
+    setExpandedTriggerOfferIds((prev) => ({
+      ...prev,
+      [offerId]: !prev[offerId],
+    }));
+  }
+
+  const [expandedSubtitleOfferIds, setExpandedSubtitleOfferIds] = useState<Record<string, boolean>>({});
+
+  function toggleSubtitleExpand(offerId: string) {
+    setExpandedSubtitleOfferIds((prev) => ({
+      ...prev,
+      [offerId]: !prev[offerId],
+    }));
+  }
+
+  const filteredOffers = useMemo(() => {
+    return visibleOffers.filter((offer) => {
+      if (statusFilter !== "all" && offer.isActive !== (statusFilter === "active")) return false;
+      if (placementFilter !== "all" && offer.placement !== placementFilter) return false;
+      return true;
+    });
+  }, [visibleOffers, statusFilter, placementFilter]);
 
   // Real, dynamic data
   const totalViews = metrics.totalViews;
@@ -299,61 +353,201 @@ export default function Dashboard({
           <div id="active-upsells-section" className="tableSection">
             <div className="tableSectionHeader">
               <h2 className="sectionHeading">Active Upsells</h2>
-              <AdminAppLink
-                to={allUpsellsUrl}
-                className="viewAllLink"
-                style={{ textDecoration: "none" }}
-              >
-                View all →
-              </AdminAppLink>
+              <div className="tableSectionHeaderRight">
+                <div className="tableFilters">
+                  <div className="filterGroup">
+                    <span className="filterLabel">Placement</span>
+                    <select
+                      className="filterSelect"
+                      value={placementFilter}
+                      onChange={(e) => setPlacementFilter(e.target.value)}
+                    >
+                      <option value="all">All</option>
+                      {Object.entries(PLACEMENT_LABELS).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="filterGroup">
+                    <span className="filterLabel">Status</span>
+                    <select
+                      className="filterSelect"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "draft")}
+                    >
+                      <option value="all">All Status</option>
+                      <option value="active">Active</option>
+                      <option value="draft">Draft</option>
+                    </select>
+                  </div>
+                </div>
+                <AdminAppLink
+                  to={allUpsellsUrl}
+                  className="viewAllLink"
+                  style={{ textDecoration: "none" }}
+                >
+                  View all →
+                </AdminAppLink>
+              </div>
             </div>
 
-            {visibleOffers.length === 0 ? (
-              <div className="emptyCell">There are no data</div>
+            {filteredOffers.length === 0 ? (
+              <div className="emptyCell">
+                {visibleOffers.length === 0 ? "There are no data" : "No offers match your filters"}
+              </div>
             ) : (
               <div className="offerList">
-                {visibleOffers.map((offer: OfferRecord) => {
+                <div className="offerRow offerRowHeader">
+                  <div className="offerColHeader">Offer</div>
+                  <div className="offerColHeader">Placement</div>
+                  <div className="offerColHeader">Trigger / Applies To</div>
+                  <div className="offerColHeader offerColHeaderBordered">Status</div>
+                  <div className="offerColHeader offerColHeaderBordered">Conv. Rate</div>
+                  <div className="offerColHeader offerColHeaderBordered">Purchases</div>
+                  <div className="offerColHeader offerColHeaderBordered">Actions</div>
+                </div>
+                {filteredOffers.map((offer: OfferRecord) => {
                   const offerViews = offerIdToViews.get(offer.id) ?? 0;
                   const offerPurchases = offerIdToPurchases.get(offer.id) ?? 0;
                   const offerConvRate =
                     offerViews > 0 ? offerPurchases / offerViews : null;
+                  const typeConfig = getOfferTypeConfig(offer.type);
+                  const placementBadge = getPlacementBadgeInfo(offer);
+                  const isPostPurchase = offer.placement === "post_purchase";
+                  const targetIds = Array.isArray(offer.targetProductIds)
+                    ? offer.targetProductIds.filter(Boolean)
+                    : [];
+                  const firstTriggerTitle =
+                    targetIds.length > 0
+                      ? productTitleByProductId[targetIds[0]] ?? targetIds[0]
+                      : null;
+                  const remainingTriggers = targetIds.length - 1;
+                  const isTriggerExpanded = Boolean(expandedTriggerOfferIds[offer.id]);
+                  const offerTitles = productTitlesForOffer(offer);
+                  const isSubtitleExpanded = Boolean(expandedSubtitleOfferIds[offer.id]);
 
                   return (
                     <div key={offer.id} className="offerRow">
-                      <div className="offerInfo">
+                      <div className="offerColDetails">
                         <div className="offerTitle">{offer.name}</div>
-                        <div className="offerSubtitle">{subtitleForOffer(offer)}</div>
+                        {isSubtitleExpanded ? (
+                          <div className="offerSubtitleContent offerSubtitleExpanded">
+                            <div className="offerSubtitleList">
+                              {offerTitles.map((t, idx) => (
+                                <span key={idx} className="offerSubtitleItem">
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              className="offerCollapseLink"
+                              onClick={() => toggleSubtitleExpand(offer.id)}
+                            >
+                              Show less
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="offerSubtitle">
+                            {offerTitles.length > 2 ? (
+                              <>
+                                <span>for {offerTitles[0]} </span>
+                                <button
+                                  type="button"
+                                  className="offerMoreLink"
+                                  onClick={() => toggleSubtitleExpand(offer.id)}
+                                >
+                                  +{offerTitles.length - 1}
+                                </button>
+                              </>
+                            ) : (
+                              subtitleForOffer(offer)
+                            )}
+                          </div>
+                        )}
                       </div>
 
-                      <span
-                        className={offer.isActive ? "badge badgeActive" : "badge badgeDraft"}
-                      >
-                        {offer.isActive ? "Active" : "Draft"}
-                      </span>
+                      <div className="offerColPlacement">
+                        <div className="placementPillGroup">
+                          <span className={isPostPurchase ? "typePill typePillPurple" : "typePill"}>
+                            {typeConfig.label}
+                          </span>
+                          <span className={`placementPill ${placementBadge.className}`}>
+                            {placementBadge.label}
+                          </span>
+                        </div>
+                      </div>
 
-                      <div className="offerStat">
-                        <div className="offerStatValue offerStatValuePositive">
+                      <div className="offerColTrigger">
+                        {firstTriggerTitle ? (
+                          <div className={`triggerCellContent ${isTriggerExpanded ? "triggerCellExpanded" : ""}`}>
+                            {isTriggerExpanded ? (
+                              <>
+                                {targetIds.map((pid) => (
+                                  <span key={pid} className="triggerPrimaryText">
+                                    {productTitleByProductId[pid] ?? pid}
+                                  </span>
+                                ))}
+                                <button
+                                  type="button"
+                                  className="triggerCollapseBtn"
+                                  onClick={() => toggleTriggerExpand(offer.id)}
+                                >
+                                  Show less
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="triggerPrimaryText" title={firstTriggerTitle}>
+                                  {firstTriggerTitle}
+                                </span>
+                                {remainingTriggers > 0 && (
+                                  <button
+                                    type="button"
+                                    className="triggerMoreBtn"
+                                    onClick={() => toggleTriggerExpand(offer.id)}
+                                  >
+                                    +{remainingTriggers} more
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="triggerCellContent">
+                            <span className="triggerPrimaryText">All Products</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="offerColStatus">
+                        <span className={offer.isActive ? "statusPill statusPillActive" : "statusPill statusPillDraft"}>
+                          {offer.isActive ? "Active" : "Draft"}
+                        </span>
+                      </div>
+
+                      <div className="offerColStat">
+                        <span className="offerStatNumber">
                           {formatPercent(offerConvRate)}
-                        </div>
-                        <div className="offerStatLabel">conv.</div>
+                        </span>
                       </div>
 
-                      <div className="offerStat">
-                        <div className="offerStatValue">
+                      <div className="offerColStat">
+                        <span className="offerStatNumber">
                           {formatCompact(offerPurchases)}
-                        </div>
-                        <div className="offerStatLabel">purchases</div>
+                        </span>
                       </div>
 
-                      <div className="offerActions">
-                        <AdminAppLink to={editUrl(offer.id)} className="linkButton" style={{ textDecoration: "none" }}>
+                      <div className="offerColActions">
+                        <AdminAppLink to={editUrl(offer.id)} className="actionBtn actionBtnEdit" style={{ textDecoration: "none" }}>
                           Edit
                         </AdminAppLink>
                         <button
+                          type="button"
                           className={
                             deletingId === offer.id
-                              ? "linkButton linkButtonDisabled"
-                              : "linkButton linkButtonDanger"
+                              ? "actionBtn actionBtnDisabled"
+                              : "actionBtn actionBtnDelete"
                           }
                           onClick={() => onDelete(offer.id)}
                           disabled={deletingId === offer.id}

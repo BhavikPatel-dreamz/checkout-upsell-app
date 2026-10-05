@@ -98,7 +98,7 @@ export default function OfferTypeSelector() {
 
       <SectionRow
         title="Offer Type"
-        description="Pick the upsell mechanic this offer will use. More types are on the way."
+        description="Choose how you want to increase your average order value (AOV)."
       >
         <div style={styles.cardGrid}>
           {offerTypeOptions().map((option) => {

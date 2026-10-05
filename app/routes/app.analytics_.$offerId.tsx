@@ -835,7 +835,6 @@ export default function OfferAnalyticsDetailsPage() {
 
         {/* Mini stat strip */}
         <Row>
-          <MiniStat label="Shown" value={formatCompact(summary.totalViews)} />
           <MiniStat label="Views" value={formatCompact(funnel.views)} />
           <MiniStat label="Clicks" value={formatCompact(funnel.clicks)} />
           <MiniStat label="CTR" value={formatRate(funnel.clickThroughRate)} />
