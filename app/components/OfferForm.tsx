@@ -244,6 +244,7 @@ export default function OfferForm({
   allowPaidDealTypes = false,
 }: OfferFormProps) {
   const hasSyncedProducts = products.length > 0;
+  const navigate = useNavigate();
   const locationOptions = displayLocationOptions(placement);
   const typeConfig = getOfferTypeConfig(offerType);
   const typeSpecificFieldIds = typeConfig.fields.filter(
@@ -549,6 +550,7 @@ export default function OfferForm({
                 onApplyPicker={applyTriggerPicker}
                 onRemove={removeTriggerSelection}
                 error={errors.targetProductIds}
+                onSyncClick={() => navigate('/app/product-sync')}
               />
             </SectionCard>
           )}
@@ -579,6 +581,7 @@ export default function OfferForm({
                 fieldIds={typeSpecificFieldIds}
                 poolOnly={Boolean(typeConfig.poolOnly)}
                 allowPaidDealTypes={allowPaidDealTypes}
+                onSyncClick={() => navigate('/app/product-sync')}
               />
             </SectionCard>
           )}
@@ -835,6 +838,7 @@ function TypeSpecificFields({
   fieldIds,
   poolOnly,
   allowPaidDealTypes,
+  onSyncClick,
 }: {
   state: OfferFormState;
   errors: ErrorMap;
@@ -843,6 +847,7 @@ function TypeSpecificFields({
   fieldIds: string[];
   poolOnly?: boolean;
   allowPaidDealTypes: boolean;
+  onSyncClick?: () => void;
 }) {
   return (
     <>
@@ -853,6 +858,7 @@ function TypeSpecificFields({
           products={products}
           hasSyncedProducts={hasSyncedProducts}
           poolOnly={poolOnly}
+          onSyncClick={onSyncClick}
         />
       )}
       {fieldIds.includes("dealType") && (
@@ -868,12 +874,14 @@ function UpsellProductField({
   products,
   hasSyncedProducts,
   poolOnly,
+  onSyncClick,
 }: {
   state: OfferFormState;
   errors: ErrorMap;
   products: Product[];
   hasSyncedProducts: boolean;
   poolOnly?: boolean;
+  onSyncClick?: () => void;
 }) {
   return (
     <Field label={poolOnly ? "Upsell product pool" : "Upsell Product"} required error={errors.upsellProduct}>
@@ -900,8 +908,16 @@ function UpsellProductField({
       {state.upsellProduct === "manual" && (
         <div style={{ marginTop: 14 }}>
           {!hasSyncedProducts ? (
-            <div style={styles.emptyNotice}>
-              No synced products found. Please sync products first.
+            <div style={{ ...styles.emptyNotice, ...styles.planNoticeBox }}>
+              <span>Please sync the product first</span>
+              <button
+                type="button"
+                className="of-btn of-btn-secondary"
+                style={styles.viewPlansButton}
+                onClick={onSyncClick}
+              >
+                Sync Products
+              </button>
             </div>
           ) : (
             <div style={styles.productSelectBar}>
@@ -984,6 +1000,7 @@ function TriggerProductField({
   onApplyPicker,
   onRemove,
   error,
+  onSyncClick,
 }: {
   products: Product[];
   selected: TriggerSelection[];
@@ -993,10 +1010,26 @@ function TriggerProductField({
   onApplyPicker: (selectedProductIds: string[]) => void;
   onRemove: (id: string) => void;
   error?: string;
+  onSyncClick?: () => void;
 }) {
+  const hasSyncedProducts = products.length > 0;
   return (
     <Field label="Main Products" required error={error} last>
-      <div style={styles.productSelectBar}>
+      {!hasSyncedProducts ? (
+        <div style={{ ...styles.emptyNotice, ...styles.planNoticeBox }}>
+          <span>Please sync the product first</span>
+          <button
+            type="button"
+            className="of-btn of-btn-secondary"
+            style={styles.viewPlansButton}
+            onClick={onSyncClick}
+          >
+            Sync Products
+          </button>
+        </div>
+      ) : (
+        <>
+          <div style={styles.productSelectBar}>
         <div style={styles.productSelectBarLeft}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="9" cy="21" r="1" />
@@ -1052,6 +1085,8 @@ function TriggerProductField({
           onClose={onClosePicker}
           onDoneProducts={onApplyPicker}
         />
+      )}
+        </>
       )}
     </Field>
   );
@@ -1309,7 +1344,7 @@ function ProductPickerModal(props: ProductPickerModalProps) {
 
         <div style={styles.modalList}>
           {filtered.length === 0 && (
-            <div style={styles.modalEmptyState}>No products found.</div>
+            <div style={styles.modalEmptyState}>Please sync the product first</div>
           )}
 
           {mode === "products" &&
