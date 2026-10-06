@@ -56,3 +56,15 @@ type = "single_line_text_field"
   type = "boolean"
   name = "Show card border"
   description = "Toggle the border around each offer card."
+
+  [[extensions.settings.fields]]
+  key = "show_editor_preview"
+  type = "boolean"
+  name = "Show preview when no offer matches"
+  description = "In the checkout editor only: show a message and sample cards when no thank-you offer matches."
+
+  [[extensions.settings.fields]]
+  key = "editor_preview_message"
+  type = "single_line_text_field"
+  name = "No-match message (editor)"
+  description = "Shown in the checkout editor when no offer matches. Leave blank for the default message."

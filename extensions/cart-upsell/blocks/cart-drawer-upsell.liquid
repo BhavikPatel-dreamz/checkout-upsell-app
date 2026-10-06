@@ -24,6 +24,7 @@
   <h3 class="cart-drawer-upsell-heading">
     {% if block.settings.heading_text != blank %}{{ block.settings.heading_text }}{% else %}{{ "cart_upsell.title" | t }}{% endif %}
   </h3>
+  <div id="cart-drawer-upsell-editor-notice" class="cart-drawer-upsell-editor-notice" style="display: none;"></div>
   <div id="cart-drawer-upsell-items" class="cart-drawer-upsell-items"></div>
   <div id="cart-drawer-upsell-error" class="cart-drawer-upsell-error"></div>
 </div>
@@ -47,11 +48,44 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  .cart-drawer-upsell-editor-notice {
+    display: none;
+    margin: 0 0 12px 0;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: #f4f6f8;
+    border: 1px dashed #8c9196;
+    color: #42474c;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
   .cart-drawer-upsell-error {
     display: none;
     color: var(--upsell-error-color);
     font-size: 12px;
     margin-top: 8px;
+  }
+
+  .cart-drawer-upsell-placeholder-img {
+    width: 64px;
+    height: 64px;
+    border-radius: 4px;
+    flex: none;
+    background: linear-gradient(135deg, #ececec 0%, #f8f8f8 100%);
+  }
+
+  .cart-drawer-upsell-card--preview {
+    opacity: 0.92;
+  }
+
+  .cart-drawer-upsell-preview-badge {
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--upsell-subtext-color);
   }
 
   .cart-drawer-upsell-card {
@@ -124,7 +158,24 @@
     addedToCartUrl: "/apps/checkout-upsell/api/offers/added-to-cart",
     customerId: {% if customer %}"gid://shopify/Customer/{{ customer.id }}"{% else %}null{% endif %},
     shop: {{ shop.permanent_domain | json }},
-    addToCartLabel: {{ "cart_upsell.add_to_cart" | t | json }},
+    designMode: {{ request.design_mode | json }},
+    editorPreviewEnabled: {{ block.settings.show_theme_editor_preview | json }},
+    editorPreviewMessage: {{ block.settings.editor_preview_message | json }},
+    previewPromoLabel: {{ block.settings.preview_promo_text | json }},
+    previewBadgeLabel: {{ "cart_upsell.preview_badge" | t | json }},
+    previewProducts: [
+      {%- for preview_product in block.settings.preview_products -%}
+        {
+          "productId": "gid://shopify/Product/{{ preview_product.id }}",
+          "variantId": "gid://shopify/ProductVariant/{{ preview_product.selected_or_first_available_variant.id }}",
+          "productTitle": {{ preview_product.title | json }},
+          "variantTitle": {{ preview_product.selected_or_first_available_variant.title | json }},
+          "price": {{ preview_product.selected_or_first_available_variant.price | money_without_currency | json }},
+          "imageUrl": {{ preview_product.featured_image | image_url: width: 200 | json }}
+        }{%- unless forloop.last -%},{%- endunless -%}
+      {%- endfor -%}
+    ],
+    addToCartLabel: {% if block.settings.add_to_cart_text != blank %}{{ block.settings.add_to_cart_text | json }}{% else %}{{ "cart_upsell.add_to_cart" | t | json }}{% endif %},
     viewLabel: {{ "product_upsell.view" | t | json }}
   };
 </script>
@@ -147,12 +198,40 @@
     { "type": "color", "id": "title_color", "label": "Product title color", "default": "#111111" },
     { "type": "color", "id": "subtext_color", "label": "Secondary text color", "default": "#666666" },
     { "type": "color", "id": "price_color", "label": "Price color", "default": "#666666" },
-    { "type": "header", "content": "Button" },
-    { "type": "color", "id": "button_bg_color", "label": "Button background", "default": "#111111" },
-    { "type": "color", "id": "button_text_color", "label": "Button text color", "default": "#ffffff" },
+    { "type": "header", "content": "Buttons" },
+    { "type": "text", "id": "add_to_cart_text", "label": "Add to cart button text", "default": "Add to cart" },
+    { "type": "color", "id": "button_bg_color", "label": "Add to cart background", "default": "#111111" },
+    { "type": "color", "id": "button_text_color", "label": "Add to cart text color", "default": "#ffffff" },
     { "type": "range", "id": "button_corner_radius", "label": "Button corner radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 4 },
     { "type": "header", "content": "Error message" },
-    { "type": "color", "id": "error_color", "label": "Error text color", "default": "#d32f2f" }
+    { "type": "color", "id": "error_color", "label": "Error text color", "default": "#d32f2f" },
+    { "type": "header", "content": "Theme editor preview" },
+    {
+      "type": "checkbox",
+      "id": "show_theme_editor_preview",
+      "label": "Show preview when no offer matches",
+      "default": true,
+      "info": "In the theme editor only: display a message and sample cards so the block is visible while you configure offers."
+    },
+    {
+      "type": "textarea",
+      "id": "editor_preview_message",
+      "label": "No-match message (theme editor)",
+      "default": "No Cart Drawer offer matches this preview cart. Create an active offer with Cart Drawer display and add a trigger product to the cart."
+    },
+    {
+      "type": "text",
+      "id": "preview_promo_text",
+      "label": "Sample promo line on preview cards",
+      "default": "Example promotional title"
+    },
+    {
+      "type": "product_list",
+      "id": "preview_products",
+      "label": "Preview products (optional)",
+      "limit": 4,
+      "info": "Used in the theme editor when no offer matches. Leave empty to use generic placeholders."
+    }
   ]
 }
 {% endschema %}

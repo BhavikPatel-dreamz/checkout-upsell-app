@@ -21,3 +21,51 @@ type = "single_line_text_field"
 target = "purchase.checkout.block.render"
 module = "./src/index.tsx"
 default_placement = "ORDER_SUMMARY1"
+
+  [[extensions.settings.fields]]
+  key = "heading_text"
+  type = "single_line_text_field"
+  name = "Heading text"
+  description = "Shown above the upsell offers."
+
+  [[extensions.settings.fields]]
+  key = "button_label"
+  type = "single_line_text_field"
+  name = "Button label"
+  description = "Text shown on the accept/add button for each offer."
+
+  [[extensions.settings.fields]]
+  key = "use_secondary_button"
+  type = "boolean"
+  name = "Use secondary button style"
+  description = "Off shows a solid primary button, on shows an outlined secondary button."
+
+  [[extensions.settings.fields]]
+  key = "price_standard_appearance"
+  type = "boolean"
+  name = "Use standard price text style"
+  description = "Off shows a subdued price, on shows standard emphasis."
+
+  [[extensions.settings.fields]]
+  key = "card_spacing"
+  type = "single_line_text_field"
+  name = "Card spacing"
+  description = "Enter tight, base, or loose. Defaults to tight if left blank or invalid."
+
+  [[extensions.settings.fields]]
+  key = "show_border"
+  type = "boolean"
+  name = "Show card border"
+  description = "Toggle the border around each offer card."
+
+  [[extensions.settings.fields]]
+  key = "show_editor_preview"
+  type = "boolean"
+  name = "Show preview when no offer matches"
+  description = "In the checkout editor only: show a message and sample cards when no checkout offer matches."
+
+  [[extensions.settings.fields]]
+  key = "editor_preview_message"
+  type = "single_line_text_field"
+  name = "No-match message (editor)"
+  description = "Shown in the checkout editor when no offer matches. Leave blank for the default message."

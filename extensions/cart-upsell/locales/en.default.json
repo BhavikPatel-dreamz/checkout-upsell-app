@@ -1,7 +1,8 @@
 {
   "cart_upsell": {
     "title": "You may also like",
-    "add_to_cart": "Add to cart"
+    "add_to_cart": "Add to cart",
+    "preview_badge": "Preview only"
   },
   "product_upsell": {
     "title": "You may also like",
