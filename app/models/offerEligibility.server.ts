@@ -98,7 +98,16 @@ export async function findEligibleCrossSellOffers(options: {
       } else if (displayLocation === "thank_you_page") {
         if (savedLocation && savedLocation !== "thank_you_page") continue;
       } else if (savedLocation !== displayLocation) {
-        continue;
+        // Legacy offers may omit displayLocation; infer from DB placement.
+        const legacyProductPage =
+          !savedLocation &&
+          displayLocation === "product_page" &&
+          placement === OfferPlacement.product_page;
+        const legacyCartDrawer =
+          !savedLocation &&
+          (displayLocation === "cart_drawer" || displayLocation === "cart_drawer_upsell") &&
+          placement === OfferPlacement.cart_drawer;
+        if (!legacyProductPage && !legacyCartDrawer) continue;
       }
     }
     const selections = manualSelectionsFromRules(triggerRules);
