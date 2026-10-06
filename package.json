@@ -9,6 +9,8 @@
     "dev": "shopify app dev --tunnel-url=https://upsale.dynamicdreamz.net:3003",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
+    "minify:theme": "node ./scripts/minify-cart-upsell.mjs",
+    "predeploy": "pnpm run minify:theme",
     "deploy": "shopify app deploy",
     "config:use": "shopify app config use",
     "env": "shopify app env",
@@ -61,6 +63,7 @@
     "eslint-plugin-react-hooks": "^4.6.2",
     "graphql-config": "^5.1.1",
     "prettier": "^3.6.2",
+    "terser": "^5.44.0",
     "typescript": "^5.9.3",
     "vite": "^6.3.6"
   },

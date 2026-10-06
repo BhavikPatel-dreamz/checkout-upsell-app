@@ -7,7 +7,8 @@ embedded = true
 
 [build]
 # Do not rewrite the live public app to the Cloudflare tunnel.
-# Dev preview uses /extensions on the tunnel; production needs shopify app deploy.
+# Dev preview uses /extensions on the tunnel; production needs deploy.
+# Use `pnpm run deploy` (not bare `shopify app deploy`) so cart-upsell JS is minified under 10KB first.
 automatically_update_urls_on_dev = true
 
 [webhooks]
