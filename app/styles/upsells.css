@@ -1,181 +1,740 @@
-.allUpsellsContent {
-  max-width: 976px;
-}
-
+/* Container & Shell */
 .allUpsellsShell {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #f8fafc;
+  min-height: 100vh;
+  padding: 24px 32px 48px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
+.allUpsellsContent {
+  max-width: 1360px;
+  width: 100%;
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
 .allUpsellsHeader {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .allUpsellsHeader h1 {
   margin: 0;
-  color: #1a1d23;
-  font-size: 1.3rem;
-  line-height: 1.3;
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
   letter-spacing: -0.02em;
 }
 
 .allUpsellsHeader p {
-  margin: 4px 0 0;
-  color: #7a8494;
-  font-size: 0.84rem;
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 14px;
 }
 
 .allUpsellsNewButton {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 36px;
+  gap: 8px;
+  min-height: 40px;
   border: 0;
   border-radius: 8px;
-  padding: 0 13px;
+  padding: 0 18px;
   background: #008060;
-  color: #fff;
-  font-size: 0.84rem;
-  font-weight: 700;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
 }
 
-.allUpsellsSearch {
+.allUpsellsNewButton:hover {
+  background: #006e52;
+}
+
+/* 4 KPI Stat Cards */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.kpiCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.kpiCardLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.kpiIconWrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kpiIconWrap.green {
+  background: #e6f7ef;
+  color: #008060;
+}
+
+.kpiIconWrap.blue {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.kpiIconWrap.purple {
+  background: #f5f3ff;
+  color: #8b5cf6;
+}
+
+.kpiIconWrap.amber {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.kpiInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.kpiLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.kpiValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.kpiTrend {
+  font-size: 12px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kpiTrendPositive {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.kpiTrendPeriod {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.kpiSparkline {
+  width: 76px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+/* Filter Bar */
+.allUpsellsFilterBar {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.allUpsellsSearchWrap {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 38px;
-  margin-bottom: 20px;
-  border: 1px solid #e4e8ec;
-  border-radius: 8px;
-  padding: 0 12px;
-  background: #fff;
-  color: #7a8494;
+  flex: 1;
+  min-width: 220px;
+  color: #94a3b8;
 }
 
-.allUpsellsSearch input {
+.allUpsellsSearchWrap input {
   width: 100%;
   border: 0;
   outline: 0;
   background: transparent;
-  color: #1a1d23;
-  font: inherit;
-  font-size: 0.84rem;
+  color: #0f172a;
+  font-size: 14px;
 }
 
-.allUpsellsTable {
-  overflow: hidden;
-  border: 1px solid #e4e8ec;
-  border-radius: 10px;
-  background: #fff;
+.allUpsellsSearchWrap input::placeholder {
+  color: #94a3b8;
 }
 
-.allUpsellsTableHeader,
-.allUpsellsRow {
-  display: grid;
-  grid-template-columns: minmax(260px, 2.2fr) minmax(100px, .8fr) minmax(100px, .8fr) minmax(110px, .8fr) minmax(120px, .9fr) minmax(80px, .7fr);
-  align-items: center;
-  gap: 14px;
-  padding: 13px 18px;
-}
-
-.allUpsellsTableHeader {
-  border-bottom: 1px solid #e4e8ec;
-  color: #5f6978;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.allUpsellsRow {
-  min-height: 64px;
-  border-bottom: 1px solid #e4e8ec;
-  color: #1a1d23;
-  font-size: 0.84rem;
-}
-
-.allUpsellsRow:last-child {
-  border-bottom: 0;
-}
-
-.allUpsellsOffer {
+.allUpsellsFiltersGroup {
   display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.allUpsellsOffer strong,
-.allUpsellsRow > strong {
-  font-weight: 700;
+.filterSelectWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
-.allUpsellsOffer span {
-  overflow: hidden;
-  color: #7a8494;
-  font-size: 0.75rem;
-  text-overflow: ellipsis;
+.filterSelectWrap.hasPrefix select {
+  padding-left: 32px;
+}
+
+.filterPrefixIcon {
+  position: absolute;
+  left: 10px;
+  pointer-events: none;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+}
+
+.filterSelectWrap select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 30px 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.filterSelectWrap select:hover {
+  border-color: #cbd5e1;
+}
+
+.filterSelectWrap select:focus {
+  border-color: #008060;
+}
+
+.filterChevron {
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+}
+
+.filterDateBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Bulk Delete Button */
+.bulkDeleteBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #dc2626;
+  cursor: pointer;
+  transition: all 0.15s ease;
   white-space: nowrap;
 }
 
-.allUpsellsStatus {
-  width: fit-content;
-  border: 0;
-  border-radius: 4px;
-  padding: 3px 8px;
-  font: inherit;
-  font-size: 0.73rem;
+.bulkDeleteBtn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.bulkDeleteBtn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+/* Table Card */
+.allUpsellsTableCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 380px;
+}
+
+.tableScrollContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+  overflow-x: auto;
+}
+
+.tableGrid {
+  display: grid;
+  grid-template-columns: 44px minmax(280px, 2.5fr) minmax(135px, 1fr) minmax(135px, 1fr) minmax(145px, 1.1fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) minmax(90px, 0.8fr) minmax(230px, 1.8fr);
+  align-items: center;
+  padding: 14px 20px;
+  gap: 12px;
+}
+
+.tableHeadRow {
+  border-bottom: 1px solid #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
   font-weight: 600;
-  cursor: pointer;
 }
 
-.allUpsellsStatus:disabled {
+.tableDataRow {
+  border-bottom: 1px solid #f1f5f9;
+  color: #0f172a;
+  font-size: 14px;
+  transition: background-color 0.15s ease;
+  min-height: 72px;
+}
+
+.tableDataRow:hover {
+  background: #fbfcfd;
+}
+
+.tableDataRow:last-child {
+  border-bottom: none;
+}
+
+/* Checkbox */
+.tableCheckbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  accent-color: #008060;
+}
+
+/* Upsell Offer Cell */
+.offerCell {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.offerThumbnail {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.offerThumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.offerMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.offerTitle {
+  font-weight: 600;
+  font-size: 14px;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.offerProduct {
+  font-size: 13px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Placement Badge */
+.placementPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.placementPill.checkout {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.placementPill.postPurchase {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.placementPill.productPage {
+  background: #faf5ff;
+  color: #7c3aed;
+}
+
+.placementPill.cartDrawer {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.placementPill.default {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Offer Type Badge */
+.offerTypePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f5f3ff;
+  color: #7c3aed;
+  width: fit-content;
+}
+
+/* Status Cell */
+.statusCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.statusPill.active {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.statusPill.draft {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.statusPill.active .statusDot {
+  background: #10b981;
+}
+
+.statusPill.draft .statusDot {
+  background: #94a3b8;
+}
+
+/* iOS Toggle Switch */
+.iosToggle {
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.2s ease;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.iosToggle.on {
+  background: #008060;
+}
+
+.iosToggle.off {
+  background: #cbd5e1;
+}
+
+.iosToggleKnob {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease;
+}
+
+.iosToggle.on .iosToggleKnob {
+  transform: translateX(16px);
+}
+
+.iosToggle.off .iosToggleKnob {
+  transform: translateX(0px);
+}
+
+.iosToggle:disabled {
+  opacity: 0.6;
   cursor: wait;
-  opacity: 0.65;
 }
 
-.allUpsellsStatus.active {
-  border: 1px solid #9ee9c6;
-  background: #e9fff3;
-  color: #008060;
+/* Value Cells */
+.tableValueBold {
+  font-weight: 600;
+  color: #0f172a;
 }
 
-.allUpsellsStatus.draft {
-  background: #eef1f4;
-  color: #5f6978;
+.tableValueMuted {
+  color: #64748b;
 }
 
-.allUpsellsPositive,
-.allUpsellsDetails {
-  color: #008060;
+/* Actions Cell */
+.actionsWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
 }
 
-.allUpsellsDetails {
-  justify-self: end;
-  border: 0;
-  background: transparent;
-  padding: 4px;
-  font: inherit;
-  font-size: 0.76rem;
+.actionBtn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1e293b;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
   cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
-.allUpsellsEmpty {
-  padding: 28px 18px;
-  color: #7a8494;
-  font-size: 0.84rem;
+.actionBtn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.actionMenuBtn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.15s ease;
+}
+
+.actionMenuBtn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.actionPopover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+  min-width: 150px;
+  padding: 4px;
+}
+
+.actionPopoverItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #334155;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: left;
+}
+
+.actionPopoverItem:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.actionPopoverItem.delete {
+  color: #ef4444;
+}
+
+.actionPopoverItem.delete:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* Empty State */
+.tableEmpty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 20px;
   text-align: center;
+  color: #64748b;
+  font-size: 14px;
 }
 
-@media (max-width: 720px) {
-  .allUpsellsTable {
-    overflow-x: auto;
-  }
+/* Footer / Pagination */
+.tableFooter {
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+  border-radius: 0 0 12px 12px;
+  margin-top: auto;
+}
 
-  .allUpsellsTableHeader,
-  .allUpsellsRow {
-    min-width: 820px;
+.tableFooterText {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pageBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pageBtn:hover:not(:disabled) {
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.pageBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pageBtn.active {
+  background: #008060;
+  border-color: #008060;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: default;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
+
+@media (max-width: 768px) {
+  .allUpsellsShell {
+    padding: 16px;
+  }
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+  .allUpsellsFilterBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+

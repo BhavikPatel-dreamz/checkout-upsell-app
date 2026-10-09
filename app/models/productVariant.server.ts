@@ -528,6 +528,6 @@ export function findVariantsByProductIds(shop: string, productIds: string[]) {
   if (!Array.isArray(productIds) || productIds.length === 0) return Promise.resolve([]);
   return db.productVariant.findMany({
     where: { shop, productId: { in: productIds } },
-    select: { productId: true, productTitle: true, variantId: true, variantTitle: true },
+    select: { productId: true, productTitle: true, variantId: true, variantTitle: true, imageUrl: true },
   });
 }

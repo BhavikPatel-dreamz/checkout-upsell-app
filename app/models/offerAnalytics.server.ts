@@ -886,6 +886,7 @@ export interface DashboardFilterParams {
   days?: number;
   status?: string;
   product?: string;
+  offerId?: string | null;
 }
 
 export interface DashboardMetricsResult {
@@ -925,7 +926,9 @@ export async function getFilteredDashboardMetrics(
   dateFrom.setDate(dateFrom.getDate() - (days - 1));
 
   let offerIds: string[] | null = null;
-  if (params.status && params.status !== "all") {
+  if (params.offerId) {
+    offerIds = [params.offerId];
+  } else if (params.status && params.status !== "all") {
     const offerWhere: Prisma.OfferWhereInput = { shop };
     if (params.status === "live") offerWhere.isActive = true;
     else if (params.status === "draft") offerWhere.isActive = false;

@@ -1,5 +1,10 @@
-import { useMemo, useState, useEffect, type MouseEvent } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router";
+import { AdminAppLink } from "../AdminAppLink";
+
+/* ---------------------------------------------------------------------- */
+/* Types                                                                  */
+/* ---------------------------------------------------------------------- */
 
 type ProductMetaMap = {
   titles: Record<string, string>;
@@ -55,136 +60,739 @@ type AnalyticsDashboardProps = {
   isRefreshing?: boolean;
 };
 
-type MetricKey = "views" | "clicks" | "addedToCart" | "purchases";
+/* ---------------------------------------------------------------------- */
+/* Formatters & Helpers                                                   */
+/* ---------------------------------------------------------------------- */
 
-const formatMetric = (value: number) =>
-  new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: value >= 10000 ? 1 : 0,
-    notation: value >= 10000 ? "compact" : "standard",
-  }).format(value);
-
-const formatPercent = (value: number | null | undefined) =>
-  value == null ? "—" : `${(value * 100).toFixed(1)}%`;
-
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max));
-
-const RANK_MEDALS = ["🥇", "🥈", "🥉"];
-
-function StatCard({
-  label,
-  value,
-  delta,
-  deltaTone,
-}: {
-  label: string;
-  value: number | string;
-  delta?: string;
-  deltaTone?: "positive" | "negative";
-}) {
-  return (
-    <div className="analytics-stat-card">
-      <span className="analytics-kpi-label">{label}</span>
-      <strong className="analytics-kpi-value">{value}</strong>
-      {delta ? (
-        <span className={`analytics-kpi-delta analytics-kpi-delta-${deltaTone ?? "positive"}`}>
-          <span className="analytics-kpi-delta-arrow">{deltaTone === "negative" ? "▼" : "▲"}</span>
-          {delta}
-        </span>
-      ) : null}
-    </div>
-  );
+function formatRate(value: number | null | undefined) {
+  if (value === null || value === undefined || isNaN(value)) return "0.0%";
+  return `${(value * 100).toFixed(1)}%`;
 }
 
-function OfferListRow({
-  rank,
-  label,
-  subtitle,
-  value,
-  valueLabel,
-  percentOfMax,
-  url,
-}: {
-  rank: number;
-  label: string;
-  subtitle?: string;
-  value: number;
-  valueLabel: string;
-  percentOfMax: number;
-  url?: string;
-}) {
-  const navigate = useNavigate();
+function formatCompact(value: number) {
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+  return value.toLocaleString();
+}
 
-  function handleClick(event: MouseEvent<HTMLButtonElement>) {
-    event.preventDefault();
-    if (url) navigate(url);
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatProductId(id: string): string {
+  if (!id) return "—";
+  const num = id.replace(/\D/g, "");
+  if (num) {
+    return `#EP-${num.slice(-3).padStart(3, "0")}`;
+  }
+  return id;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Vector Icons (identical to Offer Details Page)                         */
+/* ---------------------------------------------------------------------- */
+
+const CalendarIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
+
+
+
+const EyeIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const CursorIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+  </svg>
+);
+
+const CartIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="9" cy="21" r="1" />
+    <circle cx="20" cy="21" r="1" />
+    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+  </svg>
+);
+
+const BagIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <path d="M16 10a4 4 0 0 1-8 0" />
+  </svg>
+);
+
+const PercentIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="19" y1="5" x2="5" y2="19" />
+    <circle cx="6.5" cy="6.5" r="2.5" />
+    <circle cx="17.5" cy="17.5" r="2.5" />
+  </svg>
+);
+
+const DollarIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 6v12M15 9.5a2.5 2.5 0 0 0-5 0c0 3 5 2 5 5a2.5 2.5 0 0 1-5 0" />
+  </svg>
+);
+
+const WarningAlertIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
+const SearchIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+);
+
+const RefreshIcon = ({ isSpinning }: { isSpinning?: boolean }) => (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={isSpinning ? "odSpin" : ""}
+  >
+    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+  </svg>
+);
+
+/* ---------------------------------------------------------------------- */
+/* Performance Trend Chart                                                */
+/* ---------------------------------------------------------------------- */
+
+const TREND_SERIES = [
+  { key: "views", label: "Views", color: "#3b82f6", dataKey: "views" as const },
+  { key: "clicks", label: "Clicks", color: "#a855f7", dataKey: "clicks" as const },
+  { key: "addedToCart", label: "Add to Cart", color: "#22c55e", dataKey: "addedToCart" as const },
+  { key: "purchases", label: "Purchases", color: "#f59e0b", dataKey: "purchases" as const },
+];
+
+function PerformanceChart({
+  trendMetrics,
+  onRefresh,
+  isRefreshing,
+}: {
+  trendMetrics: { labels: string[]; views: number[]; clicks: number[]; addedToCart: number[]; purchases: number[] } | null | undefined;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+}) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set(["views", "clicks", "addedToCart", "purchases"]));
+
+  const toggleKey = (key: string) => {
+    setActiveKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (next.size > 1) next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const width = 680;
+  const height = 250;
+  const paddingLeft = 38;
+  const paddingRight = 18;
+  const paddingTop = 22;
+  const paddingBottom = 34;
+
+  const rawLabels = trendMetrics?.labels ?? [];
+  const points = rawLabels.length > 0 ? rawLabels.length : 15;
+  const labels =
+    rawLabels.length > 0
+      ? rawLabels
+      : Array.from({ length: 15 }, (_, i) => `Day ${i + 1}`);
+
+  const seriesData = TREND_SERIES.map((s) => ({
+    ...s,
+    isActive: activeKeys.has(s.key),
+    values: trendMetrics?.[s.dataKey]?.length === points
+      ? trendMetrics[s.dataKey]
+      : Array(points).fill(0),
+  }));
+
+  const allActiveValues = seriesData
+    .filter((s) => s.isActive)
+    .flatMap((s) => s.values);
+  const rawMax = allActiveValues.length > 0 ? Math.max(...allActiveValues) : 0;
+  const maxValue = rawMax <= 4 ? 4 : Math.ceil(rawMax * 1.25);
+
+  const chartLeft = paddingLeft;
+  const chartRight = width - paddingRight;
+  const chartWidth = chartRight - chartLeft;
+  const chartTop = paddingTop;
+  const chartBottom = height - paddingBottom;
+  const chartHeight = chartBottom - chartTop;
+
+  function getX(index: number) {
+    if (points <= 1) return chartLeft + chartWidth / 2;
+    return chartLeft + (index / (points - 1)) * chartWidth;
   }
 
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="analytics-offer-row"
-      style={{
-        textDecoration: "none",
-        color: "inherit",
-        cursor: url ? "pointer" : "default",
-        background: "none",
-        border: "none",
-        padding: 0,
-        fontFamily: "inherit",
-        textAlign: "left",
-        width: "100%",
-      }}
-    >
-      <div className="analytics-offer-main">
-        <div className="analytics-rank-badge">{RANK_MEDALS[rank - 1] ?? rank}</div>
-        <div className="analytics-offer-meta">
-          <div className="analytics-offer-name">{label}</div>
-          {subtitle ? <div className="analytics-offer-subtitle">{subtitle}</div> : null}
-          <div className="analytics-offer-bar-wrap">
-            <div className="analytics-offer-bar" style={{ width: `${clamp(percentOfMax, 4, 100)}%` }} />
-          </div>
-        </div>
-      </div>
-      <div className="analytics-offer-side">
-        <div className="analytics-offer-value">
-          {formatMetric(value)} <span className="analytics-offer-value-label">{valueLabel}</span>
-        </div>
-      </div>
-    </button>
-  );
-}
+  function getY(value: number) {
+    const t = maxValue > 0 ? value / maxValue : 0;
+    return chartBottom - t * chartHeight;
+  }
 
-function FunnelStep({
-  label,
-  value,
-  widthPercent,
-  colorFrom,
-  colorTo,
-  isFlagged,
-}: {
-  label: string;
-  value: number;
-  widthPercent: number;
-  colorFrom: string;
-  colorTo: string;
-  isFlagged: boolean;
-}) {
+  function getSmoothPath(values: number[]) {
+    if (values.length === 0) return "";
+    if (values.length === 1) return `M ${getX(0)} ${getY(values[0])}`;
+    const pts = values.map((val, idx) => ({ x: getX(idx), y: getY(val) }));
+    let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = i > 0 ? pts[i - 1] : pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = i < pts.length - 2 ? pts[i + 2] : p2;
+
+      const tension = 0.2;
+      const cp1x = p1.x + (p2.x - p0.x) * tension;
+      const cp1y = p1.y + (p2.y - p0.y) * tension;
+      const cp2x = p2.x - (p3.x - p1.x) * tension;
+      const cp2y = p2.y - (p3.y - p1.y) * tension;
+
+      d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+    return d;
+  }
+
+  function getAreaPath(values: number[]) {
+    const line = getSmoothPath(values);
+    if (!line) return "";
+    return `${line} L ${getX(values.length - 1).toFixed(1)},${chartBottom.toFixed(1)} L ${getX(0).toFixed(1)},${chartBottom.toFixed(1)} Z`;
+  }
+
+  const yTicks = [maxValue, Math.round(maxValue * 0.75), Math.round(maxValue * 0.5), Math.round(maxValue * 0.25), 0];
+
+  const xIndices = useMemo(() => {
+    if (points <= 7) return Array.from({ length: points }, (_, i) => i);
+    const count = 6;
+    const indices: number[] = [];
+    const step = (points - 1) / (count - 1);
+    for (let i = 0; i < count; i++) {
+      const idx = Math.round(i * step);
+      if (!indices.includes(idx)) {
+        indices.push(idx);
+      }
+    }
+    return indices;
+  }, [points]);
+
+  const tooltipIdx = hoverIndex;
+  const tooltipDate = tooltipIdx !== null ? labels[tooltipIdx] ?? "" : "";
+  const plotLeftPct = (chartLeft / width) * 100;
+  const plotWidthPct = (chartWidth / width) * 100;
+  const hoverPct =
+    tooltipIdx !== null && points > 1
+      ? plotLeftPct + (tooltipIdx / (points - 1)) * plotWidthPct
+      : plotLeftPct + plotWidthPct / 2;
+  const tooltipFitsRight = hoverPct < 55;
+
   return (
-    <div className="analytics-funnel-segment">
-      <div
-        className={`analytics-funnel-wedge ${isFlagged ? "is-flagged" : ""}`}
-        style={{
-          clipPath: `polygon(${(100 - widthPercent) / 2}% 0%, ${100 - (100 - widthPercent) / 2}% 0%, 100% 100%, 0% 100%)`,
-          background: `linear-gradient(180deg, ${colorFrom}, ${colorTo})`,
-        }}
-      >
-        <span className="analytics-funnel-wedge-label">{label}</span>
-        <span className="analytics-funnel-wedge-value">{formatMetric(value)}</span>
+    <div className="odCard" style={{ flex: 1, minWidth: 0 }}>
+      <div className="odCardHeader">
+        <h3 className="odCardTitle">Performance Trend</h3>
+        <div className="odTrendLegend">
+          {TREND_SERIES.map((s) => {
+            const isActive = activeKeys.has(s.key);
+            return (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => toggleKey(s.key)}
+                className="odLegendItem"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "2px 4px",
+                  borderRadius: "4px",
+                  opacity: isActive ? 1 : 0.4,
+                  transition: "opacity 0.15s ease",
+                }}
+                title={isActive ? `Hide ${s.label}` : `Show ${s.label}`}
+              >
+                <span className="odLegendDot" style={{ background: s.color }} />
+                <span>{s.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        {onRefresh ? (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="odViewDetailsBtn"
+            title="Refresh trends"
+          >
+            <RefreshIcon isSpinning={isRefreshing} />
+            <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
+          </button>
+        ) : (
+          <span className="odViewDetailsBtn" style={{ cursor: "default" }}>
+            Overview
+          </span>
+        )}
+      </div>
+
+      <div style={{ position: "relative", width: "100%", marginTop: "6px" }}>
+        <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "auto", overflow: "visible" }}>
+          <defs>
+            {seriesData.map((s) => (
+              <linearGradient key={`grad-${s.key}`} id={`grad-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={s.color} stopOpacity="0.12" />
+                <stop offset="100%" stopColor={s.color} stopOpacity="0.0" />
+              </linearGradient>
+            ))}
+          </defs>
+
+          {/* Horizontal gridlines & Y labels */}
+          {yTicks.map((val, i) => {
+            const y = getY(val);
+            const isBaseline = val === 0;
+            return (
+              <g key={`ytick-${val}-${i}`}>
+                <line
+                  x1={chartLeft}
+                  x2={chartRight}
+                  y1={y}
+                  y2={y}
+                  stroke={isBaseline ? "#e2e8f0" : "#f1f5f9"}
+                  strokeWidth={isBaseline ? "1.2" : "1"}
+                  strokeDasharray={isBaseline ? undefined : "3 3"}
+                />
+                <text
+                  x={chartLeft - 10}
+                  y={y + 3.5}
+                  textAnchor="end"
+                  fontSize="9.5"
+                  fontWeight="500"
+                  fill="#94a3b8"
+                  fontFamily="-apple-system, sans-serif"
+                >
+                  {val}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Area gradient fills */}
+          {seriesData
+            .filter((s) => s.isActive)
+            .map((s) => (
+              <path
+                key={`area-${s.key}`}
+                d={getAreaPath(s.values)}
+                fill={`url(#grad-${s.key})`}
+                pointerEvents="none"
+              />
+            ))}
+
+          {/* Hover vertical dashed line */}
+          {tooltipIdx !== null && (
+            <line
+              x1={getX(tooltipIdx)}
+              x2={getX(tooltipIdx)}
+              y1={chartTop}
+              y2={chartBottom}
+              stroke="#cbd5e1"
+              strokeWidth="1.2"
+              strokeDasharray="3,3"
+            />
+          )}
+
+          {/* Series smooth paths */}
+          {seriesData
+            .filter((s) => s.isActive)
+            .map((s) => (
+              <path
+                key={`path-${s.key}`}
+                d={getSmoothPath(s.values)}
+                fill="none"
+                stroke={s.color}
+                strokeWidth="2.2"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            ))}
+
+          {/* Non-zero dots on paths (avoids cluttering the zero baseline) */}
+          {seriesData
+            .filter((s) => s.isActive)
+            .map((s) =>
+              s.values.map((val, idx) => {
+                if (val === 0 && points > 7) return null;
+                if (idx === tooltipIdx) return null;
+                return (
+                  <circle
+                    key={`dot-${s.key}-${idx}`}
+                    cx={getX(idx)}
+                    cy={getY(val)}
+                    r="2.8"
+                    fill="#ffffff"
+                    stroke={s.color}
+                    strokeWidth="1.6"
+                  />
+                );
+              })
+            )}
+
+          {/* Hover highlight dots */}
+          {tooltipIdx !== null &&
+            seriesData
+              .filter((s) => s.isActive)
+              .map((s) => {
+                const val = s.values[tooltipIdx] ?? 0;
+                return (
+                  <g key={`hover-dot-${s.key}`}>
+                    <circle
+                      cx={getX(tooltipIdx)}
+                      cy={getY(val)}
+                      r="6.5"
+                      fill={s.color}
+                      opacity="0.22"
+                    />
+                    <circle
+                      cx={getX(tooltipIdx)}
+                      cy={getY(val)}
+                      r="3.8"
+                      fill="#ffffff"
+                      stroke={s.color}
+                      strokeWidth="2.2"
+                    />
+                  </g>
+                );
+              })}
+
+          {/* X-axis date labels */}
+          {xIndices.map((idx) => {
+            const isFirst = idx === 0;
+            const isLast = idx === points - 1;
+            return (
+              <text
+                key={`xlabel-${idx}`}
+                x={isLast ? chartRight : isFirst ? chartLeft : getX(idx)}
+                y={height - 8}
+                textAnchor={isLast ? "end" : isFirst ? "start" : "middle"}
+                fontSize="9.5"
+                fontWeight="500"
+                fill="#94a3b8"
+                fontFamily="-apple-system, sans-serif"
+              >
+                {labels[idx]}
+              </text>
+            );
+          })}
+        </svg>
+
+        {/* Hover overlay */}
+        <div
+          style={{
+            position: "absolute",
+            left: `${plotLeftPct}%`,
+            top: `${(chartTop / height) * 100}%`,
+            width: `${plotWidthPct}%`,
+            height: `${(chartHeight / height) * 100}%`,
+            display: "flex",
+            cursor: "crosshair",
+          }}
+          onMouseLeave={() => setHoverIndex(null)}
+        >
+          {Array.from({ length: points }, (_, i) => (
+            <div
+              key={`hit-${i}`}
+              style={{ flex: 1, height: "100%" }}
+              onMouseEnter={() => setHoverIndex(i)}
+            />
+          ))}
+        </div>
+
+        {/* Tooltip Card */}
+        {tooltipIdx !== null && (
+          <div
+            style={{
+              position: "absolute",
+              top: "8px",
+              left: tooltipFitsRight ? `calc(${hoverPct}% + 14px)` : undefined,
+              right: tooltipFitsRight ? undefined : `calc(${100 - hoverPct}% + 14px)`,
+              background: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: "10px",
+              padding: "10px 14px",
+              fontSize: "12px",
+              lineHeight: 1.6,
+              pointerEvents: "none",
+              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+              minWidth: "150px",
+              zIndex: 20,
+              transition: "left 0.1s ease, right 0.1s ease",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 700,
+                color: "#111827",
+                marginBottom: "6px",
+                borderBottom: "1px solid #f1f5f9",
+                paddingBottom: "4px",
+              }}
+            >
+              {tooltipDate}
+            </div>
+            {seriesData
+              .filter((s) => s.isActive)
+              .map((s) => (
+                <div
+                  key={s.key}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "14px",
+                    marginTop: "2px",
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#4b5563" }}>
+                    <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: s.color }} />
+                    {s.label}
+                  </span>
+                  <span style={{ fontWeight: 700, color: "#111827" }}>
+                    {(s.values[tooltipIdx] ?? 0).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+/* ---------------------------------------------------------------------- */
+/* Conversion Funnel Card                                                 */
+/* ---------------------------------------------------------------------- */
+
+function ConversionFunnelCard({
+  funnel,
+  browseToOffer,
+}: {
+  funnel: {
+    views: number;
+    clicks: number;
+    addedToCart: number;
+    purchases: number;
+  };
+  browseToOffer?: {
+    browseIdentities: number;
+    offerViewIdentities: number;
+    overlap: number;
+    browseToOfferRate: number | null;
+  };
+}) {
+  const viewToClickRate = funnel.views > 0 ? funnel.clicks / funnel.views : 0;
+  const clickToAddedRate = funnel.clicks > 0 ? funnel.addedToCart / funnel.clicks : 0;
+  const addedToPurchaseRate = funnel.addedToCart > 0 ? funnel.purchases / funnel.addedToCart : 0;
+  const overallRate = funnel.views > 0 ? funnel.purchases / funnel.views : 0;
+
+  // Determine biggest drop-off
+  let dropoffLabel = "View → Click";
+  let maxDrop = 0;
+  if (funnel.views > 0) {
+    const dropViewClick = (funnel.views - funnel.clicks) / funnel.views;
+    if (dropViewClick > maxDrop) {
+      maxDrop = dropViewClick;
+      dropoffLabel = "View → Click";
+    }
+  }
+  if (funnel.clicks > 0) {
+    const dropClickAdd = (funnel.clicks - funnel.addedToCart) / funnel.clicks;
+    if (dropClickAdd > maxDrop) {
+      maxDrop = dropClickAdd;
+      dropoffLabel = "Click → Add to Cart";
+    }
+  }
+  if (funnel.addedToCart > 0) {
+    const dropAddPurchase = (funnel.addedToCart - funnel.purchases) / funnel.addedToCart;
+    if (dropAddPurchase > maxDrop) {
+      maxDrop = dropAddPurchase;
+      dropoffLabel = "Add to Cart → Purchase";
+    }
+  }
+
+  const stages = [
+    {
+      key: "viewed",
+      label: "Viewed",
+      value: funnel.views,
+      widthPct: "100%",
+      bgColor: "#e0f2fe",
+      borderColor: "#bae6fd",
+      textColor: "#0369a1",
+      icon: <EyeIcon size={14} />,
+      rateText: `→ ${(viewToClickRate * 100).toFixed(1)}%`,
+    },
+    {
+      key: "clicked",
+      label: "Clicked",
+      value: funnel.clicks,
+      widthPct: "86%",
+      bgColor: "#f3e8ff",
+      borderColor: "#e9d5ff",
+      textColor: "#7e22ce",
+      icon: <CursorIcon size={14} />,
+      rateText: `→ ${(clickToAddedRate * 100).toFixed(1)}%`,
+    },
+    {
+      key: "added",
+      label: "Added to Cart",
+      value: funnel.addedToCart,
+      widthPct: "72%",
+      bgColor: "#dcfce7",
+      borderColor: "#bbf7d0",
+      textColor: "#15803d",
+      icon: <CartIcon size={14} />,
+      rateText: `→ ${(addedToPurchaseRate * 100).toFixed(1)}%`,
+    },
+    {
+      key: "purchased",
+      label: "Purchased",
+      value: funnel.purchases,
+      widthPct: "58%",
+      bgColor: "#fef3c7",
+      borderColor: "#fde68a",
+      textColor: "#b45309",
+      icon: <BagIcon size={14} />,
+      rateText: `${(overallRate * 100).toFixed(1)}%`,
+    },
+  ];
+
+  return (
+    <div className="odCard" style={{ flex: "0 0 380px", minWidth: "320px" }}>
+      <div className="odCardHeader">
+        <h3 className="odCardTitle">Conversion Funnel</h3>
+      </div>
+
+      <div className="odFunnelContainer">
+        {stages.map((st) => (
+          <div key={st.key} className="odFunnelRow">
+            <div className="odFunnelBarWrap">
+              <div
+                style={{
+                  position: "relative",
+                  width: st.widthPct,
+                  height: "38px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  color: st.textColor,
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  transition: "transform 0.15s ease",
+                  cursor: "default",
+                }}
+              >
+                <svg
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    overflow: "visible",
+                  }}
+                  viewBox="0 0 100 40"
+                  preserveAspectRatio="none"
+                >
+                  <polygon
+                    points="3,1 97,1 92,39 8,39"
+                    fill={st.bgColor}
+                    stroke={st.borderColor}
+                    strokeWidth="1.2"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: "6px" }}>
+                  {st.icon}
+                  <span>{st.label}</span>
+                  <span style={{ fontWeight: 700, marginLeft: "4px" }}>{st.value.toLocaleString()}</span>
+                </span>
+              </div>
+            </div>
+            <div className="odFunnelRate">{st.rateText}</div>
+          </div>
+        ))}
+
+        <div className="odDropoffAlert">
+          <div className="odDropoffLeft">
+            <span className="odDropoffIcon">
+              <WarningAlertIcon />
+            </span>
+            <div>
+              <span className="odDropoffTitle">Biggest drop-off: </span>
+              <span className="odDropoffSubtitle">{dropoffLabel}</span>
+            </div>
+          </div>
+          <div className="odDropoffValue">
+            {maxDrop > 0 ? `${(maxDrop * 100).toFixed(0)}%` : "—"}
+          </div>
+        </div>
+
+        {browseToOffer ? (
+          <div
+            style={{
+              marginTop: "8px",
+              paddingTop: "10px",
+              borderTop: "1px solid #f1f5f9",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "12px",
+              color: "#6b7280",
+            }}
+          >
+            <span>Browse → Offer View</span>
+            <span style={{ fontWeight: 600, color: "#111827" }}>
+              {formatRate(browseToOffer.browseToOfferRate)}
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/* Main Analytics Dashboard Component                                     */
+/* ---------------------------------------------------------------------- */
 
 export default function AnalyticsDashboard({
   viewMetrics: initViewMetrics,
@@ -199,14 +807,11 @@ export default function AnalyticsDashboard({
   onRefresh,
   isRefreshing = false,
 }: AnalyticsDashboardProps) {
-  const [selectedMetrics, setSelectedMetrics] = useState<Set<MetricKey>>(
-    new Set(["views", "clicks", "purchases"]),
-  );
-  const [selectedRankingMetric, setSelectedRankingMetric] = useState<"purchases" | "clicks" | "views">("purchases");
-  const [mainProductFilter, setMainProductFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const navigate = useNavigate();
   const [timeRangeFilter, setTimeRangeFilter] = useState("30d");
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [tableMode, setTableMode] = useState<"offers" | "products">("offers");
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState("purchases");
 
   const [viewMetrics, setViewMetrics] = useState(initViewMetrics);
   const [clickMetrics, setClickMetrics] = useState(initClickMetrics);
@@ -215,6 +820,7 @@ export default function AnalyticsDashboard({
   const [productMetaMap, setProductMetaMap] = useState(initProductMetaMap);
   const [browseToOffer, setBrowseToOffer] = useState(initBrowseToOffer);
   const [funnelRates, setFunnelRates] = useState(initFunnelRates);
+  const [localTrendMetrics, setLocalTrendMetrics] = useState(initTrendMetrics);
 
   const totalViews = viewMetrics.totalViews;
   const totalClicks = clickMetrics.totalClicks;
@@ -222,49 +828,6 @@ export default function AnalyticsDashboard({
   const totalPurchases = purchaseMetrics.totalPurchases;
   const totalRevenue = purchaseMetrics.totalRevenue ?? 0;
   const conversionRate = totalViews > 0 ? totalPurchases / totalViews : null;
-
-  const chartSeries = useMemo(
-    () => [
-      { key: "views" as MetricKey, label: "Views", value: totalViews, color: "#2f6de5", phase: 0 },
-      { key: "clicks" as MetricKey, label: "Clicks", value: totalClicks, color: "#f39d2a", phase: 1.4 },
-      { key: "addedToCart" as MetricKey, label: "Add to Cart", value: totalAddedToCart, color: "#7c6ce0", phase: 2.6 },
-      { key: "purchases" as MetricKey, label: "Purchases", value: totalPurchases, color: "#1a7d4e", phase: 3.8 },
-    ],
-    [totalViews, totalClicks, totalAddedToCart, totalPurchases],
-  );
-
-  const toggleMetric = (key: MetricKey) => {
-    setSelectedMetrics((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        // never allow zero metrics selected
-        if (next.size > 1) next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
-
-  const summaryMetrics = [
-    { label: "Impressions", value: formatMetric(totalViews), delta: undefined, deltaTone: undefined },
-    { label: "Views", value: formatMetric(totalViews), delta: undefined, deltaTone: undefined },
-    { label: "Clicks", value: formatMetric(totalClicks), delta: undefined, deltaTone: undefined },
-    { label: "Add to Cart", value: formatMetric(totalAddedToCart), delta: undefined, deltaTone: undefined },
-    { label: "Purchases", value: formatMetric(totalPurchases), delta: undefined, deltaTone: undefined },
-    { label: "Conv. Rate", value: formatPercent(conversionRate), delta: undefined, deltaTone: undefined },
-    {
-      label: "Revenue",
-      value:
-        totalRevenue >= 1000
-          ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(totalRevenue)
-          : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalRevenue),
-      delta: undefined,
-      deltaTone: undefined,
-    },
-  ];
-
-  const [localTrendMetrics, setLocalTrendMetrics] = useState(initTrendMetrics);
 
   const mapRangeToDays = (r: string) => (r === "7d" ? 7 : r === "30d" ? 30 : r === "90d" ? 90 : 30);
 
@@ -296,7 +859,6 @@ export default function AnalyticsDashboard({
       return [...Array(days - a.length).fill(""), ...a];
     };
 
-    // Special handling for 90-day range: aggregate into 3 month-wise buckets
     if (days === 90) {
       const raw = {
         labels: takeLabels(source.labels),
@@ -306,7 +868,7 @@ export default function AnalyticsDashboard({
         purchases: takeLastOrPad(source.purchases),
       };
 
-      const bucketSize = Math.ceil(90 / 3); // ~30
+      const bucketSize = Math.ceil(90 / 3);
       const sliceArr = (arr: number[]) => {
         const res: number[] = [];
         for (let i = 0; i < 3; i++) {
@@ -318,7 +880,6 @@ export default function AnalyticsDashboard({
         return res;
       };
 
-      // build month labels based on current month
       const monthNames = (n: number) => {
         const now = new Date();
         const labels: string[] = [];
@@ -338,7 +899,6 @@ export default function AnalyticsDashboard({
       };
     }
 
-    // For 7d and 30d, always show recent date labels (e.g. "Aug 19") instead of generic placeholders
     if (days === 7 || days === 30) {
       const dateLabels = (n: number) => {
         const arr: string[] = [];
@@ -369,24 +929,14 @@ export default function AnalyticsDashboard({
   };
 
   useEffect(() => {
-    const mapRangeToDays = (r: string) => (r === "7d" ? 7 : r === "30d" ? 30 : r === "90d" ? 90 : 30);
     const days = mapRangeToDays(timeRangeFilter);
     let cancelled = false;
 
     (async () => {
       try {
-        const params = new URLSearchParams({ days: String(days), status: statusFilter });
+        const params = new URLSearchParams({ days: String(days), status: "all" });
         const res = await fetch(`/api/analytics/dashboard?${params.toString()}`, { credentials: "same-origin" });
-        if (!res.ok) {
-          try {
-            const txt = await res.text();
-            // eslint-disable-next-line no-console
-            console.warn("Failed to load dashboard metrics:", res.status, txt.slice(0, 200));
-          } catch {
-            // ignore
-          }
-          return;
-        }
+        if (!res.ok) return;
         const data = await res.json();
         if (!cancelled) {
           if (data.viewMetrics) setViewMetrics(data.viewMetrics);
@@ -399,117 +949,25 @@ export default function AnalyticsDashboard({
           if (data.browseToOffer) setBrowseToOffer(data.browseToOffer);
         }
       } catch {
-        // ignore fetch errors; keep existing metrics
+        // ignore fetch errors; keep existing
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [timeRangeFilter, statusFilter, mainProductFilter]);
+  }, [timeRangeFilter]);
 
-  // Immediately adjust local trend metrics to match the selected time range
   useEffect(() => {
     const days = mapRangeToDays(timeRangeFilter);
     setLocalTrendMetrics((prev) => adjustTrendMetrics(prev ?? initTrendMetrics, days));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRangeFilter, initTrendMetrics]);
 
-  const trendByMetric = useMemo(() => {
-    const map: Record<MetricKey, number[]> = { views: [], clicks: [], addedToCart: [], purchases: [] };
-    const source = localTrendMetrics ?? initTrendMetrics ?? {
-      labels: Array.from({ length: 12 }, (_, index) => `${index + 1}`),
-      views: Array(12).fill(0),
-      clicks: Array(12).fill(0),
-      addedToCart: Array(12).fill(0),
-      purchases: Array(12).fill(0),
-    };
+  /* -------------------------------------------------------------------- */
+  /* Offers breakdown list for bottom card                                */
+  /* -------------------------------------------------------------------- */
 
-    map.views = source.views.length ? source.views : Array(12).fill(0);
-    map.clicks = source.clicks.length ? source.clicks : Array(12).fill(0);
-    map.addedToCart = source.addedToCart.length ? source.addedToCart : Array(12).fill(0);
-    map.purchases = source.purchases.length ? source.purchases : Array(12).fill(0);
-    return map;
-  }, [localTrendMetrics, initTrendMetrics]);
-
-  const activeSeries = chartSeries.filter((s) => selectedMetrics.has(s.key));
-  const allActiveValues = activeSeries.flatMap((s) => trendByMetric[s.key]);
-  const chartMax = Math.max(...allActiveValues, 1);
-  const chartMin = 0;
-  const pointCount = (localTrendMetrics ?? initTrendMetrics)?.views?.length ?? 12;
-
-  const toXY = (v: number, i: number) => {
-    const x = (i / (pointCount - 1)) * 1000;
-    const y = 276 - ((v - chartMin) / (chartMax - chartMin || 1)) * 234;
-    return { x, y };
-  };
-
-  const buildLinePath = (values: number[]) =>
-    values
-      .map((v, i) => {
-        const { x, y } = toXY(v, i);
-        return `${i === 0 ? "M" : "L"}${x},${y}`;
-      })
-      .join(" ");
-
-  const buildAreaPath = (values: number[]) => `${buildLinePath(values)} L1000,300 L0,300 Z`;
-
-  const yAxisLabels = [chartMax, chartMax * 0.75, chartMax * 0.5, chartMax * 0.25].map((v) => formatMetric(v));
-  const xAxisLabels = (localTrendMetrics ?? initTrendMetrics)?.labels?.length
-    ? (localTrendMetrics ?? initTrendMetrics)!.labels
-    : Array.from({ length: Math.min(pointCount, 6) }, (_, index) => `D${index + 1}`);
-
-  const stageConversionRows = [
-    { label: "Views → Clicked", rate: funnelRates?.viewToClick ?? (totalViews > 0 ? totalClicks / totalViews : null) },
-    { label: "Clicked → Added to Cart", rate: funnelRates?.clickToAddedToCart ?? (totalClicks > 0 ? totalAddedToCart / totalClicks : null) },
-    { label: "Added to Cart → Purchased", rate: funnelRates?.addedToCartToPurchase ?? (totalAddedToCart > 0 ? totalPurchases / totalAddedToCart : null) },
-    { label: "Views → Purchased", rate: funnelRates?.viewToPurchase ?? conversionRate },
-  ];
-
-  const sequentialStageCount = 3;
-  const lowestStageIndex = stageConversionRows.slice(0, sequentialStageCount).reduce((lowestIdx, row, idx, arr) => {
-    if (row.rate == null) return lowestIdx;
-    if (lowestIdx === -1 || (arr[lowestIdx].rate ?? Infinity) > row.rate) return idx;
-    return lowestIdx;
-  }, -1);
-
-  // Funnel: one consistent green -> teal gradient family, top (Shown) darkest,
-  // bottom (Purchased) brightest emerald — matches the reference image.
-  // The stage immediately after the worst drop-off gets a red tint to flag it.
-  const funnelPalette = [
-    { from: "#0f6b46", to: "#1a8a5c" }, // Shown
-    { from: "#12866f", to: "#189e89" }, // Clicked
-    { from: "#149a8b", to: "#1cae9d" }, // Added to Cart
-    { from: "#1ca97c", to: "#22c98f" }, // Purchased
-  ];
-  const flaggedStage = { from: "#e0596a", to: "#d34c4c" };
-
-  const funnelSteps = [
-    { label: "Shown", value: totalViews, widthPercent: 100 },
-    {
-      label: "Clicked",
-      value: totalClicks,
-      widthPercent: totalViews > 0 ? clamp((totalClicks / totalViews) * 100, 30, 92) : 30,
-    },
-    {
-      label: "Added to Cart",
-      value: totalAddedToCart,
-      widthPercent: totalClicks > 0 ? clamp((totalAddedToCart / totalClicks) * 75, 24, 70) : 24,
-    },
-    {
-      label: "Purchased",
-      value: totalPurchases,
-      widthPercent: totalAddedToCart > 0 ? clamp((totalPurchases / totalAddedToCart) * 55, 16, 50) : 16,
-    },
-  ];
-
-  const funnelDropoffs = [
-    { continued: totalViews > 0 ? totalClicks / totalViews : null },
-    { continued: totalClicks > 0 ? totalAddedToCart / totalClicks : null },
-    { continued: totalAddedToCart > 0 ? totalPurchases / totalAddedToCart : null },
-  ];
-
-  const rankingData = useMemo(() => {
+  const offersList = useMemo(() => {
     const offerIdToClicks = Object.fromEntries(clickMetrics.offerBreakdown.map((row) => [row.offerId, row.clicks]));
     const offerIdToViews = Object.fromEntries(viewMetrics.offerBreakdown.map((row) => [row.offerId, row.views]));
     const offerIdToPurchases = Object.fromEntries(purchaseMetrics.offerBreakdown.map((row) => [row.offerId, row.purchases]));
@@ -528,358 +986,420 @@ export default function AnalyticsDashboard({
     for (const row of addedToCartMetrics.offerBreakdown) offerIdToName.set(row.offerId, row.offerName);
     for (const row of purchaseMetrics.offerBreakdown) offerIdToName.set(row.offerId, row.offerName);
 
-    return Array.from(allOfferIds)
-      .map((offerId) => ({
-        offerId,
-        offerName: offerIdToName.get(offerId) ?? "Unknown offer",
-        purchases: offerIdToPurchases[offerId] ?? 0,
-        clicks: offerIdToClicks[offerId] ?? 0,
-        views: offerIdToViews[offerId] ?? 0,
-      }))
-      .sort((a, b) => {
-        if (selectedRankingMetric === "clicks") return b.clicks - a.clicks;
-        if (selectedRankingMetric === "views") return b.views - a.views;
-        return b.purchases - a.purchases;
-      })
-      .slice(0, 5);
-  }, [selectedRankingMetric, clickMetrics.offerBreakdown, purchaseMetrics.offerBreakdown, viewMetrics.offerBreakdown, addedToCartMetrics.offerBreakdown]);
+    return Array.from(allOfferIds).map((offerId) => {
+      const views = offerIdToViews[offerId] ?? 0;
+      const clicks = offerIdToClicks[offerId] ?? 0;
+      const addedToCart = offerIdToAdded[offerId] ?? 0;
+      const purchases = offerIdToPurchases[offerId] ?? 0;
+      const ctr = views > 0 ? (clicks / views) * 100 : 0;
+      const convRate = views > 0 ? (purchases / views) * 100 : 0;
+      const revenue = totalPurchases > 0 ? (totalRevenue / totalPurchases) * purchases : 0;
 
-  const maxRankingValue = Math.max(...rankingData.map((row) => row[selectedRankingMetric]), 1);
-  const rankingUnitLabel =
-    selectedRankingMetric === "purchases" ? "purchases" : selectedRankingMetric === "clicks" ? "clicks" : "views";
+      return {
+        offerId,
+        offerName: offerIdToName.get(offerId) || `Offer ${offerId.slice(-6)}`,
+        views,
+        clicks,
+        addedToCart,
+        purchases,
+        ctr,
+        convRate,
+        revenue,
+      };
+    });
+  }, [clickMetrics, viewMetrics, purchaseMetrics, addedToCartMetrics, totalPurchases, totalRevenue]);
+
+  /* -------------------------------------------------------------------- */
+  /* Products breakdown list for bottom card                              */
+  /* -------------------------------------------------------------------- */
+
+  const productsList = useMemo(() => {
+    const prodIdToClicks = Object.fromEntries(clickMetrics.productBreakdown.map((row) => [row.productId, row.clicks]));
+    const prodIdToViews = Object.fromEntries(viewMetrics.productBreakdown.map((row) => [row.productId, row.views]));
+    const prodIdToPurchases = Object.fromEntries(purchaseMetrics.productBreakdown.map((row) => [row.productId, row.purchases]));
+    const prodIdToAdded = Object.fromEntries(addedToCartMetrics.productBreakdown.map((row) => [row.productId, row.addedToCart]));
+
+    const allProductIds = new Set([
+      ...viewMetrics.productBreakdown.map((r) => r.productId),
+      ...clickMetrics.productBreakdown.map((r) => r.productId),
+      ...addedToCartMetrics.productBreakdown.map((r) => r.productId),
+      ...purchaseMetrics.productBreakdown.map((r) => r.productId),
+    ]);
+
+    return Array.from(allProductIds).map((productId) => {
+      const views = prodIdToViews[productId] ?? 0;
+      const clicks = prodIdToClicks[productId] ?? 0;
+      const addedToCart = prodIdToAdded[productId] ?? 0;
+      const purchases = prodIdToPurchases[productId] ?? 0;
+      const ctr = views > 0 ? (clicks / views) * 100 : 0;
+      const convRate = views > 0 ? (purchases / views) * 100 : 0;
+      const revenue = totalPurchases > 0 ? (totalRevenue / totalPurchases) * purchases : 0;
+
+      return {
+        productId,
+        productName: productMetaMap.titles[productId] || productId,
+        views,
+        clicks,
+        addedToCart,
+        purchases,
+        ctr,
+        convRate,
+        revenue,
+      };
+    });
+  }, [clickMetrics, viewMetrics, purchaseMetrics, addedToCartMetrics, productMetaMap, totalPurchases, totalRevenue]);
+
+  /* -------------------------------------------------------------------- */
+  /* Filter & Sort for Table                                              */
+  /* -------------------------------------------------------------------- */
+
+  const filteredOffers = useMemo(() => {
+    let list = [...offersList];
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(
+        (o) =>
+          o.offerName.toLowerCase().includes(q) ||
+          o.offerId.toLowerCase().includes(q)
+      );
+    }
+    list.sort((a, b) => {
+      switch (sortKey) {
+        case "purchases":
+          return b.purchases - a.purchases;
+        case "views":
+          return b.views - a.views;
+        case "clicks":
+          return b.clicks - a.clicks;
+        case "revenue":
+          return b.revenue - a.revenue;
+        case "conversion":
+          return b.convRate - a.convRate;
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [offersList, search, sortKey]);
+
+  const filteredProducts = useMemo(() => {
+    let list = [...productsList];
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.productName.toLowerCase().includes(q) ||
+          p.productId.toLowerCase().includes(q)
+      );
+    }
+    list.sort((a, b) => {
+      switch (sortKey) {
+        case "purchases":
+          return b.purchases - a.purchases;
+        case "views":
+          return b.views - a.views;
+        case "clicks":
+          return b.clicks - a.clicks;
+        case "revenue":
+          return b.revenue - a.revenue;
+        case "conversion":
+          return b.convRate - a.convRate;
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [productsList, search, sortKey]);
+
+  const funnel = {
+    views: totalViews,
+    clicks: totalClicks,
+    addedToCart: totalAddedToCart,
+    purchases: totalPurchases,
+  };
 
   return (
-    <div className="analytics-page-shell">
-      <div className="analytics-page">
-        <header className="analytics-header">
-          <div>
-            <h1 className="analytics-title">Upsell Analytics</h1>
-            <p className="analytics-subtitle">
-              Smart ranking reorders eligible offers from browse activity and offer conversion. You still choose trigger and upsell products.
-            </p>
+    <div className="odPageShell">
+      <div className="odContainer">
+        {/* Top Header */}
+        <div className="odHeader">
+          <div className="odHeaderLeft">
+            <div className="odTitleGroup">
+              <h1 className="odTitle">Upsell Analytics</h1>
+              <p className="odSubtitle">
+                Smart ranking reorders eligible offers from browse activity and offer conversion
+              </p>
+            </div>
           </div>
-
-          <div className="analytics-filters" aria-label="Analytics filters">
-            <label className="analytics-filter-control">
-              <select value={timeRangeFilter} onChange={(event) => setTimeRangeFilter(event.target.value)}>
+          <div className="odHeaderRight">
+            <div className="odDateSelect">
+              <CalendarIcon />
+              <select
+                value={timeRangeFilter}
+                onChange={(event) => setTimeRangeFilter(event.target.value)}
+              >
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
                 <option value="90d">Last 90 days</option>
               </select>
-            </label>
-
-          </div>
-        </header>
-
-        <section className="analytics-kpi-grid" aria-label="Analytics summary metrics">
-          {summaryMetrics.map((metric) => (
-            <StatCard
-              key={metric.label}
-              label={metric.label}
-              value={metric.value}
-              delta={metric.delta}
-              deltaTone={metric.deltaTone}
-            />
-          ))}
-        </section>
-
-        <section className="analytics-main-grid">
-          <article className="analytics-card analytics-card-wide">
-            <div className="analytics-card-header">
-              <div>
-                <h2>Upsell Performance</h2>
-                <p>Toggle metrics to compare trends over time</p>
-              </div>
             </div>
-
-            <div className="analytics-legend">
-              {chartSeries.map((metric) => {
-                const isActive = selectedMetrics.has(metric.key);
-                return (
-                  <button
-                    key={metric.key}
-                    type="button"
-                    aria-pressed={isActive}
-                    className={`analytics-legend-button ${isActive ? "is-active" : ""}`}
-                    onClick={() => toggleMetric(metric.key)}
-                    style={
-                      isActive
-                        ? {
-                            borderColor: metric.color,
-                            color: metric.color,
-                            background: `${metric.color}14`,
-                          }
-                        : undefined
-                    }
-                  >
-                    <span className="analytics-legend-dot" style={{ background: metric.color }} />
-                    {metric.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="analytics-chart-wrap">
-              <div className="analytics-chart-body">
-                <div className="analytics-chart-yaxis">
-                  {yAxisLabels.map((label, idx) => (
-                    <span key={`${label}-${idx}`}>{label}</span>
-                  ))}
-                  <span>0</span>
-                </div>
-
-                <div className="analytics-chart-svg-wrap">
-                  <svg
-                    className="analytics-chart"
-                    viewBox="0 0 1000 300"
-                    preserveAspectRatio="none"
-                    aria-label="Analytics performance chart"
-                  >
-                    {[0, 75, 150, 225, 300].map((row) => (
-                      <line key={row} x1="0" x2="1000" y1={row} y2={row} className="analytics-chart-grid" />
-                    ))}
-
-                    {/* area fill only when a single metric is isolated, matching the reference */}
-                    {activeSeries.length === 1 ? (
-                      <path
-                        d={buildAreaPath(trendByMetric[activeSeries[0].key])}
-                        className="analytics-chart-area"
-                        style={{ fill: `${activeSeries[0].color}1a` }}
-                      />
-                    ) : null}
-
-                    {hoveredIndex != null ? (
-                      <line
-                        x1={(hoveredIndex / (pointCount - 1)) * 1000}
-                        x2={(hoveredIndex / (pointCount - 1)) * 1000}
-                        y1="0"
-                        y2="300"
-                        className="analytics-chart-hover-line"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    ) : null}
-
-                    {activeSeries.map((series) => (
-                      <path
-                        key={series.key}
-                        d={buildLinePath(trendByMetric[series.key])}
-                        className="analytics-chart-line"
-                        style={{ stroke: series.color }}
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    ))}
-
-                    {activeSeries.map((series) =>
-                      trendByMetric[series.key].map((v, i) => {
-                        const { x, y } = toXY(v, i);
-                        return (
-                          <circle
-                            key={`${series.key}-${i}`}
-                            cx={x}
-                            cy={y}
-                            r={hoveredIndex === i ? 7 : 5}
-                            className="analytics-chart-point"
-                            style={{ fill: series.color }}
-                            vectorEffect="non-scaling-stroke"
-                            onMouseEnter={() => setHoveredIndex(i)}
-                            onMouseLeave={() => setHoveredIndex(null)}
-                          />
-                        );
-                      }),
-                    )}
-                  </svg>
-
-                  {hoveredIndex != null ? (
-                    <div
-                      className="analytics-chart-tooltip"
-                      style={{ left: `${(hoveredIndex / (pointCount - 1)) * 100}%` }}
-                    >
-                      <div className="analytics-chart-tooltip-title">
-                        {xAxisLabels[Math.min(hoveredIndex, xAxisLabels.length - 1)]}
-                      </div>
-                      {activeSeries.map((series) => (
-                        <div key={series.key} className="analytics-chart-tooltip-row">
-                          <span style={{ color: series.color }}>{series.label}</span>
-                          <strong>{formatMetric(trendByMetric[series.key][hoveredIndex])}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="analytics-chart-xaxis">
-                {xAxisLabels.map((label, i) => {
-                  const basePct = pointCount > 1 ? (i / (pointCount - 1)) * 100 : 0;
-                  const offsetPct = timeRangeFilter === "90d" ? 4 : 1.5;
-                  const extraFirst = (i === 0 && (timeRangeFilter === "7d" || timeRangeFilter === "30d")) ? 3 : 0;
-                  // For 7d/30d ranges, labels are date strings like "Aug 19" - render day above month
-                  const isDayMonth = (timeRangeFilter === "7d" || timeRangeFilter === "30d") && typeof label === "string" && label.includes(" ");
-
-                  // Additional tiny nudge for specific days in the 7-day view (Aug 21/22)
-                  let extraDayOffset = 0;
-                  if (timeRangeFilter === "7d" && isDayMonth) {
-                    const m = String(label).match(/(\d+)/);
-                    const dayNum = m ? Number(m[1]) : NaN;
-                    if (dayNum === 21 || dayNum === 22) extraDayOffset = 2; // small right nudge
-                  }
-
-                  const leftPct = Math.min(100, Math.max(0, basePct + offsetPct + extraFirst + extraDayOffset));
-
-                  return (
-                    <span key={`${String(label)}-${i}`} style={{ left: `${leftPct.toFixed(2)}%` }}>
-                      {isDayMonth ? (
-                        (() => {
-                          const parts = String(label).split(" ");
-                          const month = parts[0];
-                          const day = parts.slice(1).join(" ");
-                          return (
-                            <>
-                              <div className="analytics-xaxis-day">{day}</div>
-                              <div className="analytics-xaxis-month">{month}</div>
-                            </>
-                          );
-                        })()
-                      ) : (
-                        String(label)
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </article>
-
-          <aside className="analytics-card analytics-card-compact">
-            <div className="analytics-card-header">
-              <div>
-                <h2>Conversion Funnel</h2>
-                <p>See where customers drop off</p>
-              </div>
-            </div>
-
-            <div className="analytics-funnel-list">
-              {funnelSteps.map((step, index) => {
-                const isFlagged = index === lowestStageIndex + 1;
-                const palette = isFlagged ? flaggedStage : funnelPalette[index];
-                return (
-                  <div key={step.label}>
-                    <FunnelStep
-                      label={step.label}
-                      value={step.value}
-                      widthPercent={step.widthPercent}
-                      colorFrom={palette.from}
-                      colorTo={palette.to}
-                      isFlagged={isFlagged}
-                    />
-                    {index < funnelDropoffs.length ? (
-                      <div className="analytics-funnel-dropoff">
-                        <span>{formatPercent(funnelDropoffs[index].continued)} continued</span>
-                        <span
-                          className={
-                            index === lowestStageIndex
-                              ? "analytics-funnel-dropoff-bad"
-                              : "analytics-funnel-dropoff-muted"
-                          }
-                        >
-                          {index === lowestStageIndex ? "⚠ " : ""}
-                          {funnelDropoffs[index].continued == null
-                            ? "—"
-                            : `${((1 - funnelDropoffs[index].continued!) * 100).toFixed(0)}% dropped`}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="analytics-funnel-footer">
-              <span>Overall conversion rate</span>
-              <strong>{formatPercent(conversionRate)}</strong>
-            </div>
-            {browseToOffer ? (
-              <div className="analytics-funnel-footer">
-                <span>Browse → offer view</span>
-                <strong>{formatPercent(browseToOffer.browseToOfferRate)}</strong>
-              </div>
+            {onRefresh ? (
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                className="odViewDetailsBtn"
+                title="Refresh dashboard metrics"
+                style={{ cursor: isRefreshing ? "wait" : "pointer" }}
+              >
+                <RefreshIcon isSpinning={isRefreshing} />
+                <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
+              </button>
             ) : null}
-          </aside>
-        </section>
+          </div>
+        </div>
 
-        <section className="analytics-bottom-grid">
-          <article className="analytics-card analytics-list-card">
-            <div className="analytics-card-header analytics-card-header-row">
-              <div>
-                <h2>🏆 Top Performing Upsells</h2>
-                <p>Rank your upsell offers by key metrics</p>
+        {/* Top Summary Banner Card */}
+        <div className="odSummaryCard">
+          <div className="odOfferInfo">
+            <h2 className="odOfferName">All Upsell Offers</h2>
+            <div className="odAppliesTo">
+              <span>Smart ranking from browse & conversion</span>
+            </div>
+          </div>
+
+          <div className="odMetricsGrid">
+            <div className="odMetricCol">
+              <div className="odMetricLabel">
+                <EyeIcon size={14} />
+                <span>Total Views</span>
               </div>
-              <div className="analytics-rank-select-wrap">
+              <div className="odMetricValue">{totalViews.toLocaleString()}</div>
+            </div>
+            <div className="odMetricCol">
+              <div className="odMetricLabel">
+                <CursorIcon size={14} />
+                <span>Clicks</span>
+              </div>
+              <div className="odMetricValue">{totalClicks.toLocaleString()}</div>
+            </div>
+            <div className="odMetricCol">
+              <div className="odMetricLabel">
+                <CartIcon size={14} />
+                <span>Add to Cart</span>
+              </div>
+              <div className="odMetricValue">{totalAddedToCart.toLocaleString()}</div>
+            </div>
+            <div className="odMetricCol">
+              <div className="odMetricLabel">
+                <BagIcon size={14} />
+                <span>Purchases</span>
+              </div>
+              <div className="odMetricValue">{totalPurchases.toLocaleString()}</div>
+            </div>
+            <div className="odMetricCol">
+              <div className="odMetricLabel">
+                <PercentIcon size={14} />
+                <span>Conversion Rate</span>
+              </div>
+              <div className="odMetricValue">{formatRate(conversionRate)}</div>
+            </div>
+            <div className="odMetricCol">
+              <div className="odMetricLabel">
+                <DollarIcon size={14} />
+                <span>Revenue</span>
+              </div>
+              <div className="odMetricValue">{formatCurrency(totalRevenue)}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Middle Row: Trend & Funnel */}
+        <div className="odMiddleRow">
+          <PerformanceChart
+            trendMetrics={localTrendMetrics}
+            onRefresh={onRefresh}
+            isRefreshing={isRefreshing}
+          />
+          <ConversionFunnelCard funnel={funnel} browseToOffer={browseToOffer} />
+        </div>
+
+        {/* Bottom Card: Offer / Product Performance */}
+        <div className="odBottomCard">
+          <div className="odCardHeader">
+            <div>
+              <h3 className="odCardTitle">
+                {tableMode === "offers" ? "Offer Performance" : "Product Performance"}
+              </h3>
+              <p className="odSubtitle" style={{ marginTop: "2px" }}>
+                {tableMode === "offers"
+                  ? "Track performance and conversion across all upsell offers"
+                  : "Track performance across target products"}
+              </p>
+            </div>
+            <div className="odTableControls">
+              <label className="odSortSelect">
+                <span>View</span>
                 <select
-                  id="analytics-ranking-metric"
-                  value={selectedRankingMetric}
-                  onChange={(event) => setSelectedRankingMetric(event.target.value as "purchases" | "clicks" | "views")}
+                  value={tableMode}
+                  onChange={(e) => setTableMode(e.target.value as "offers" | "products")}
                 >
-                  <option value="purchases">Most Purchases</option>
-                  <option value="clicks">Most Clicks</option>
-                  <option value="views">Most Views</option>
+                  <option value="offers">Offers</option>
+                  <option value="products">Products</option>
                 </select>
+              </label>
+
+              <label className="odSortSelect">
+                <span>Sort by</span>
+                <select value={sortKey} onChange={(e) => setSortKey(e.target.value)}>
+                  <option value="purchases">Most Purchases</option>
+                  <option value="views">Most Views</option>
+                  <option value="clicks">Most Clicks</option>
+                  <option value="revenue">Highest Revenue</option>
+                  <option value="conversion">Highest Conversion Rate</option>
+                </select>
+              </label>
+
+              <div className="odSearchInput">
+                <SearchIcon />
+                <input
+                  type="text"
+                  placeholder={tableMode === "offers" ? "Search offers..." : "Search products..."}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
             </div>
+          </div>
 
-            <div className="analytics-offer-list">
-              {rankingData.length === 0 ? (
-                <div className="analytics-empty-state">No offer data available yet.</div>
-              ) : (
-                rankingData.map((offer, index) => (
-                  <OfferListRow
-                    key={offer.offerId}
-                    rank={index + 1}
-                    label={offer.offerName}
-                    subtitle={productMetaMap.titles[offer.offerId] ? productMetaMap.titles[offer.offerId] : undefined}
-                    value={offer[selectedRankingMetric]}
-                    valueLabel={rankingUnitLabel}
-                    percentOfMax={(offer[selectedRankingMetric] / maxRankingValue) * 100}
-                    url={offerDetailUrl(offer.offerId)}
-                  />
-                ))
-              )}
-            </div>
-          </article>
-
-          <aside className="analytics-card analytics-list-card">
-            <div className="analytics-card-header">
-              <div>
-                <h2>Stage Conversion</h2>
-                <p>Track how each stage performs</p>
-              </div>
-            </div>
-
-            <div className="analytics-stage-list">
-              {stageConversionRows.map((row, index) => (
-                <div key={row.label} className="analytics-stage-row">
-                  <div className="analytics-stage-row-top">
-                    <span className="analytics-stage-label">{row.label}</span>
-                    <span
-                      className={
-                        index === lowestStageIndex ? "analytics-stage-value analytics-stage-value-bad" : "analytics-stage-value"
-                      }
-                    >
-                      {formatPercent(row.rate)}
-                    </span>
-                  </div>
-                  <div className="analytics-stage-bar-wrap">
-                    <div
-                      className={index === lowestStageIndex ? "analytics-stage-bar is-bad" : "analytics-stage-bar"}
-                      style={{ width: `${clamp((row.rate ?? 0) * 100, 3, 100)}%` }}
-                    />
-                  </div>
-                  {index === lowestStageIndex ? <div className="analytics-stage-flag">⚠ Biggest drop-off</div> : null}
-                </div>
-              ))}
-            </div>
-          </aside>
-        </section>
+          <div className="odTableWrapper">
+            {tableMode === "offers" ? (
+              <table className="odTable">
+                <thead>
+                  <tr>
+                    <th>Offer</th>
+                    <th>Offer ID</th>
+                    <th>Views</th>
+                    <th>Clicks</th>
+                    <th>CTR</th>
+                    <th>Add to Cart</th>
+                    <th>Purchases</th>
+                    <th>Conversion Rate</th>
+                    <th>Revenue</th>
+                    <th style={{ textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOffers.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} style={{ textAlign: "center", padding: "28px", color: "#6b7280" }}>
+                        No upsell offers found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredOffers.map((offer) => (
+                      <tr key={offer.offerId}>
+                        <td>
+                          <div className="odProductCell">
+                            <button
+                              type="button"
+                              onClick={() => navigate(offerDetailUrl(offer.offerId))}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                textAlign: "left",
+                                cursor: "pointer",
+                                font: "inherit",
+                              }}
+                            >
+                              <span className="odProductName" style={{ color: "#111827" }}>
+                                {offer.offerName}
+                              </span>
+                            </button>
+                            <span className="odProductSubtitle">Upsell Offer</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="odProductId">{formatProductId(offer.offerId)}</span>
+                        </td>
+                        <td>{offer.views.toLocaleString()}</td>
+                        <td>{offer.clicks.toLocaleString()}</td>
+                        <td>{offer.ctr.toFixed(1)}%</td>
+                        <td>{offer.addedToCart.toLocaleString()}</td>
+                        <td>{offer.purchases.toLocaleString()}</td>
+                        <td>{offer.convRate.toFixed(1)}%</td>
+                        <td>{formatCurrency(offer.revenue)}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(offerDetailUrl(offer.offerId))}
+                            className="odActionLink odActionEdit"
+                          >
+                            View Analytics →
+                          </button>
+                          <AdminAppLink
+                            to={`/app/offers/new?id=${encodeURIComponent(offer.offerId)}`}
+                            className="odActionLink"
+                            style={{ color: "#4b5563" }}
+                          >
+                            Edit
+                          </AdminAppLink>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <table className="odTable">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Product ID</th>
+                    <th>Views</th>
+                    <th>Clicks</th>
+                    <th>CTR</th>
+                    <th>Add to Cart</th>
+                    <th>Purchases</th>
+                    <th>Conversion Rate</th>
+                    <th>Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ textAlign: "center", padding: "28px", color: "#6b7280" }}>
+                        No products found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredProducts.map((prod) => (
+                      <tr key={prod.productId}>
+                        <td>
+                          <div className="odProductCell">
+                            <span className="odProductName">{prod.productName}</span>
+                            <span className="odProductSubtitle">Target Product</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="odProductId">{formatProductId(prod.productId)}</span>
+                        </td>
+                        <td>{prod.views.toLocaleString()}</td>
+                        <td>{prod.clicks.toLocaleString()}</td>
+                        <td>{prod.ctr.toFixed(1)}%</td>
+                        <td>{prod.addedToCart.toLocaleString()}</td>
+                        <td>{prod.purchases.toLocaleString()}</td>
+                        <td>{prod.convRate.toFixed(1)}%</td>
+                        <td>{formatCurrency(prod.revenue)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

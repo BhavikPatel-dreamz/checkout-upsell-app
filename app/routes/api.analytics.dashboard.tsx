@@ -34,6 +34,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const daysParam = url.searchParams.get("days") ?? "30";
   const statusParam = url.searchParams.get("status") ?? "all";
+  const offerIdParam = url.searchParams.get("offerId");
+  const offerId = offerIdParam && offerIdParam.trim() ? offerIdParam : null;
   const days = Math.max(1, Math.min(365, Number.parseInt(daysParam, 10) || 30));
 
   const validStatuses = ["all", "live", "draft"];
@@ -60,7 +62,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const productParam = url.searchParams.get("product") ?? "all";
 
-  const metrics = await getFilteredDashboardMetrics(shop, { days, status, product: productParam });
+  const metrics = await getFilteredDashboardMetrics(shop, { days, status, product: productParam, offerId });
 
   // ensure trend metrics are explicitly fetched using the same days/status filter
   // (this guards against older callers that omitted trend calculations)

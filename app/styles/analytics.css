@@ -735,3 +735,599 @@
   padding: 10px 16px;
   font-weight: 600;
 }
+
+/* ==========================================================================
+   Offer Details Page (Specific Layout & Components)
+   ========================================================================== */
+
+.odPageShell {
+  background: #f8fafc;
+  min-height: 100vh;
+  padding: 24px 32px 48px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #111827;
+}
+
+.odContainer {
+  max-width: 1360px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Header */
+.odHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.odHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.odBackBtn {
+  background: none;
+  border: none;
+  padding: 6px;
+  color: #4b5563;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.odBackBtn:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.odTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.odTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.01em;
+}
+
+.odSubtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.odHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.odDateSelect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+}
+
+.odDateSelect select {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Top Summary Banner Card */
+.odSummaryCard {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 24px;
+  align-items: center;
+}
+
+.odOfferInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.odOfferStatusPill {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.odStatusActive {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.odStatusDraft {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.odOfferName {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.3;
+  margin: 0;
+  word-break: break-word;
+}
+
+.odBadgeRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.odTypeBadge {
+  display: inline-block;
+  background: #f3e8ff;
+  color: #7e22ce;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.odPlacementBadge {
+  display: inline-block;
+  background: #e0f2fe;
+  color: #0284c7;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.odAppliesTo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.odMetricsGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  align-items: center;
+}
+
+.odMetricCol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 16px;
+  border-left: 1px solid #f1f2f3;
+}
+
+.odMetricCol:first-child {
+  border-left: 1px solid #e5e7eb;
+}
+
+.odMetricLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.odMetricValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.2;
+}
+
+/* Middle Row: Trend & Funnel */
+.odMiddleRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(360px, 1.2fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.odCard {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+.odCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.odCardTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.odTrendLegend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.odLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.odLegendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.odViewDetailsBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4b5563;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.odViewDetailsBtn:hover {
+  background: #f9fafb;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+/* Funnel Visual */
+.odFunnelContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  justify-content: center;
+}
+
+.odFunnelRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.odFunnelBarWrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.odFunnelBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: transform 0.15s ease;
+}
+
+.odFunnelBar:hover {
+  transform: scale(1.01);
+}
+
+.odFunnelStageViewed {
+  width: 100%;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+}
+
+.odFunnelStageClicked {
+  width: 86%;
+  background: #f3e8ff;
+  border: 1px solid #e9d5ff;
+  color: #7e22ce;
+}
+
+.odFunnelStageAdded {
+  width: 72%;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.odFunnelStagePurchased {
+  width: 58%;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  color: #b45309;
+}
+
+.odFunnelRate {
+  width: 55px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.odDropoffAlert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 14px;
+}
+
+.odDropoffLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.odDropoffIcon {
+  color: #ef4444;
+  font-size: 14px;
+}
+
+.odDropoffTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.odDropoffSubtitle {
+  font-size: 11.5px;
+  color: #ef4444;
+}
+
+.odDropoffValue {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ef4444;
+}
+
+/* Bottom Card: Product Performance */
+.odBottomCard {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.odTableControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.odSortSelect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #4b5563;
+}
+
+.odSortSelect select {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 5px 24px 5px 10px;
+  font-size: 12.5px;
+  color: #374151;
+  background: #fff;
+  cursor: pointer;
+  outline: none;
+}
+
+.odSearchInput {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 5px 10px;
+  background: #fff;
+}
+
+.odSearchInput input {
+  border: none;
+  outline: none;
+  font-size: 12.5px;
+  color: #111827;
+  width: 170px;
+}
+
+.odTableWrapper {
+  overflow-x: auto;
+  margin-top: 14px;
+}
+
+.odTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.odTable th {
+  padding: 10px 14px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.odTable td {
+  padding: 14px;
+  font-size: 13px;
+  color: #111827;
+  border-bottom: 1px solid #f1f2f3;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.odTable tr:last-child td {
+  border-bottom: none;
+}
+
+.odProductCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 180px;
+}
+
+.odProductName {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.odProductSubtitle {
+  font-size: 11.5px;
+  color: #6b7280;
+}
+
+.odProductId {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.odActionLink {
+  background: none;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+
+.odActionEdit {
+  color: #2563eb;
+  margin-right: 12px;
+}
+
+.odActionEdit:hover {
+  text-decoration: underline;
+}
+
+.odActionDelete {
+  color: #dc2626;
+}
+
+.odActionDelete:hover {
+  text-decoration: underline;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1100px) {
+  .odSummaryCard {
+    grid-template-columns: 1fr;
+  }
+  .odMetricCol:first-child {
+    border-left: none;
+  }
+  .odMiddleRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .odPageShell {
+    padding: 16px;
+  }
+  .odMetricsGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .odMetricCol {
+    padding: 0 8px;
+    border-left: none;
+  }
+}
+
+@keyframes odSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.odSpin {
+  animation: odSpin 0.9s linear infinite;
+}
