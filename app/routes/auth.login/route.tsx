@@ -29,7 +29,7 @@ export default function Auth() {
       <s-page>
         <s-section heading="Open from Shopify">
           <s-paragraph>
-            Dynamic Dreamz Upsell is installed from the Shopify App Store or opened from Shopify
+            Smart Upsell is installed from the Shopify App Store or opened from Shopify
             Admin. This page does not collect a store domain.
           </s-paragraph>
         </s-section>
