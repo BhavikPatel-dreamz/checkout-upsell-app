@@ -26,11 +26,12 @@
     margin: 16px 0;
   "
 >
-  <h3 class="product-upsell-heading">
+  <h3 id="product-upsell-heading" class="product-upsell-heading">
     {% if block.settings.heading_text != blank %}{{ block.settings.heading_text | escape }}{% else %}{{ "product_upsell.title" | t | escape }}{% endif %}
   </h3>
   <div id="product-upsell-editor-notice" class="product-upsell-editor-notice" style="display: none;"></div>
   <div id="product-upsell-items" class="product-upsell-items"></div>
+  <div id="product-upsell-empty" class="product-upsell-empty" style="display: none;">Currently this product doesn't have any offer</div>
   <div id="product-upsell-error" class="product-upsell-error"></div>
 </div>
 
@@ -49,6 +50,13 @@
     overflow-x: auto;
     padding-bottom: 4px;
     scroll-snap-type: x proximity;
+  }
+
+  .product-upsell-empty {
+    display: none;
+    font-size: 14px;
+    color: var(--pu-subtext-color);
+    padding: 4px 0;
   }
 
   .product-upsell-editor-notice {

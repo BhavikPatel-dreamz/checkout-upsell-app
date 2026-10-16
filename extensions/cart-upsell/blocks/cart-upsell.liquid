@@ -28,6 +28,7 @@
   </h3>
   <div id="cart-upsell-editor-notice" class="cart-upsell-editor-notice" style="display: none;"></div>
   <div id="cart-upsell-items" class="cart-upsell-items"></div>
+  <div id="cart-upsell-empty" class="cart-upsell-empty" style="display: none;">Currently this product doesn't have any offer</div>
   <div id="cart-upsell-error" class="cart-upsell-error"></div>
 </div>
 
@@ -46,6 +47,13 @@
     overflow-x: auto;
     padding-bottom: 4px;
     scroll-snap-type: x proximity;
+  }
+
+  .cart-upsell-empty {
+    display: none;
+    font-size: 13px;
+    color: var(--cu-subtext-color);
+    padding: 4px 0;
   }
 
   .cart-upsell-editor-notice {

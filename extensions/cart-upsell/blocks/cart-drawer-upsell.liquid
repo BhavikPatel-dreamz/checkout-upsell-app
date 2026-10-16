@@ -21,11 +21,12 @@
     border-top: var(--upsell-border-top);
   "
 >
-  <h3 class="cart-drawer-upsell-heading">
+  <h3 id="cart-drawer-upsell-heading" class="cart-drawer-upsell-heading">
     {% if block.settings.heading_text != blank %}{{ block.settings.heading_text | escape }}{% else %}{{ "cart_upsell.title" | t | escape }}{% endif %}
   </h3>
   <div id="cart-drawer-upsell-editor-notice" class="cart-drawer-upsell-editor-notice" style="display: none;"></div>
   <div id="cart-drawer-upsell-items" class="cart-drawer-upsell-items"></div>
+  <div id="cart-drawer-upsell-empty" class="cart-drawer-upsell-empty" style="display: none;">Currently this product doesn't have any offer</div>
   <div id="cart-drawer-upsell-error" class="cart-drawer-upsell-error"></div>
 </div>
 
@@ -35,6 +36,13 @@
     font-size: var(--upsell-heading-size);
     font-weight: 600;
     color: var(--upsell-heading-color);
+  }
+
+  .cart-drawer-upsell-empty {
+    display: none;
+    font-size: 13px;
+    color: var(--upsell-subtext-color);
+    padding: 4px 0;
   }
 
   .cart-drawer-upsell-items {
