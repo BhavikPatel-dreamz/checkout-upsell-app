@@ -282,7 +282,7 @@ importers:
         version: 2.11.3(preact@10.29.8)
       '@shopify/ui-extensions':
         specifier: 2026.7.x
-        version: 2026.7.0(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)
+        version: 2026.7.4(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)
       preact:
         specifier: ^10.10.x
         version: 10.29.8
@@ -293,8 +293,8 @@ importers:
         specifier: ^2.3.0
         version: 2.11.3(preact@10.29.8)
       '@shopify/ui-extensions':
-        specifier: ~2026.7.0
-        version: 2026.7.0(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)
+        specifier: ~2026.7.4
+        version: 2026.7.4(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)
       preact:
         specifier: ^10.27.0
         version: 10.29.8
@@ -309,8 +309,8 @@ importers:
         specifier: ^2.3.0
         version: 2.11.3(preact@10.29.8)
       '@shopify/ui-extensions':
-        specifier: ~2026.7.0
-        version: 2026.7.0(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)
+        specifier: ~2026.7.4
+        version: 2026.7.4(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)
       preact:
         specifier: ^10.27.0
         version: 10.29.8
@@ -1540,8 +1540,8 @@ packages:
   '@shopify/storefront-api-client@1.0.10':
     resolution: {integrity: sha512-A0ItFW58L5+y/jnnJDEsmt2YcQSt2BG+pNoQOYRpPBJaOLpTj7A13q1QVrE5XYVGZCA6ZQ6FqAtgosHHrkut0Q==}
 
-  '@shopify/ui-extensions@2026.7.0':
-    resolution: {integrity: sha512-xqcExD7d5yAmTZMd+W8yB5sfB587UKobY/fPeONImZLITsEPRbUYfH9MPUHoGJ3uL+5oBYy9ZMZofysQ3vP7eQ==}
+  '@shopify/ui-extensions@2026.7.4':
+    resolution: {integrity: sha512-z0CcCIpQCAYnEJ+A4pW0zW1KdVQZnrD4uZVMWcci8IeCTCF62yYm0k5CZCnwdrP70l2v7ZX3rsy/bGqOjRAbug==}
     peerDependencies:
       '@preact/signals': '*'
       preact: '*'
@@ -5346,7 +5346,7 @@ snapshots:
     dependencies:
       '@shopify/graphql-client': 1.4.2
 
-  '@shopify/ui-extensions@2026.7.0(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)':
+  '@shopify/ui-extensions@2026.7.4(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)':
     dependencies:
       ts-morph: 25.0.1
     optionalDependencies:
