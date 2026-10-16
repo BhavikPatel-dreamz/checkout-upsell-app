@@ -1,12 +1,10 @@
-import { authenticate } from "../shopify.server";
+import { env } from "../env.server";
+import { shopFromAppProxyQuery } from "./appProxySignature.server";
 import { shopFromCheckoutSessionToken } from "./checkoutSessionToken.server";
 
-const SHOP_DOMAIN = /^[a-z0-9-]+\.myshopify\.com$/;
-
-function asShopDomain(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const shop = value.trim().toLowerCase();
-  return SHOP_DOMAIN.test(shop) ? shop : null;
+function queryString(url: string): string {
+  const start = url.indexOf("?");
+  return start === -1 ? "" : url.slice(start + 1);
 }
 
 /**
@@ -22,11 +20,5 @@ export async function shopFromVerifiedStorefrontRequest(
     return shopFromCheckoutSessionToken(request);
   }
 
-  try {
-    const proxy = await authenticate.public.appProxy(request);
-    const signedShop = proxy.session?.shop ?? new URL(request.url).searchParams.get("shop");
-    return asShopDomain(signedShop);
-  } catch {
-    return null;
-  }
+  return shopFromAppProxyQuery(queryString(request.url), env.shopifyApiSecret);
 }
