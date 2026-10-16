@@ -24,8 +24,8 @@ importers:
         specifier: ^7.18.0
         version: 7.18.2(react-router@7.18.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(typescript@5.9.3)
       '@shopify/app-bridge-react':
-        specifier: ^4.2.4
-        version: 4.2.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^4.2.13
+        version: 4.2.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@shopify/shopify-app-react-router':
         specifier: ^1.2.1
         version: 1.2.1(react-dom@18.3.1(react@18.3.1))(react-router@7.18.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
@@ -1222,8 +1222,8 @@ packages:
   '@shopify/api-codegen-preset@1.2.2':
     resolution: {integrity: sha512-NizmrrrxmoIBfrGv/qvrm1ZytkGsFfeaMj14Gj+IDx6JZAK9A72jsTIyQ7DTTKWMPB6F4d7E20dygA7SEYPVEw==}
 
-  '@shopify/app-bridge-react@4.2.12':
-    resolution: {integrity: sha512-7youUp0rF6fvbRQ0qT5qD/yHRTXnFSo0gHyZixcfJWM/KocefWMjjLIWAxcaJW7DVHWpq6bGZqC7s5XS3avTKw==}
+  '@shopify/app-bridge-react@4.2.13':
+    resolution: {integrity: sha512-9ArXhCNRefHZwVwu/DNll1FOQPiKwPhlGs9IwE9FWw39osG+e0SNImczW4B0WF1b92sdRsTgmFkqp3Vvmi3ARg==}
     peerDependencies:
       react: '*'
       react-dom: '*'
@@ -5076,7 +5076,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@shopify/app-bridge-react@4.2.12(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@shopify/app-bridge-react@4.2.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@shopify/app-bridge-types': 0.7.2
       react: 18.3.1
