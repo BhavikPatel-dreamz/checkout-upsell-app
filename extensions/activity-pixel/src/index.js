@@ -27,16 +27,12 @@ function myshopifyDomain(init) {
   return "";
 }
 
-register(({ analytics, browser, init, settings }) => {
+register(({ analytics, browser, init }) => {
   const shop = myshopifyDomain(init);
-  const apiBase = String(settings?.apiBase || "").replace(/\/$/, "");
   let lastProductView = { productId: null, variantId: null };
 
-  function endpoints() {
-    const urls = [];
-    if (apiBase) urls.push(`${apiBase}/api/activity`);
-    if (shop) urls.push(`https://${shop}/apps/checkout-upsell/api/activity`);
-    return urls;
+  function activityUrl() {
+    return shop ? `https://${shop}/apps/checkout-upsell/api/activity` : "";
   }
 
   async function clientIdFromCookie() {
@@ -66,8 +62,8 @@ register(({ analytics, browser, init, settings }) => {
   async function postActivity(payload) {
     if (!EVENT_TYPES.has(payload.eventType)) return;
     if (!payload.clientId && !payload.customerId && !payload.guestKey) return;
-    const urls = endpoints();
-    if (urls.length === 0) return;
+    const url = activityUrl();
+    if (!url) return;
 
     const body = JSON.stringify({
       shop,
@@ -75,18 +71,15 @@ register(({ analytics, browser, init, settings }) => {
       ...payload,
     });
 
-    for (const url of urls) {
-      try {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          keepalive: true,
-          body,
-        });
-        if (response.ok) return;
-      } catch (error) {
-        console.error("Activity pixel post failed:", url, error);
-      }
+    try {
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body,
+      });
+    } catch (error) {
+      console.error("Activity pixel post failed:", url, error);
     }
   }
 

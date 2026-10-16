@@ -19,5 +19,5 @@ type = "single_line_text_field"
 
 [settings.fields.apiBase]
 name = "API base URL"
-description = "App backend URL used to record browse activity"
+description = "Unused. Browse activity is recorded through the store app proxy."
 type = "single_line_text_field"

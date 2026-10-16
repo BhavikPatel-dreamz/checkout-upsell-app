@@ -1,5 +1,3 @@
-import { env } from "../env.server";
-
 type AdminGraphql = {
   graphql: (query: string, options?: { variables?: Record<string, unknown> }) => Promise<Response>;
 };
@@ -9,7 +7,9 @@ const ensuredShops = new Set<string>();
 function pixelSettings() {
   return {
     accountID: "checkout-upsell",
-    apiBase: env.shopifyAppUrl.replace(/\/$/, ""),
+    // The storefront pixel posts to /apps/checkout-upsell/api/activity so Shopify
+    // signs the shop. The app origin rejects that call without a signature.
+    apiBase: "",
   };
 }
 
