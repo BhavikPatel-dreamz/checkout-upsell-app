@@ -182,7 +182,8 @@
         if (items[i].variant_id) variantIds.push(toVariantGid(items[i].variant_id));
       }
       var params = new URLSearchParams({
-        placement: "checkout",
+        placement: "cart_drawer",
+        displayLocation: "cart_drawer",
         productIds: productIds.join(","),
         variantIds: variantIds.join(","),
       });
@@ -240,15 +241,35 @@
     }
 
     function renderOffers(offers) {
+      var heading = document.querySelector(".cart-upsell-heading");
       var items = document.getElementById("cart-upsell-items");
       var notice = document.getElementById("cart-upsell-editor-notice");
+      var empty = document.getElementById("cart-upsell-empty");
       if (!items) return;
       items.replaceChildren();
+      if (heading) heading.style.display = "";
       if (notice) notice.style.display = "none";
+      if (empty) empty.style.display = "none";
       clearError();
       offers.forEach(function (offer) {
         items.appendChild(renderOfferCard(offer, { readOnly: false }));
       });
+      showRoot();
+    }
+
+    function renderEmpty() {
+      var root = document.getElementById("cart-upsell-root");
+      var heading = document.querySelector(".cart-upsell-heading");
+      var items = document.getElementById("cart-upsell-items");
+      var notice = document.getElementById("cart-upsell-editor-notice");
+      var empty = document.getElementById("cart-upsell-empty");
+      if (!root || !empty) return;
+
+      if (items) items.replaceChildren();
+      if (heading) heading.style.display = "none";
+      if (notice) notice.style.display = "none";
+      clearError();
+      empty.style.display = "block";
       showRoot();
     }
 
@@ -409,7 +430,7 @@
             renderEditorEmptyState("0 eligible offers");
             return;
           }
-          hideRoot();
+          renderEmpty();
         })
         .catch(function () {
           if (isDesignMode() && showEditorPreviewEnabled()) {

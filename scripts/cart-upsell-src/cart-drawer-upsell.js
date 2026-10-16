@@ -6,18 +6,20 @@
     var rootEl = null;
     var wasDrawerOpen = false;
     var hadCartItems = false;
+    var P = "cart-drawer-upsell-";
 
-    function config() {
-      return window.CART_DRAWER_UPSELL_CONFIG || {};
+    function byId(name) {
+      return document.getElementById(P + name);
     }
 
+    var o = window.CART_DRAWER_UPSELL_CONFIG || {};
+
     function isDesignMode() {
-      var c = config();
-      return !!(c.designMode || (window.Shopify && window.Shopify.designMode));
+      return !!(o.designMode || (window.Shopify && window.Shopify.designMode));
     }
 
     function showEditorPreviewEnabled() {
-      return config().editorPreviewEnabled !== false;
+      return o.editorPreviewEnabled !== false;
     }
 
     function guestKey() {
@@ -25,10 +27,7 @@
         var existing = sessionStorage.getItem(GUEST_KEY);
         if (existing) return existing;
         var created =
-          "guest-" +
-          (window.crypto && crypto.randomUUID
-            ? crypto.randomUUID()
-            : Date.now() + "-" + Math.random().toString(16).slice(2));
+          "guest-" + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
         sessionStorage.setItem(GUEST_KEY, created);
         return created;
       } catch {
@@ -37,14 +36,8 @@
     }
 
     function identity() {
-      var customerId = config().customerId || null;
-      var match = null;
-      try {
-        match = document.cookie.match(/(?:^|; )_shopify_y=([^;]*)/);
-      } catch {
-        match = null;
-      }
-      var clientId = match ? decodeURIComponent(match[1]) : null;
+      var customerId = o.customerId || null;
+      var clientId = (document.cookie.match(/(?:^|; )_shopify_y=([^;]*)/) || [])[1] || null;
       if (customerId) {
         return { customerId: customerId, guestKey: null, clientId: clientId, isGuest: false };
       }
@@ -68,26 +61,19 @@
       parent.appendChild(el);
     }
 
-
     function findDrawer() {
-      return (
-        document.querySelector("cart-drawer") ||
-        document.querySelector("cart-drawer-component") ||
-        document.querySelector("theme-drawer#cart-drawer, #cart-drawer, [data-cart-drawer]") ||
-        null
+      return document.querySelector(
+        "cart-drawer, cart-drawer-component, theme-drawer#cart-drawer, #cart-drawer, [data-cart-drawer]",
       );
     }
 
     function placeRoot() {
-      var el = rootEl || document.getElementById("cart-drawer-upsell-root");
+      var el = rootEl || byId("root");
       var drawer = findDrawer();
       if (!el || !drawer) return el;
       rootEl = el;
       var inner =
-        drawer.querySelector(".drawer__inner") ||
-        drawer.querySelector(".drawer__contents") ||
-        drawer.querySelector(".cart-drawer__inner") ||
-        drawer;
+        drawer.querySelector(".drawer__inner, .drawer__contents, .cart-drawer__inner") || drawer;
       var footer = drawer.querySelector(
         ".drawer__footer, .cart-drawer__footer, .cart-drawer__summary",
       );
@@ -102,17 +88,13 @@
       return el;
     }
 
-    function errorEl() {
-      return document.getElementById("cart-drawer-upsell-error");
-    }
-
     function clearError() {
-      var el = errorEl();
+      var el = byId("error");
       if (el) el.style.display = "none";
     }
 
     function showError(message) {
-      var el = errorEl();
+      var el = byId("error");
       if (!el) return;
       el.textContent = message;
       el.style.display = "block";
@@ -125,7 +107,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          shop: config().shop,
+          shop: o.shop,
           offerId: offer.offerId,
           offerName: offer.offerName,
           productId: offer.productId,
@@ -138,13 +120,12 @@
       }).catch(function () {});
     }
 
+    var ITEM_SEL =
+      'tr[id^="CartItem-"], tr.cart-items__table-row, .cart-item, [data-cart-item], [ref="cartItemRows[]"]';
+
     function cartItemNodes(drawer) {
       if (!drawer) return [];
-      return Array.prototype.slice.call(
-        drawer.querySelectorAll(
-          'tr[id^="CartItem-"], tr.cart-items__table-row, .cart-item, [data-cart-item], [ref="cartItemRows[]"]',
-        ),
-      );
+      return Array.prototype.slice.call(drawer.querySelectorAll(ITEM_SEL));
     }
 
     function variantIdFromNode(node) {
@@ -170,12 +151,14 @@
     function collectVariantIds() {
       var seen = {};
       var ids = [];
-      cartItemNodes(findDrawer()).forEach(function (node) {
-        var id = variantIdFromNode(node);
+      function add(id) {
         if (id && !seen[id]) {
           seen[id] = true;
           ids.push(id);
         }
+      }
+      cartItemNodes(findDrawer()).forEach(function (node) {
+        add(variantIdFromNode(node));
       });
       if (ids.length) return ids;
 
@@ -185,11 +168,7 @@
         drawer.querySelector(".cart-drawer__items, .cart-drawer__content, .cart-items, .cart-items__wrapper") ||
         drawer;
       container.querySelectorAll("[data-variant-id]").forEach(function (node) {
-        var id = numericId(node.getAttribute("data-variant-id"));
-        if (id && !seen[id]) {
-          seen[id] = true;
-          ids.push(id);
-        }
+        add(numericId(node.getAttribute("data-variant-id")));
       });
       return ids;
     }
@@ -205,7 +184,7 @@
       if (id.customerId) params.set("customerId", id.customerId);
       if (id.guestKey) params.set("guestKey", id.guestKey);
       if (id.clientId) params.set("clientId", id.clientId);
-      return fetch(config().eligibilityUrl + "?" + params.toString(), {
+      return fetch(o.eligibilityUrl + "?" + params.toString(), {
         credentials: "same-origin",
       }).then(function (res) {
         if (!res.ok) throw new Error("eligible request failed");
@@ -223,8 +202,8 @@
     function renderOfferCard(offer, options) {
       var readOnly = options && options.readOnly;
       var card = document.createElement("div");
-      card.className = "cart-drawer-upsell-card";
-      if (readOnly) card.classList.add("cart-drawer-upsell-card--preview");
+      card.className = P + "card";
+      if (readOnly) card.classList.add(P + "card--preview");
 
       var imageUrl = String(offer.imageUrl || "");
       if (imageUrl.indexOf("http") === 0) {
@@ -234,21 +213,21 @@
         card.appendChild(img);
       } else {
         var placeholder = document.createElement("div");
-        placeholder.className = "cart-drawer-upsell-placeholder-img";
+        placeholder.className = P + "placeholder-img";
         card.appendChild(placeholder);
       }
 
       var details = document.createElement("div");
-      details.className = "cart-drawer-upsell-details";
-      addDiv(details, "cart-drawer-upsell-promo", offer.promotionalTitle || "");
-      addDiv(details, "cart-drawer-upsell-product-title", offer.productTitle || "");
+      details.className = P + "details";
+      addDiv(details, P + "promo", offer.promotionalTitle || "");
+      addDiv(details, P + "product-title", offer.productTitle || "");
       var variant = document.createElement("div");
-      variant.className = "cart-drawer-upsell-variant";
-      variant.appendChild(document.createTextNode(offer.variantTitle || ""));
+      variant.className = P + "variant";
+      variant.textContent = offer.variantTitle || "";
       if (offer.price) {
-        variant.appendChild(document.createTextNode(" · "));
+        if (offer.variantTitle) variant.textContent += " · ";
         var price = document.createElement("span");
-        price.className = "cart-drawer-upsell-price";
+        price.className = P + "price";
         price.textContent = "$" + offer.price;
         variant.appendChild(price);
       }
@@ -258,64 +237,90 @@
       if (!readOnly) {
         var btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "cart-drawer-upsell-btn";
-        btn.textContent = config().addToCartLabel || "Add to cart";
+        btn.className = P + "btn";
+        btn.textContent = o.addToCartLabel || "Add to cart";
         btn.addEventListener("click", function () {
           addOfferToCart(offer, btn);
         });
-        if (details) details.appendChild(btn);
-        else card.appendChild(btn);
+        details.appendChild(btn);
       } else {
         var badge = document.createElement("div");
-        badge.className = "cart-drawer-upsell-preview-badge";
-        badge.textContent = config().previewBadgeLabel || "Preview only";
-        if (details) details.appendChild(badge);
-        else card.appendChild(badge);
+        badge.className = P + "preview-badge";
+        badge.textContent = o.previewBadgeLabel || "Preview only";
+        details.appendChild(badge);
       }
       return card;
     }
 
-    function renderOffers(offers) {
-      var items = document.getElementById("cart-drawer-upsell-items");
-      var notice = document.getElementById("cart-drawer-upsell-editor-notice");
+    function getEls() {
       var root = placeRoot();
-      if (!items || !root) return;
-      items.replaceChildren();
-      if (notice) notice.style.display = "none";
+      return {
+        root: root,
+        heading: byId("heading") || (root && root.querySelector("." + P + "heading")),
+        items: byId("items"),
+        notice: byId("editor-notice"),
+        empty: byId("empty"),
+      };
+    }
+
+    function renderOffers(offers) {
+      var els = getEls();
+      if (!els.items || !els.root) return;
+      els.items.replaceChildren();
+      if (els.heading) els.heading.style.display = "";
+      if (els.notice) els.notice.style.display = "none";
+      if (els.empty) els.empty.style.display = "none";
       clearError();
       offers.forEach(function (offer) {
-        items.appendChild(renderOfferCard(offer, { readOnly: false }));
+        els.items.appendChild(renderOfferCard(offer, { readOnly: false }));
       });
-      root.style.display = "block";
+      els.root.style.display = "block";
+    }
+
+    function renderEmpty() {
+      var els = getEls();
+      if (!els.root) return;
+      if (els.items) els.items.replaceChildren();
+      if (els.heading) els.heading.style.display = "none";
+      if (els.notice) els.notice.style.display = "none";
+      clearError();
+      if (!els.empty) {
+        els.empty = document.createElement("div");
+        els.empty.id = P + "empty";
+        els.empty.className = P + "empty";
+        els.root.appendChild(els.empty);
+      }
+      els.empty.textContent = "Currently this product doesn't have any offer";
+      els.empty.style.display = "block";
+      els.root.style.display = "block";
     }
 
     function renderEditorEmptyState(reason) {
-      var root = placeRoot();
-      var items = document.getElementById("cart-drawer-upsell-items");
-      var notice = document.getElementById("cart-drawer-upsell-editor-notice");
-      if (!root || !items) return;
+      var els = getEls();
+      if (!els.root || !els.items) return;
 
-      items.replaceChildren();
+      els.items.replaceChildren();
+      if (els.heading) els.heading.style.display = "";
+      if (els.empty) els.empty.style.display = "none";
       clearError();
 
-      if (notice) {
-        notice.textContent =
-          config().editorPreviewMessage ||
+      if (els.notice) {
+        els.notice.textContent =
+          o.editorPreviewMessage ||
           "Editor preview: no Cart Drawer offer matches. Add a trigger product or create an active Cart Drawer offer.";
-        if (reason) notice.textContent += " (" + reason + ")";
-        notice.style.display = "block";
+        if (reason) els.notice.textContent += " (" + reason + ")";
+        els.notice.style.display = "block";
       }
 
-      var previews = Array.isArray(config().previewProducts) ? config().previewProducts : [];
-      if (previews.length === 0) {
-        previews = [
-          { productTitle: "Sample upsell product", variantTitle: "Example variant", price: "19.99" },
-          { productTitle: "Another recommended item", price: "24.00" },
-        ];
-      }
+      var previews = Array.isArray(o.previewProducts) && o.previewProducts.length
+        ? o.previewProducts
+        : [
+            { productTitle: "Sample upsell product", variantTitle: "Example variant", price: "19.99" },
+            { productTitle: "Another recommended item", price: "24.00" },
+          ];
 
       previews.forEach(function (p) {
-        items.appendChild(
+        els.items.appendChild(
           renderOfferCard(
             {
               offerId: "preview",
@@ -326,15 +331,15 @@
               variantTitle: p.variantTitle || null,
               imageUrl: p.imageUrl || p.featured_image || null,
               price: p.price != null ? String(p.price) : null,
-              promotionalTitle: config().previewPromoLabel || "Example offer copy",
+              promotionalTitle: o.previewPromoLabel || "Example offer copy",
             },
             { readOnly: true },
           ),
         );
       });
 
-      root.style.display = "block";
-      root.setAttribute("data-upsell-preview", "theme-editor");
+      els.root.style.display = "block";
+      els.root.setAttribute("data-upsell-preview", "theme-editor");
     }
 
     function addOfferToCart(offer, button) {
@@ -343,7 +348,7 @@
       var original = button.textContent;
       button.replaceChildren();
       var spinner = document.createElement("span");
-      spinner.className = "cart-drawer-upsell-spinner";
+      spinner.className = P + "spinner";
       button.appendChild(spinner);
       button.appendChild(document.createTextNode("Adding..."));
 
@@ -356,7 +361,7 @@
       if (id.customerId) properties._upsell_customer_id = id.customerId;
       if (id.guestKey || id.clientId) properties._upsell_guest_key = id.guestKey || id.clientId;
 
-      track(config().clickedUrl, offer);
+      track(o.clickedUrl, offer);
       fetch("/cart/add.js", {
         method: "POST",
         credentials: "same-origin",
@@ -372,7 +377,7 @@
           return res.json();
         })
         .then(function () {
-          track(config().addedToCartUrl, offer);
+          track(o.addedToCartUrl, offer);
           var drawer = findDrawer();
           if (drawer && typeof drawer.renderContents === "function") {
             return fetch("/cart?sections=cart-drawer,cart-icon-bubble", {
@@ -388,23 +393,15 @@
                 drawer.renderContents({ sections: payload.sections || payload, id: payload.id });
                 if (typeof drawer.open === "function") drawer.open();
               })
-              .catch(function () {
-                openDrawerFallback();
-              });
+              .catch(openDrawerFallback);
           }
           openDrawerFallback();
           return Promise.resolve();
         })
+        .then(loadOffers)
         .then(function () {
-          return loadOffers();
-        })
-        .then(function () {
-          return new Promise(function (resolve) {
-            window.requestAnimationFrame(function () {
-              window.requestAnimationFrame(function () {
-                window.setTimeout(resolve, 150);
-              });
-            });
+          return new Promise(function (r) {
+            window.setTimeout(r, 150);
           });
         })
         .catch(function () {
@@ -418,8 +415,7 @@
 
     function loadOffers() {
       var root = placeRoot();
-      var c = config();
-      if (!c.eligibilityUrl || !c.shop || !root) {
+      if (!o.eligibilityUrl || !o.shop || !root) {
         if (isDesignMode() && showEditorPreviewEnabled()) {
           renderEditorEmptyState("missing shop / drawer root");
         }
@@ -448,7 +444,7 @@
             offers.forEach(function (offer) {
               if (viewedKeys[offer.offerId]) return;
               viewedKeys[offer.offerId] = true;
-              if (!isDesignMode()) track(config().viewedUrl, offer);
+              if (!isDesignMode()) track(o.viewedUrl, offer);
             });
             return;
           }
@@ -456,14 +452,14 @@
             renderEditorEmptyState("0 eligible offers");
             return;
           }
-          root.style.display = "none";
+          renderEmpty();
         })
         .catch(function () {
           if (isDesignMode() && showEditorPreviewEnabled()) {
             renderEditorEmptyState("API error");
             return;
           }
-          if (root) root.style.display = "none";
+          renderEmpty();
         });
     }
 
@@ -472,9 +468,7 @@
     }
 
     function scheduleLoads(delays) {
-      delays.forEach(function (d) {
-        scheduleLoad(d);
-      });
+      delays.forEach(scheduleLoad);
     }
 
     ["cart:updated", "cart:refresh", "cart:change", "cart:rendered"].forEach(function (evt) {
@@ -488,19 +482,13 @@
       var drawer = findDrawer();
       var inner =
         drawer &&
-        (drawer.querySelector(".drawer__inner") ||
-          drawer.querySelector(".drawer__contents") ||
-          drawer.querySelector(".cart-drawer__inner") ||
-          drawer);
+        (drawer.querySelector(".drawer__inner, .drawer__contents, .cart-drawer__inner") || drawer);
       if (root && inner && root.parentElement !== inner) scheduleLoad(0);
 
       var openDialog = drawer ? drawer.querySelector("dialog[open]") : null;
       var isOpen = Boolean(drawer && (drawer.classList.contains("active") || openDialog));
       var hasItems = Boolean(
-        drawer &&
-          drawer.querySelector(
-            'tr[id^="CartItem-"], tr.cart-items__table-row, .cart-item, [data-cart-item], [ref="cartItemRows[]"], [data-variant-id]',
-          ),
+        drawer && drawer.querySelector(ITEM_SEL + ", [data-variant-id]"),
       );
       if ((isOpen && !wasDrawerOpen) || (hasItems && !hadCartItems)) {
         scheduleLoads([80, 350, 800]);

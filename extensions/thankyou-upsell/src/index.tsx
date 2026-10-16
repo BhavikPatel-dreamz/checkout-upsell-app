@@ -74,6 +74,12 @@ export default async function extension() {
   const inEditor = isCheckoutEditor();
   const previewOnly = result.offers.length === 0 && inEditor && styles.editorPreviewEnabled;
   if (result.offers.length === 0 && !previewOnly) {
+    render(
+      <s-stack direction="block">
+        <s-text tone="neutral">Currently this product doesn't have any offer</s-text>
+      </s-stack>,
+      document.body,
+    );
     return;
   }
 

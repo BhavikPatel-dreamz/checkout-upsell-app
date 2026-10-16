@@ -135,9 +135,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
             ? rawRules.conditions
             : [{ field: "", operator: "", value: "" }],
           displayLocation:
-            offer.placement === "cart_drawer"
+            rawRules.displayLocation ??
+            (offer.placement === "cart_drawer"
               ? "cart_drawer_upsell"
-              : rawRules.displayLocation ?? "checkout_page",
+              : "checkout_page"),
           upsellProduct: rawRules.upsellProduct ?? "manual",
           triggerProductIds: Array.isArray(offer.targetProductIds)
             ? offer.targetProductIds
@@ -244,7 +245,7 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!allowed) {
       return {
         errors: {
-          placement: "Post-purchase offers are included on Silver. Free includes checkout offers only.",
+          displayLocation: "Post-purchase offers are included on Silver. Free includes checkout offers only.",
         },
       };
     }
