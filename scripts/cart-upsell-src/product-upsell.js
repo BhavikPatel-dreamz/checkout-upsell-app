@@ -259,12 +259,16 @@
 
     function renderOffers(offers) {
       var root = document.getElementById("product-upsell-root");
+      var heading = document.getElementById("product-upsell-heading") || (root && root.querySelector(".product-upsell-heading"));
       var items = document.getElementById("product-upsell-items");
       var notice = document.getElementById("product-upsell-editor-notice");
+      var empty = document.getElementById("product-upsell-empty");
       if (!root || !items) return;
 
       items.replaceChildren();
+      if (heading) heading.style.display = "";
       if (notice) notice.style.display = "none";
+      if (empty) empty.style.display = "none";
       hideError();
 
       offers.forEach(function (offer) {
@@ -274,13 +278,45 @@
       root.style.display = offers.length ? "block" : "none";
     }
 
-    function renderEditorEmptyState(reason) {
+    function renderEmpty() {
       var root = document.getElementById("product-upsell-root");
+      var heading = document.getElementById("product-upsell-heading") || (root && root.querySelector(".product-upsell-heading"));
       var items = document.getElementById("product-upsell-items");
       var notice = document.getElementById("product-upsell-editor-notice");
+      var empty = document.getElementById("product-upsell-empty");
+      if (!root) return;
+
+      if (items) items.replaceChildren();
+      if (heading) heading.style.display = "none";
+      if (notice) notice.style.display = "none";
+      hideError();
+
+      if (!empty) {
+        empty = document.createElement("div");
+        empty.id = "product-upsell-empty";
+        empty.className = "product-upsell-empty";
+        if (items) {
+          root.insertBefore(empty, items.nextSibling);
+        } else {
+          root.appendChild(empty);
+        }
+      }
+      empty.textContent = "Currently this product doesn't have any offer";
+      empty.style.display = "block";
+      root.style.display = "block";
+    }
+
+    function renderEditorEmptyState(reason) {
+      var root = document.getElementById("product-upsell-root");
+      var heading = document.getElementById("product-upsell-heading") || (root && root.querySelector(".product-upsell-heading"));
+      var items = document.getElementById("product-upsell-items");
+      var notice = document.getElementById("product-upsell-editor-notice");
+      var empty = document.getElementById("product-upsell-empty");
       if (!root || !items) return;
 
       items.replaceChildren();
+      if (heading) heading.style.display = "";
+      if (empty) empty.style.display = "none";
       hideError();
 
       if (notice) {
@@ -409,6 +445,8 @@
       if (!variantId) {
         if (isDesignMode() && showEditorPreviewEnabled()) {
           renderEditorEmptyState("no variant selected");
+        } else {
+          renderEmpty();
         }
         return;
       }
@@ -436,8 +474,7 @@
             return;
           }
 
-          var root = document.getElementById("product-upsell-root");
-          if (root) root.style.display = "none";
+          renderEmpty();
         })
         .catch(function () {
           if (generation !== loadGeneration) return;
@@ -445,8 +482,7 @@
             renderEditorEmptyState("API error");
             return;
           }
-          var root = document.getElementById("product-upsell-root");
-          if (root) root.style.display = "none";
+          renderEmpty();
         });
     }
 
