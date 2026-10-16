@@ -711,46 +711,14 @@ export default function AllUpsellsPage() {
                         >
                           <PencilIcon /> Edit
                         </AdminAppLink>
-                        <div style={{ position: "relative" }}>
-                          <button
-                            type="button"
-                            className="actionMenuBtn"
-                            onClick={() =>
-                              setOpenMenuId(openMenuId === offer.id ? null : offer.id)
-                            }
-                            aria-label={`More actions for ${offer.name}`}
-                          >
-                            <MoreDotsIcon />
-                          </button>
-                          {openMenuId === offer.id && (
-                            <div className="actionPopover">
-                              <AdminAppLink
-                                to={`/app/analytics/${encodeURIComponent(offer.id)}`}
-                                className="actionPopoverItem"
-                                onClick={() => setOpenMenuId(null)}
-                              >
-                                <ChartIcon /> View Analytics
-                              </AdminAppLink>
-                              <AdminAppLink
-                                to={`/app/offers/new?id=${encodeURIComponent(offer.id)}`}
-                                className="actionPopoverItem"
-                                onClick={() => setOpenMenuId(null)}
-                              >
-                                <PencilIcon /> Edit Offer
-                              </AdminAppLink>
-                              <button
-                                type="button"
-                                className="actionPopoverItem delete"
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  deleteOffer(offer.id);
-                                }}
-                              >
-                                <TrashIcon /> Delete Offer
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          className="actionMenuBtn"
+                          onClick={() => deleteOffer(offer.id)}
+                          aria-label={`Delete ${offer.name}`}
+                        >
+                          <TrashIcon />
+                        </button>
                       </div>
                     </div>
                   );

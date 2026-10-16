@@ -139,13 +139,6 @@ function adjustTrendMetrics(
 /* ---------------------------------------------------------------------- */
 
 
-const CopyIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-  </svg>
-);
-
 const CalendarIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -1160,30 +1153,9 @@ export default function OfferAnalyticsDetailsPage() {
           }}
         >
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#111827" }}>
-                {offer.name}
-              </h1>
-              <button
-                type="button"
-                title="Copy Offer ID"
-                onClick={() => {
-                  if (offer.id) {
-                    navigator.clipboard?.writeText(offer.id);
-                  }
-                }}
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: "2px",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  color: "#6b7280",
-                }}
-              >
-                <CopyIcon />
-              </button>
-            </div>
+            <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#111827" }}>
+              {offer.name}
+            </h1>
             <p style={{ margin: "3px 0 0", fontSize: "13px", color: "#6b7280" }}>
               Upsell offer · {offer.configuredProductCount} product
               {offer.configuredProductCount === 1 ? "" : "s"} configured
