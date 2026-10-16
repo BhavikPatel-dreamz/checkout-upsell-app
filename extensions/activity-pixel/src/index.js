@@ -1,5 +1,7 @@
 import { register } from "@shopify/web-pixels-extension";
 
+// The pixel sandbox blocks the shop origin, so activity is posted to the app host.
+
 const EVENT_TYPES = new Set([
   "product_viewed",
   "collection_viewed",
@@ -27,12 +29,14 @@ function myshopifyDomain(init) {
   return "";
 }
 
-register(({ analytics, browser, init }) => {
+register(({ analytics, browser, init, settings }) => {
   const shop = myshopifyDomain(init);
+  const apiBase = String(settings?.apiBase || "").replace(/\/$/, "");
+  const pixelToken = String(settings?.pixelToken || "");
   let lastProductView = { productId: null, variantId: null };
 
   function activityUrl() {
-    return shop ? `https://${shop}/apps/checkout-upsell/api/activity` : "";
+    return apiBase ? `${apiBase}/api/activity` : "";
   }
 
   async function clientIdFromCookie() {
@@ -63,10 +67,11 @@ register(({ analytics, browser, init }) => {
     if (!EVENT_TYPES.has(payload.eventType)) return;
     if (!payload.clientId && !payload.customerId && !payload.guestKey) return;
     const url = activityUrl();
-    if (!url) return;
+    if (!url || !pixelToken) return;
 
     const body = JSON.stringify({
       shop,
+      pixelToken,
       consented: true,
       ...payload,
     });

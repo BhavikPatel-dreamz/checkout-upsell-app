@@ -19,5 +19,10 @@ type = "single_line_text_field"
 
 [settings.fields.apiBase]
 name = "API base URL"
-description = "Unused. Browse activity is recorded through the store app proxy."
+description = "App host the pixel calls. The shop domain is blocked inside the pixel sandbox."
+type = "single_line_text_field"
+
+[settings.fields.pixelToken]
+name = "Pixel token"
+description = "Shop-scoped token the app checks before recording browse activity"
 type = "single_line_text_field"

@@ -1,5 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { env } from "../env.server";
 import { badRequest, methodNotAllowed, readJsonBody } from "../lib/http.server";
+import { shopFromPixelCredential } from "../lib/pixelToken.server";
 import { recordBrowseActivity } from "../models/browseActivity.server";
 import { shopFromVerifiedStorefrontRequest } from "../lib/verifiedShop.server";
 
@@ -24,7 +26,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!parsed.ok) return withCors(badRequest({ body: "Request body must be valid JSON." }));
 
   const body = parsed.body as Record<string, unknown>;
-  const shop = await shopFromVerifiedStorefrontRequest(request);
+  const shop =
+    (await shopFromVerifiedStorefrontRequest(request)) ??
+    shopFromPixelCredential(body.shop, body.pixelToken, env.shopifyApiSecret);
 
   if (!shop) {
     return withCors(Response.json({ error: "Unauthorized" }, { status: 401 }));

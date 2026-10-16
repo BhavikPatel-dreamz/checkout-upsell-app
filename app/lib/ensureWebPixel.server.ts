@@ -1,15 +1,19 @@
+import { env } from "../env.server";
+import { pixelTokenForShop } from "./pixelToken.server";
+
 type AdminGraphql = {
   graphql: (query: string, options?: { variables?: Record<string, unknown> }) => Promise<Response>;
 };
 
 const ensuredShops = new Set<string>();
 
-function pixelSettings() {
+function pixelSettings(shop: string) {
   return {
     accountID: "checkout-upsell",
-    // The storefront pixel posts to /apps/checkout-upsell/api/activity so Shopify
-    // signs the shop. The app origin rejects that call without a signature.
-    apiBase: "",
+    // Web pixels cannot call the shop origin. They post to the app host with a
+    // shop-scoped token. Theme blocks still use the signed app proxy.
+    apiBase: env.shopifyAppUrl.replace(/\/$/, ""),
+    pixelToken: pixelTokenForShop(shop, env.shopifyApiSecret),
   };
 }
 
@@ -106,10 +110,10 @@ async function readWebPixelId(admin: AdminGraphql): Promise<string | null> {
 }
 
 export async function ensureWebPixel(admin: AdminGraphql, shop?: string | null): Promise<void> {
-  if (shop && ensuredShops.has(shop)) return;
+  if (!shop || ensuredShops.has(shop)) return;
 
   try {
-    const settings = pixelSettings();
+    const settings = pixelSettings(shop);
     const createJson = await graphqlJson<{
       data?: {
         webPixelCreate?: {
