@@ -1,13 +1,8 @@
 import type { LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
-import { badRequest } from "../lib/http.server";
 import { authenticate } from "../shopify.server";
 import { storeCanUse } from "../models/billing.server";
 import { getFilteredDashboardMetrics, getOfferTrendMetrics } from "../models/offerAnalytics.server";
-
-function isValidShopDomain(value: unknown): value is string {
-  return typeof value === "string" && /^[a-z0-9-]+\.myshopify\.com$/.test(value);
-}
 
 async function getProductMetaMap(shop: string, productIds: string[]) {
   const uniqueProductIds = Array.from(new Set(productIds.filter(Boolean)));
@@ -39,20 +34,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const validStatuses = ["all", "live", "draft"];
   const status = validStatuses.includes(statusParam) ? statusParam : "all";
 
-  let shop: string;
-
-  try {
-    const { session } = await authenticate.admin(request);
-    shop = session.shop;
-  } catch {
-    const shopCandidate =
-      url.searchParams.get("shop") || request.headers.get("x-shopify-shop-domain") || null;
-    if (shopCandidate && isValidShopDomain(shopCandidate)) {
-      shop = shopCandidate;
-    } else {
-      return badRequest({ body: "Unable to load dashboard metrics" });
-    }
-  }
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
 
   if (!(await storeCanUse(shop, "analytics"))) {
     return Response.json({ error: "Analytics is not included on the Free plan." }, { status: 403 });

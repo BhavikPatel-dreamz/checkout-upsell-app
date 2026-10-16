@@ -1,14 +1,9 @@
 import { corsPreflight, jsonWithCors } from "../lib/cors.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { OfferPlacement } from "@prisma/client";
-import { authenticate } from "../shopify.server";
 import { findEligibleCrossSellOffers } from "../models/offerEligibility.server";
 import { rankEligibleOffers } from "../models/offerRanker.server";
-import { shopFromCheckoutSessionToken } from "../lib/checkoutSessionToken.server";
-
-function isValidShopDomain(value: unknown): value is string {
-  return typeof value === "string" && /^[a-z0-9-]+\.myshopify\.com$/.test(value);
-}
+import { shopFromVerifiedStorefrontRequest } from "../lib/verifiedShop.server";
 
 function parseCsvParam(value: string | null): string[] {
   if (!value) return [];
@@ -23,34 +18,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (request.method === "OPTIONS") return corsPreflight(request);
 
-  let shop: string | null = shopFromCheckoutSessionToken(request);
+  const shop = await shopFromVerifiedStorefrontRequest(request);
   const url = new URL(request.url);
 
   if (!shop) {
-    const proxyShop = request.headers.get("x-shopify-shop-domain");
-    if (proxyShop && isValidShopDomain(proxyShop)) {
-      shop = proxyShop;
-    }
-  }
-
-  if (!shop) {
-    const shopParam = url.searchParams.get("shop");
-    if (shopParam && isValidShopDomain(shopParam)) {
-      shop = shopParam;
-    }
-  }
-
-  if (!shop) {
-    try {
-      const { session } = await authenticate.admin(request);
-      shop = session.shop;
-    } catch {
-      shop = null;
-    }
-  }
-
-  if (!shop) {
-    return jsonWithCors({ errors: { shop: "Shop domain is required." } }, { status: 400 }, request);
+    return jsonWithCors({ error: "Unauthorized" }, { status: 401 }, request);
   }
 
   const placementParam = url.searchParams.get("placement");

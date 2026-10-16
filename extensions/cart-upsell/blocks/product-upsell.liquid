@@ -27,7 +27,7 @@
   "
 >
   <h3 class="product-upsell-heading">
-    {% if block.settings.heading_text != blank %}{{ block.settings.heading_text }}{% else %}{{ "product_upsell.title" | t }}{% endif %}
+    {% if block.settings.heading_text != blank %}{{ block.settings.heading_text | escape }}{% else %}{{ "product_upsell.title" | t | escape }}{% endif %}
   </h3>
   <div id="product-upsell-editor-notice" class="product-upsell-editor-notice" style="display: none;"></div>
   <div id="product-upsell-items" class="product-upsell-items"></div>

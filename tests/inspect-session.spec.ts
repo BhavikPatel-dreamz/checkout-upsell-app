@@ -11,11 +11,5 @@ it("find a live session token for the shop", async () => {
     take: 10,
   });
   console.log("SESSIONS", JSON.stringify(sessions, null, 2));
-  const anySession = await db.session.findFirst({
-    where: { shop: "findash-shipping-12.myshopify.com" },
-  });
-  if (anySession && "accessToken" in anySession) {
-    console.log("ACCESS_TOKEN_PRESENT", Boolean((anySession as any).accessToken));
-  }
   await db.$disconnect();
 });

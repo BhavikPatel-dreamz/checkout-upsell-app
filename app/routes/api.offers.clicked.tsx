@@ -3,10 +3,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { OfferPlacement } from "@prisma/client";
 import { badRequest, methodNotAllowed, readJsonBody } from "../lib/http.server";
 import { trackOfferClick } from "../models/offerAnalytics.server";
-
-function isValidShopDomain(value: unknown): value is string {
-  return typeof value === "string" && /^[a-z0-9-]+\.myshopify\.com$/.test(value);
-}
+import { shopFromVerifiedStorefrontRequest } from "../lib/verifiedShop.server";
 
 function parsePlacement(value: unknown): OfferPlacement | null {
   if (value === "checkout") return OfferPlacement.checkout;
@@ -24,15 +21,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!parsed.ok) return withCors(badRequest({ body: "Request body must be valid JSON." }), request);
 
   const body = parsed.body as Record<string, unknown>;
-  const shop =
-    (typeof body.shop === "string" && isValidShopDomain(body.shop) ? body.shop : null) ??
-    (request.headers.get("x-shopify-shop-domain") && isValidShopDomain(request.headers.get("x-shopify-shop-domain"))
-      ? request.headers.get("x-shopify-shop-domain")
-      : null) ??
-    new URL(request.url).searchParams.get("shop");
+  const shop = await shopFromVerifiedStorefrontRequest(request);
 
-  if (!shop || !isValidShopDomain(shop)) {
-    return withCors(badRequest({ shop: "Shop domain is required." }), request);
+  if (!shop) {
+    return withCors(Response.json({ error: "Unauthorized" }, { status: 401 }), request);
   }
 
   const offerId = typeof body.offerId === "string" ? body.offerId.trim() : "";

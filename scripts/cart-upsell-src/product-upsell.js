@@ -92,7 +92,6 @@
     function fetchEligible(variantId, generation) {
       var id = identity();
       var params = new URLSearchParams({
-        shop: o.shop || "",
         placement: "product_page",
         displayLocation: "product_page",
         productIds: o.productId || "",
@@ -116,12 +115,23 @@
         });
     }
 
-    function escapeHtml(text) {
-      return String(text || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
+    function appendText(parent, className, text) {
+      var el = document.createElement("div");
+      el.className = className;
+      el.textContent = text == null ? "" : String(text);
+      parent.appendChild(el);
+      return el;
+    }
+
+    function safeImageUrl(value) {
+      if (!value) return "";
+      try {
+        var url = new URL(String(value), window.location.origin);
+        if (url.protocol === "https:" || url.protocol === "http:") return url.href;
+      } catch (err) {
+        return "";
+      }
+      return "";
     }
 
     function showError(message) {
@@ -195,20 +205,22 @@
       card.className = "product-upsell-card";
       if (readOnly) card.classList.add("product-upsell-card--preview");
 
-      card.innerHTML =
-        (offer.imageUrl
-          ? '<img src="' + escapeHtml(offer.imageUrl) + '" alt="' + escapeHtml(offer.productTitle) + '">'
-          : '<div class="product-upsell-placeholder-img" aria-hidden="true"></div>') +
-        (offer.promotionalTitle
-          ? '<div class="product-upsell-promo">' + escapeHtml(offer.promotionalTitle) + "</div>"
-          : "") +
-        '<div class="product-upsell-product-title">' + escapeHtml(offer.productTitle) + "</div>" +
-        (offer.variantTitle
-          ? '<div class="product-upsell-variant">' + escapeHtml(offer.variantTitle) + "</div>"
-          : "") +
-        (offer.price
-          ? '<div class="product-upsell-price">$' + escapeHtml(offer.price) + "</div>"
-          : "");
+      var imageUrl = safeImageUrl(offer.imageUrl);
+      if (imageUrl) {
+        var img = document.createElement("img");
+        img.src = imageUrl;
+        img.alt = offer.productTitle || "";
+        card.appendChild(img);
+      } else {
+        var placeholder = document.createElement("div");
+        placeholder.className = "product-upsell-placeholder-img";
+        placeholder.setAttribute("aria-hidden", "true");
+        card.appendChild(placeholder);
+      }
+      if (offer.promotionalTitle) appendText(card, "product-upsell-promo", offer.promotionalTitle);
+      appendText(card, "product-upsell-product-title", offer.productTitle || "");
+      if (offer.variantTitle) appendText(card, "product-upsell-variant", offer.variantTitle);
+      if (offer.price) appendText(card, "product-upsell-price", "$" + offer.price);
 
       if (!readOnly) {
         var addBtn = document.createElement("button");
@@ -251,7 +263,7 @@
       var notice = document.getElementById("product-upsell-editor-notice");
       if (!root || !items) return;
 
-      items.innerHTML = "";
+      items.replaceChildren();
       if (notice) notice.style.display = "none";
       hideError();
 
@@ -268,7 +280,7 @@
       var notice = document.getElementById("product-upsell-editor-notice");
       if (!root || !items) return;
 
-      items.innerHTML = "";
+      items.replaceChildren();
       hideError();
 
       if (notice) {

@@ -77,13 +77,13 @@ register(({ analytics, browser, init, settings }) => {
 
     for (const url of urls) {
       try {
-        await fetch(url, {
+        const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           keepalive: true,
           body,
         });
-        return;
+        if (response.ok) return;
       } catch (error) {
         console.error("Activity pixel post failed:", url, error);
       }

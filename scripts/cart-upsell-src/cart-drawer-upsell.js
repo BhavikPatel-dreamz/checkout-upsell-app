@@ -61,13 +61,13 @@
       return s.indexOf("gid://") === 0 ? s : "gid://shopify/ProductVariant/" + s;
     }
 
-    function escapeHtml(text) {
-      return String(text == null ? "" : text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
+    function addDiv(parent, className, text) {
+      var el = document.createElement("div");
+      el.className = className;
+      el.textContent = text || "";
+      parent.appendChild(el);
     }
+
 
     function findDrawer() {
       return (
@@ -197,7 +197,6 @@
     function fetchEligible(variantIds) {
       var gids = variantIds.map(toVariantGid);
       var params = new URLSearchParams({
-        shop: config().shop || "",
         placement: "cart_drawer",
         displayLocation: "cart_drawer_upsell",
         variantIds: gids.join(","),
@@ -227,27 +226,35 @@
       card.className = "cart-drawer-upsell-card";
       if (readOnly) card.classList.add("cart-drawer-upsell-card--preview");
 
-      var img = offer.imageUrl
-        ? '<img src="' + escapeHtml(offer.imageUrl) + '" alt="' + escapeHtml(offer.productTitle) + '">'
-        : '<div class="cart-drawer-upsell-placeholder-img" aria-hidden="true"></div>';
+      var imageUrl = String(offer.imageUrl || "");
+      if (imageUrl.indexOf("http") === 0) {
+        var img = document.createElement("img");
+        img.src = imageUrl;
+        img.alt = offer.productTitle || "";
+        card.appendChild(img);
+      } else {
+        var placeholder = document.createElement("div");
+        placeholder.className = "cart-drawer-upsell-placeholder-img";
+        card.appendChild(placeholder);
+      }
 
-      card.innerHTML =
-        img +
-        '<div class="cart-drawer-upsell-details">' +
-        '<div class="cart-drawer-upsell-promo">' +
-        escapeHtml(offer.promotionalTitle || "") +
-        "</div>" +
-        '<div class="cart-drawer-upsell-product-title">' +
-        escapeHtml(offer.productTitle) +
-        "</div>" +
-        '<div class="cart-drawer-upsell-variant">' +
-        escapeHtml(offer.variantTitle || "") +
-        (offer.price
-          ? ' · <span class="cart-drawer-upsell-price">$' + escapeHtml(offer.price) + "</span>"
-          : "") +
-        "</div></div>";
+      var details = document.createElement("div");
+      details.className = "cart-drawer-upsell-details";
+      addDiv(details, "cart-drawer-upsell-promo", offer.promotionalTitle || "");
+      addDiv(details, "cart-drawer-upsell-product-title", offer.productTitle || "");
+      var variant = document.createElement("div");
+      variant.className = "cart-drawer-upsell-variant";
+      variant.appendChild(document.createTextNode(offer.variantTitle || ""));
+      if (offer.price) {
+        variant.appendChild(document.createTextNode(" · "));
+        var price = document.createElement("span");
+        price.className = "cart-drawer-upsell-price";
+        price.textContent = "$" + offer.price;
+        variant.appendChild(price);
+      }
+      details.appendChild(variant);
+      card.appendChild(details);
 
-      var details = card.querySelector(".cart-drawer-upsell-details");
       if (!readOnly) {
         var btn = document.createElement("button");
         btn.type = "button";
@@ -273,7 +280,7 @@
       var notice = document.getElementById("cart-drawer-upsell-editor-notice");
       var root = placeRoot();
       if (!items || !root) return;
-      items.innerHTML = "";
+      items.replaceChildren();
       if (notice) notice.style.display = "none";
       clearError();
       offers.forEach(function (offer) {
@@ -288,7 +295,7 @@
       var notice = document.getElementById("cart-drawer-upsell-editor-notice");
       if (!root || !items) return;
 
-      items.innerHTML = "";
+      items.replaceChildren();
       clearError();
 
       if (notice) {
@@ -334,7 +341,11 @@
       clearError();
       button.disabled = true;
       var original = button.textContent;
-      button.innerHTML = '<span class="cart-drawer-upsell-spinner"></span>Adding...';
+      button.replaceChildren();
+      var spinner = document.createElement("span");
+      spinner.className = "cart-drawer-upsell-spinner";
+      button.appendChild(spinner);
+      button.appendChild(document.createTextNode("Adding..."));
 
       var id = identity();
       var properties = {

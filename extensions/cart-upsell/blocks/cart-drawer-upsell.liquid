@@ -22,7 +22,7 @@
   "
 >
   <h3 class="cart-drawer-upsell-heading">
-    {% if block.settings.heading_text != blank %}{{ block.settings.heading_text }}{% else %}{{ "cart_upsell.title" | t }}{% endif %}
+    {% if block.settings.heading_text != blank %}{{ block.settings.heading_text | escape }}{% else %}{{ "cart_upsell.title" | t | escape }}{% endif %}
   </h3>
   <div id="cart-drawer-upsell-editor-notice" class="cart-drawer-upsell-editor-notice" style="display: none;"></div>
   <div id="cart-drawer-upsell-items" class="cart-drawer-upsell-items"></div>
