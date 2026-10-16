@@ -1,0 +1,409 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+model Shop {
+  id        String   @id @default(cuid())
+  shop      String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Offer {
+  id               String         @id @default(cuid())
+  shop             String
+  name             String
+  type             OfferType
+  placement        OfferPlacement
+  targetProductIds String[]
+  triggerRules     Json?
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  events           OfferEvent[]
+
+  @@index([shop])
+  @@index([shop, placement, isActive])
+}
+
+model BrowseActivity {
+  id           String              @id @default(cuid())
+  shop         String
+  eventType    BrowseActivityType
+  customerId   String?
+  guestKey     String?
+  clientId     String?
+  productId    String?
+  variantId    String?
+  collectionId String?
+  query        String?
+  occurredAt   DateTime            @default(now())
+  createdAt    DateTime            @default(now())
+
+  @@index([shop, occurredAt])
+  @@index([shop, customerId, occurredAt])
+  @@index([shop, guestKey, occurredAt])
+  @@index([shop, clientId, occurredAt])
+}
+
+model OfferEvent {
+  id         String          @id @default(cuid())
+  offerId    String
+  shop       String
+  eventType  OfferEventType
+  orderId    String?
+  revenue    Decimal?        @db.Decimal(12, 2)
+  createdAt  DateTime        @default(now())
+  customerId String?
+  guestKey   String?
+  placement  OfferPlacement?
+  productId  String?
+  variantId  String?
+  lineItemId String?
+  offer      Offer           @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@index([offerId, eventType])
+  @@index([shop])
+  @@index([offerId, createdAt])
+  @@index([shop, eventType, customerId])
+  @@index([shop, eventType, guestKey])
+  @@index([shop, eventType, offerId, productId, variantId, customerId])
+  @@index([shop, eventType, offerId, productId, variantId, guestKey])
+}
+
+model ProductVariant {
+  id                String   @id @default(cuid())
+  shop              String
+  variantId         String
+  variantTitle      String?
+  sku               String?
+  price             Decimal? @db.Decimal(12, 2)
+  compareAtPrice    Decimal? @db.Decimal(12, 2)
+  inventoryQuantity Int?
+  availableForSale  Boolean  @default(true)
+  selectedOptions   Json?
+  imageUrl          String?
+  productId         String
+  productTitle      String
+  productHandle     String?
+  productStatus     String?
+  syncedAt          DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([shop, variantId])
+  @@index([shop])
+  @@index([shop, productId])
+}
+
+model SyncLog {
+  id         String    @id @default(cuid())
+  shop       String
+  status     String    @default("running")
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  pages      Int       @default(0)
+  upserted   Int       @default(0)
+  removed    Int       @default(0)
+  estimated  Int?
+  error      String?
+  createdAt  DateTime  @default(now())
+  cursor     String?
+
+  @@index([shop, startedAt])
+}
+
+model Product {
+  id              BigInt    @id @default(autoincrement())
+  title           String?
+  showUpsell      Boolean   @default(true) @map("show_upsell")
+  isCondition     Boolean?  @map("is_condition")
+  upsellOn        String?   @map("upsell_on") @db.VarChar(255)
+  upsellDaterange String?   @map("upsell_daterange") @db.VarChar(100)
+  product         String?   @db.VarChar(255)
+  shopDomain      String?   @map("shop_domain") @db.VarChar(255)
+  productId       String?   @map("product_id")
+  variantId       String?   @map("variant_id")
+  offer           Int?
+  isDiscount      Int?      @map("is_discount")
+  promotionTitle  String?   @map("promotion_title") @db.VarChar(255)
+  action          Boolean   @default(true)
+  attribute       String?   @db.VarChar(100)
+  createdAt       DateTime? @default(now()) @map("created_at")
+  updatedAt       DateTime? @updatedAt @map("updated_at")
+
+  @@map("products")
+}
+
+model UpsellCriteria {
+  id                Int      @id @default(autoincrement())
+  upsellId          Int?     @map("upsell_id")
+  conditionType     String?  @map("condition_type") @db.VarChar(255)
+  conditionCriteria String?  @map("condition_criteria") @db.VarChar(255)
+  conditionValue    String?  @map("condition_value") @db.VarChar(255)
+  andOr             String?  @map("and_or") @db.VarChar(255)
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("upsell_criteria")
+}
+
+model UpsellHistory {
+  id         Int      @id @default(autoincrement())
+  upsellId   BigInt?  @map("upsell_id")
+  customerId String?  @map("customer_id") @db.VarChar(255)
+  productId  String?  @map("product_id") @db.VarChar(255)
+  variantId  String?  @map("variant_id") @db.VarChar(255)
+  shopdomain String?  @db.VarChar(255)
+  action     String   @default("1")
+  attribute  String?  @db.VarChar(255)
+  type       String?  @db.VarChar(20)
+  dateTime   DateTime @default(now()) @map("date_time")
+
+  @@map("upsell_history")
+}
+
+model Condition {
+  id              Int      @id @default(autoincrement())
+  conditionTypeId Int      @map("condition_type_id")
+  conditionName   String   @map("condition_name") @db.VarChar(255)
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("conditions")
+}
+
+model ConditionType {
+  id        Int       @id @default(autoincrement())
+  type      String    @db.VarChar(255)
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("condition_type")
+}
+
+model Discount {
+  id         Int      @id @default(autoincrement())
+  variantId  String   @map("variant_id") @db.VarChar(255)
+  shop       String   @db.VarChar(255)
+  discountId String   @map("discount_id") @db.VarChar(255)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("discounts")
+}
+
+model Setting {
+  id              BigInt    @id @default(autoincrement())
+  shopDomain      String?   @map("shop_domain") @db.VarChar(255)
+  backgroundColor String?   @map("background_color") @db.VarChar(255)
+  buttonTitle     String?   @map("button_title") @db.VarChar(255)
+  textColor       String?   @map("text_color") @db.VarChar(255)
+  borderColor     String?   @map("border_color") @db.VarChar(20)
+  titleSize       String?   @map("title_size") @db.VarChar(20)
+  buttonBorder    String?   @map("button_border") @db.VarChar(20)
+  buttonRadious   String?   @map("button_radious") @db.VarChar(20)
+  createdAt       DateTime? @map("created_at")
+  updatedAt       DateTime? @default(now()) @map("updated_at")
+
+  @@map("setting")
+}
+
+model StoreDetail {
+  id              Int       @id @default(autoincrement())
+  url             String    @db.VarChar(255)
+  accesstoken     String?   @db.VarChar(255)
+  storefrontToken String?   @map("storefront_token") @db.VarChar(255)
+  isPlus          Boolean?  @map("is_plus")
+  name            String?   @db.VarChar(150)
+  email           String?   @db.VarChar(150)
+  timeZone        String?   @map("time_zone") @db.VarChar(150)
+  moneyFormat     String?   @map("money_format") @db.VarChar(150)
+  planDisplayName String?   @map("plan_display_name") @db.VarChar(50)
+  planName        String?   @map("plan_name") @db.VarChar(50)
+  createdAt       DateTime? @default(now()) @map("created_at")
+  updatedAt       DateTime? @default(now()) @map("updated_at")
+  isActive        Boolean   @default(true) @map("is_active")
+
+  @@map("storedetails")
+}
+
+model StoreHistory {
+  id          Int      @id @default(autoincrement())
+  shop        String?  @db.VarChar(255)
+  email       String?  @db.VarChar(255)
+  isInstalled Boolean? @map("is_installed")
+  dateTime    DateTime @default(now()) @map("date_time")
+
+  @@map("store_history")
+}
+
+model RecurringApplicationCharge {
+  id        BigInt   @id @default(autoincrement())
+  clientId  Int      @map("client_id")
+  chargeId  String?  @map("charge_id") @db.VarChar(255)
+  name      String?  @db.VarChar(255)
+  price     String?  @db.VarChar(10)
+  response  String?
+  isApprove Boolean  @default(false) @map("is_approve")
+  isActive  Boolean  @default(true) @map("is_active")
+  created   DateTime @default(now())
+  modified  DateTime @default(now())
+
+  @@map("recurring_application_charge")
+}
+
+/// Old recurring charges, mapped onto the shop domain. Charge response bodies are not copied.
+model SubscriptionHistory {
+  id        Int      @id
+  shop      String
+  chargeId  String?
+  name      String?
+  price     String?
+  approved  Boolean  @default(false)
+  active    Boolean  @default(false)
+  chargedAt DateTime
+
+  @@index([shop, chargedAt])
+}
+
+/// Per-store plan terms. The public price and trial are $9.99 / 15 days.
+model StoreBillingOffer {
+  shop             String    @id
+  plan             String    @default("free")
+  discountPercent  Int       @default(0)
+  trialDays        Int       @default(15)
+  legacySubscriber Boolean   @default(false)
+  shopifyChargeId  String?
+  cancelledAt      DateTime?
+  updatedAt        DateTime  @updatedAt
+}
+
+model Webhook {
+  id        Int       @id @default(autoincrement())
+  clientId  Int?      @map("client_id")
+  webhookId String?   @map("webhook_id") @db.VarChar(255)
+  topic     String?   @db.VarChar(255)
+  address   String?   @db.VarChar(255)
+  response  String?
+  created   DateTime? @default(now())
+  modified  DateTime? @default(now())
+
+  @@map("webhooks")
+}
+
+model Gdpr {
+  id        Int      @id @default(autoincrement())
+  topic     String   @db.VarChar(25)
+  response  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  @@map("GDPR")
+}
+
+/// One row per shop: whether this app is allowed to keep that store's data.
+model ShopDataPolicy {
+  shop               String    @id
+  dataStorageAllowed Boolean   @default(true)
+  redactedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+/// GDPR webhook log, scoped to a shop. Customer email and phone are not stored.
+model GdprEvent {
+  id         String   @id @default(cuid())
+  shop       String
+  topic      String
+  legacyId   Int?     @unique
+  webhookId  String?  @unique
+  customerId String?
+  status     String
+  receivedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([shop, receivedAt])
+  @@index([shop, topic])
+}
+
+model JobsHistory {
+  id        BigInt   @id @default(autoincrement())
+  store     String?  @db.VarChar(200)
+  job       String?  @db.VarChar(100)
+  status    String   @default("0")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("jobs_history")
+}
+
+model Currency {
+  id             Int    @id @default(autoincrement())
+  currencyCode   String @map("currency_code") @db.VarChar(3)
+  currencyName   String @map("currency_name") @db.VarChar(50)
+  currencySymbol String @map("currency_symbol") @db.VarChar(50)
+
+  @@map("currency")
+}
+
+enum OfferType {
+  cross_sell
+  bundle
+  volume
+  free_gift
+  subscription
+  ai_recommend
+}
+
+enum OfferPlacement {
+  product_page
+  cart_drawer
+  checkout
+  post_purchase
+  order_status
+}
+
+enum OfferEventType {
+  viewed
+  accepted
+  declined
+  clicked
+  added_to_cart
+  purchased
+}
+
+enum BrowseActivityType {
+  product_viewed
+  collection_viewed
+  search_submitted
+  product_added_to_cart
+  variant_changed
+  time_on_page
+}

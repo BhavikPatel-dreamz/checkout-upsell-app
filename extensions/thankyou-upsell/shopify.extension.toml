@@ -1,0 +1,70 @@
+uid = "c8f1a4e2-7b93-4d16-a0e5-3f9c2b8d1a70e6c4b5d8"
+api_version = "2025-10"
+
+[[extensions]]
+name = "Thank You Upsell"
+handle = "thankyou-upsell"
+type = "ui_extension"
+
+  [extensions.capabilities]
+    network_access = true
+
+[extensions.settings]
+
+[[extensions.settings.fields]]
+key = "api_base"
+name = "App API URL"
+description = "Production app origin with no trailing slash (https://upsell.dreamzapps.com). Leave blank to use production. Do not use the local tunnel host."
+type = "single_line_text_field"
+
+  [[extensions.targeting]]
+  target = "purchase.thank-you.block.render"
+  module = "./src/index.tsx"
+
+  [[extensions.settings.fields]]
+  key = "heading_text"
+  type = "single_line_text_field"
+  name = "Heading text"
+  description = "Shown above the upsell offers."
+
+  [[extensions.settings.fields]]
+  key = "button_label"
+  type = "single_line_text_field"
+  name = "Button label"
+  description = "Text shown on the accept/add button for each offer."
+
+  [[extensions.settings.fields]]
+  key = "use_secondary_button"
+  type = "boolean"
+  name = "Use secondary button style"
+  description = "Off shows a solid primary button, on shows an outlined secondary button."
+
+  [[extensions.settings.fields]]
+  key = "price_standard_appearance"
+  type = "boolean"
+  name = "Use standard price text style"
+  description = "Off shows a subdued price, on shows standard emphasis."
+
+  [[extensions.settings.fields]]
+  key = "card_spacing"
+  type = "single_line_text_field"
+  name = "Card spacing"
+  description = "Enter tight, base, or loose. Defaults to tight if left blank or invalid."
+
+  [[extensions.settings.fields]]
+  key = "show_border"
+  type = "boolean"
+  name = "Show card border"
+  description = "Toggle the border around each offer card."
+
+  [[extensions.settings.fields]]
+  key = "show_editor_preview"
+  type = "boolean"
+  name = "Show preview when no offer matches"
+  description = "In the checkout editor only: show a message and sample cards when no thank-you offer matches."
+
+  [[extensions.settings.fields]]
+  key = "editor_preview_message"
+  type = "single_line_text_field"
+  name = "No-match message (editor)"
+  description = "Shown in the checkout editor when no offer matches. Leave blank for the default message."

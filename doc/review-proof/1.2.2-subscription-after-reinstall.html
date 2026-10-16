@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Subscription · after uninstall and reinstall</title>
+  <link rel="stylesheet" href="../../app/styles/billing.css" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f1f2f4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .shell { display: flex; min-height: 100vh; }
+    .nav {
+      width: 240px;
+      background: #fff;
+      border-right: 1px solid #e4e8ec;
+      padding: 16px 12px;
+    }
+    .nav h3 { margin: 0 12px 16px; font-size: 13px; color: #6d7175; font-weight: 650; }
+    .nav a {
+      display: block;
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: #202223;
+      text-decoration: none;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+    .nav a.active { background: #f1f2f4; font-weight: 650; }
+    .main { flex: 1; background: #fff; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="nav">
+      <h3>Dynamic Dreamz Upsell</h3>
+      <a>Dashboard</a>
+      <a>Create Upsell</a>
+      <a>All Upsells</a>
+      <a>Product Sync</a>
+      <a>Analytics</a>
+      <a class="active">Subscription</a>
+      <a>Settings</a>
+      <a>Onboarding</a>
+    </aside>
+    <div class="main">
+      <div class="billingPage">
+        <header class="billingHeader">
+          <div>
+            <h1>Subscription</h1>
+            <p>Pick a plan for this store. You can change it or cancel anytime.</p>
+          </div>
+        </header>
+
+        <section class="billingBanner">
+          <div>
+            <strong>Free plan</strong>
+            <span>No monthly charge.</span>
+          </div>
+        </section>
+
+        <section class="billingGrid">
+          <article class="planCard planCardCurrent">
+            <span class="planBadge">Current plan</span>
+            <h2 class="planName">Free</h2>
+            <p class="planPrice">$0</p>
+            <p class="planTrial">No trial needed</p>
+            <p class="planSummary">Two checkout offers at full price. Analytics is not included.</p>
+            <ul class="planFeatures">
+              <li><span class="planMark">✓</span>Up to 2 offers</li>
+              <li><span class="planMark">✓</span>Checkout upsells</li>
+              <li class="missing"><span class="planMark">–</span>Post-purchase upsells</li>
+              <li class="missing"><span class="planMark">–</span>Analytics</li>
+              <li class="missing"><span class="planMark">–</span>AI recommendations</li>
+              <li class="missing"><span class="planMark">–</span>Free and % discount on the upsell product</li>
+            </ul>
+            <button class="planButton planButtonCurrent" type="button" disabled>Current plan</button>
+          </article>
+
+          <article class="planCard planCardPopular">
+            <span class="planBadge">Most popular</span>
+            <h2 class="planName">Silver</h2>
+            <p class="planPrice">$9.99<small>/ month</small></p>
+            <p class="planTrial">15-day free trial, cancel anytime</p>
+            <p class="planSummary">Up to 10 offers, plus analytics. Upsells stay at full catalog price.</p>
+            <ul class="planFeatures">
+              <li><span class="planMark">✓</span>Up to 10 offers</li>
+              <li><span class="planMark">✓</span>Checkout upsells</li>
+              <li><span class="planMark">✓</span>Post-purchase upsells</li>
+              <li><span class="planMark">✓</span>Analytics</li>
+              <li class="missing"><span class="planMark">–</span>AI recommendations</li>
+              <li class="missing"><span class="planMark">–</span>Free and % discount on the upsell product</li>
+            </ul>
+            <a class="planButton" href="#">Choose Silver</a>
+          </article>
+        </section>
+
+        <p class="billingNote">
+          Free and Silver are both chosen on Shopify’s plan page, so a paid charge does not stay active after you switch to Free.
+          <a href="#">Open the Shopify plan page</a>.
+        </p>
+
+        <section class="billingHistory">
+          <h2>Previous charges</h2>
+          <table class="billingTable">
+            <thead>
+              <tr>
+                <th>Charge</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Free</td>
+                <td>$0.00</td>
+                <td><span class="statusPill">Approved, inactive</span></td>
+                <td>2 Oct 2026</td>
+              </tr>
+              <tr>
+                <td>Silver</td>
+                <td>$9.99</td>
+                <td><span class="statusPill">Approved, inactive</span></td>
+                <td>1 Oct 2026</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+name = "Activity Pixel"
+type = "web_pixel_extension"
+uid = "a4c8e91b-7f12-4d3a-9c6e-21b8f0d47a11"
+runtime_context = "strict"
+
+[customer_privacy]
+analytics = true
+marketing = false
+preferences = false
+sale_of_data = "disabled"
+
+[settings]
+type = "object"
+
+[settings.fields.accountID]
+name = "Account ID"
+description = "Internal pixel account identifier"
+type = "single_line_text_field"
+
+[settings.fields.apiBase]
+name = "API base URL"
+description = "App backend URL used to record browse activity"
+type = "single_line_text_field"

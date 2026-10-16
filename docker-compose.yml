@@ -1,0 +1,25 @@
+# Local development database for the Checkout Upsell app.
+# Start:  docker compose up -d
+# Stop:   docker compose down          (keeps data)
+# Reset:  docker compose down -v       (deletes data volume)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: checkout-upsell-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: upsell
+      POSTGRES_PASSWORD: upsell
+      POSTGRES_DB: checkout_upsell
+    ports:
+      - "5434:5432"
+    volumes:
+      - upsell_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U upsell -d checkout_upsell"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  upsell_pgdata:

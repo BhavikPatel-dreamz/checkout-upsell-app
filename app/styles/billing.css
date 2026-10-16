@@ -1,0 +1,279 @@
+.billingPage {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 24px 48px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1a1d23;
+}
+
+.billingHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.billingHeader h1 {
+  margin: 0;
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+}
+
+.billingHeader p {
+  margin: 6px 0 0;
+  color: #5c6778;
+  font-size: 0.9rem;
+}
+
+.billingBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+  padding: 16px 18px;
+  border: 1px solid #d7efe6;
+  border-radius: 12px;
+  background: #f3fbf7;
+}
+
+.billingBanner strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.billingBanner span {
+  display: block;
+  margin-top: 4px;
+  color: #3d4a42;
+  font-size: 0.84rem;
+}
+
+.billingCancel {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #e4b4b4;
+  border-radius: 8px;
+  background: #fff;
+  color: #9b2c2c;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.billingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 760px;
+  margin-bottom: 28px;
+}
+
+.planCard {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 18px 18px;
+  border: 1px solid #e4e8ec;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.planCardCurrent {
+  border-color: #008060;
+  box-shadow: 0 0 0 1px #008060;
+}
+
+.planCardPopular {
+  position: relative;
+}
+
+.planBadge {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e7f6f1;
+  color: #08744f;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.planName {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.planPrice {
+  margin: 10px 0 0;
+  font-size: 1.8rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+
+.planPrice small {
+  margin-left: 4px;
+  color: #6b7482;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.planWas {
+  margin: 2px 0 0;
+  color: #8a93a1;
+  font-size: 0.78rem;
+  text-decoration: line-through;
+}
+
+.planTrial {
+  margin: 8px 0 0;
+  color: #08744f;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.planSummary {
+  margin: 10px 0 14px;
+  color: #5c6778;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.planFeatures {
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.planFeatures li {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #2a3140;
+  font-size: 0.84rem;
+}
+
+.planFeatures li.missing {
+  color: #9aa3af;
+}
+
+.planMark {
+  width: 16px;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.planCard form {
+  margin-top: auto;
+  width: 100%;
+}
+
+.planButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin-top: auto;
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: #008060;
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.planButtonSecondary {
+  background: #fff;
+  color: #1a1d23;
+  border: 1px solid #d5dbe3;
+}
+
+.planButtonCurrent {
+  background: #eef1f4;
+  color: #5c6778;
+  cursor: default;
+}
+
+.billingNote {
+  margin: -8px 0 24px;
+  color: #6b7482;
+  font-size: 0.82rem;
+}
+
+.billingNote a {
+  color: #08744f;
+  font-weight: 650;
+}
+
+.billingHistory {
+  overflow: hidden;
+  border: 1px solid #e4e8ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.billingHistory h2 {
+  margin: 0;
+  padding: 16px 18px 0;
+  font-size: 1rem;
+}
+
+.billingHistory p {
+  margin: 0;
+  padding: 8px 18px 16px;
+  color: #6b7482;
+  font-size: 0.84rem;
+}
+
+.billingTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.billingTable th,
+.billingTable td {
+  padding: 12px 18px;
+  border-top: 1px solid #eef1f4;
+  text-align: left;
+  font-size: 0.84rem;
+}
+
+.billingTable th {
+  color: #6b7482;
+  font-weight: 650;
+}
+
+.statusPill {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef1f4;
+  color: #5c6778;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.statusPillOn {
+  background: #e7f6f1;
+  color: #08744f;
+}
+
+@media (max-width: 860px) {
+  .billingHeader,
+  .billingBanner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .billingGrid {
+    grid-template-columns: 1fr;
+  }
+}
